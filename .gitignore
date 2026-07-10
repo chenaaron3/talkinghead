@@ -1,0 +1,29 @@
+node_modules
+dist
+.DS_Store
+.env
+out
+
+# Schedule automation (local state + secrets)
+schedule-manifest.json
+.playwright/
+secrets/*
+!secrets/.gitkeep
+
+# Local whisper.cpp install + models
+whisper.cpp/
+tmp.json
+tmp/
+
+# Generated per-episode artifacts (source video + config stay tracked)
+source/**/generated/
+public/episodes/
+src/generated/
+
+# Large source videos — keep configs, ignore media
+source/**/*.mp4
+source/**/*.mov
+source/**/*.webm
+source/**/*.MP4
+source/**/*.MOV
+source/**/*.WEBM

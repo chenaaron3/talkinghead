@@ -1,0 +1,9 @@
+# Daily publish slot (wall clock in timezone)
+time: "17:00"
+timezone: America/New_York
+
+# Platforms to schedule (order = run order)
+platforms:
+  - youtube
+  - instagram
+  - tiktok

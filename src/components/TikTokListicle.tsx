@@ -1,13 +1,8 @@
-import React from "react";
-import {
-  AbsoluteFill,
-  interpolate,
-  spring,
-  useCurrentFrame,
-  useVideoConfig,
-} from "remotion";
+import React from 'react';
+import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 
-import { FADE_DURATION_SEC } from "../lib/constants";
+import { FADE_DURATION_SEC } from '../lib/constants';
+import { Sfx } from './Sfx';
 
 import type { ListicleItem, ListicleOverlay } from "../lib/types";
 
@@ -165,15 +160,25 @@ export const TikTokListicle: React.FC<{
   const { fps } = useVideoConfig();
   const fadeFrames = Math.max(1, Math.round(FADE_DURATION_SEC * fps));
 
+  // Rendered outside the visual's early returns so pops aren't cut short.
+  const sfx = listicle.items.map((item, index) => (
+    <Sfx
+      key={`${item.revealFrame}-${index}`}
+      src="sfx/mouse_click.wav"
+      from={item.revealFrame}
+      durationSec={0.2}
+    />
+  ));
+
   if (frame < listicle.startFrame || frame >= listicle.endFrame) {
-    return null;
+    return sfx;
   }
 
   const visibleItems = listicle.items.filter(
     (item) => frame >= item.revealFrame,
   );
   if (visibleItems.length === 0) {
-    return null;
+    return sfx;
   }
 
   const opacity = fadeOpacity(
@@ -184,24 +189,27 @@ export const TikTokListicle: React.FC<{
   );
 
   return (
-    <AbsoluteFill
-      style={{
-        justifyContent: "flex-start",
-        alignItems: "center",
-        pointerEvents: "none",
-        opacity,
-      }}
-    >
-      <div style={CARD_STYLE}>
-        {visibleItems.map((item, index) => (
-          <ListicleRow
-            key={`${item.revealFrame}-${item.label}-${index}`}
-            item={item}
-            frame={frame}
-            fps={fps}
-          />
-        ))}
-      </div>
-    </AbsoluteFill>
+    <>
+      {sfx}
+      <AbsoluteFill
+        style={{
+          justifyContent: "flex-start",
+          alignItems: "center",
+          pointerEvents: "none",
+          opacity,
+        }}
+      >
+        <div style={CARD_STYLE}>
+          {visibleItems.map((item, index) => (
+            <ListicleRow
+              key={`${item.revealFrame}-${item.label}-${index}`}
+              item={item}
+              frame={frame}
+              fps={fps}
+            />
+          ))}
+        </div>
+      </AbsoluteFill>
+    </>
   );
 };

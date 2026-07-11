@@ -2,6 +2,7 @@ import {
   FILLER_PADDING_SEC,
   FILLER_WORDS,
   GAP_THRESHOLD_SEC,
+  TRANSCRIPTION_ARTIFACTS,
 } from "./constants";
 import type {
   CaptionGroup,
@@ -21,6 +22,16 @@ function isFiller(word: string): boolean {
   const token = normalizeToken(word);
   if (!token) return false;
   return (FILLER_WORDS as readonly string[]).includes(token);
+}
+
+function isTranscriptionArtifact(word: string): boolean {
+  const token = normalizeToken(word);
+  if (!token) return /BLANK_AUDIO/i.test(word);
+  return (TRANSCRIPTION_ARTIFACTS as readonly string[]).includes(token);
+}
+
+function isSkippedWord(word: string): boolean {
+  return isFiller(word) || isTranscriptionArtifact(word);
 }
 
 /** Strip punctuation for on-screen captions (keep letters/numbers/apostrophes). */
@@ -80,7 +91,7 @@ export function buildKeepSegments(options: {
   }
 
   // Split keep intervals on long internal silence using word boundaries.
-  const keepWords = words.filter((w) => !isFiller(w.word));
+  const keepWords = words.filter((w) => !isSkippedWord(w.word));
   const speechKeep: Interval[] = [];
 
   for (const region of keepRaw) {
@@ -181,7 +192,7 @@ export function buildCaptionGroups(options: {
 
   const captionWords: CaptionWord[] = [];
   for (const word of words) {
-    if (isFiller(word.word)) continue;
+    if (isSkippedWord(word.word)) continue;
 
     const outStart = mapSourceTimeToOutput(word.start, segments);
     const outEnd = mapSourceTimeToOutput(word.end, segments);

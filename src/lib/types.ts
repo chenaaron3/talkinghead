@@ -2,6 +2,18 @@ export type EpisodeConfig = {
   title: string;
   titleDurationSec: number;
   captionsAtATime: number;
+  listicle: boolean;
+};
+
+export type ListicleItem = {
+  label: string;
+  revealFrame: number;
+};
+
+export type ListicleOverlay = {
+  startFrame: number;
+  endFrame: number;
+  items: ListicleItem[];
 };
 
 export type TranscriptWord = {
@@ -15,7 +27,6 @@ export type Transcript = {
   language: string;
   duration: number;
   words: TranscriptWord[];
-  segments: Array<{ start: number; end: number; text: string }>;
   source: {
     path: string;
     size: number;
@@ -63,4 +74,5 @@ export type EpisodeProps = {
     durationInFrames: number;
   }>;
   captionGroups: CaptionGroup[];
+  listicle: ListicleOverlay | null;
 };

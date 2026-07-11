@@ -21,6 +21,7 @@ const fallbackProps: EpisodeProps = {
   captionsAtATime: 1,
   sections: [{ trimBefore: 0, trimAfter: 30 * 10, durationInFrames: 30 * 10 }],
   captionGroups: [],
+  listicle: null,
 };
 
 const propsMap = allProps as Record<string, EpisodeProps>;

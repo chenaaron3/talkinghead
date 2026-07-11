@@ -1,3 +1,4 @@
+import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -7,6 +8,7 @@ import {
   resolveEpisodeDir,
 } from "./config";
 import { buildCaptionGroups, buildKeepSegments } from "./cuts";
+import { buildListicle } from "./listicle";
 import type { EpisodeProps, Transcript } from "./types";
 import {
   GENERATED_EPISODES_INDEX,
@@ -172,6 +174,16 @@ async function main() {
     captionsAtATime: config.captionsAtATime,
   });
 
+  const listicle = await buildListicle({
+    enabled: config.listicle,
+    words: transcript.words,
+    segments,
+    fps,
+    transcriptPath,
+    cachePath: path.join(generatedDir, "listicle.json"),
+    force,
+  });
+
   const durationInFrames = segments.reduce(
     (sum, seg) => sum + seg.durationInFrames,
     0,
@@ -195,6 +207,7 @@ async function main() {
       durationInFrames: seg.durationInFrames,
     })),
     captionGroups,
+    listicle,
   };
 
   writeJson(path.join(generatedDir, "props.json"), props);

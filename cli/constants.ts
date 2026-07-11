@@ -27,6 +27,9 @@ export const FILLER_WORDS = [
   "mhm",
 ] as const;
 
+/** Whisper silence markers — never shown as captions */
+export const TRANSCRIPTION_ARTIFACTS = ["blank_audio"] as const;
+
 /** Fallback when titleDurationSec is omitted from config */
 export const DEFAULT_TITLE_DURATION_SEC = 5;
 /** Fallback when captionsAtATime is omitted from config */

@@ -10,12 +10,15 @@
     "@remotion/install-whisper-cpp": "4.0.487",
     "@remotion/media": "4.0.487",
     "@remotion/renderer": "4.0.487",
+    "dotenv": "^17.4.2",
     "googleapis": "^173.0.0",
+    "openai": "^6.46.0",
     "playwright": "^1.61.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.487",
-    "yaml": "^2.8.0"
+    "yaml": "^2.8.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@remotion/eslint-config-flat": "4.0.487",

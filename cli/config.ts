@@ -106,6 +106,7 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     titleDurationSec: Number(
       merged.titleDurationSec ?? DEFAULT_TITLE_DURATION_SEC,
     ),
+    listicle: Boolean(merged.listicle ?? false),
   };
 }
 

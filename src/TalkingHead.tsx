@@ -5,6 +5,7 @@ import { Video } from '@remotion/media';
 
 import { TikTokCaptions } from './components/TikTokCaptions';
 import { TikTokTitle } from './components/TikTokTitle';
+import { useListicleOverlay } from './hooks/useListicleOverlay';
 import { SAFE_AREA } from './lib/constants';
 
 import type { EpisodeProps } from "./lib/types";
@@ -15,8 +16,10 @@ export const TalkingHead: React.FC<EpisodeProps> = ({
   sections,
   captionGroups,
   titleDurationSec,
+  listicle,
 }) => {
   const { fps } = useVideoConfig();
+  const { showTitle, node: listicleNode } = useListicleOverlay(listicle);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
@@ -52,10 +55,12 @@ export const TalkingHead: React.FC<EpisodeProps> = ({
           width: "auto",
           height: "auto",
           pointerEvents: "none",
-          // backgroundColor: "#fff",
         }}
       >
-        <TikTokTitle title={title} durationSec={titleDurationSec} />
+        {showTitle ? (
+          <TikTokTitle title={title} durationSec={titleDurationSec} />
+        ) : null}
+        {listicleNode}
         <TikTokCaptions groups={captionGroups} />
       </AbsoluteFill>
     </AbsoluteFill>

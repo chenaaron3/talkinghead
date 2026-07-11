@@ -94,7 +94,7 @@ export async function runWhisper(options: {
           probability: caption.confidence ?? null,
         };
       })
-      .filter((w) => w.word.length > 0);
+      .filter((w) => w.word.length > 0 && !/\[BLANK_AUDIO\]/i.test(w.word));
 
     // Snap ends so words don't overlap
     for (let i = 0; i < words.length - 1; i++) {
@@ -108,17 +108,9 @@ export async function runWhisper(options: {
       }
     }
 
-    const segments = words.map((w) => ({
-      start: w.start,
-      end: w.end,
-      text: w.word,
-    }));
-
     const duration = Math.max(0, ...words.map((w) => w.end));
 
-    console.log(
-      `[whisper] wrote ${words.length} words / ${segments.length} segments`,
-    );
+    console.log(`[whisper] wrote ${words.length} words`);
 
     // Remotion's whisper.cpp wrapper leaves tmp.json in the project root
     const leftover = path.join(ROOT, "tmp.json");
@@ -130,7 +122,6 @@ export async function runWhisper(options: {
       language: whisperCppOutput.result.language || WHISPER_LANGUAGE,
       duration,
       words,
-      segments,
     };
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });

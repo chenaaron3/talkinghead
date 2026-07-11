@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { loadEpisodeConfig, resolveEpisodeDir } from "../config";
-import { ROOT } from "../types";
+import { loadEpisodeConfig, resolveEpisodeDir } from "../helpers/config";
+import { ROOT } from "../helpers/types";
 import { formatLocalSlot, nextPublishAt } from "./cadence";
 import { loadScheduleConfig } from "./config";
 import {

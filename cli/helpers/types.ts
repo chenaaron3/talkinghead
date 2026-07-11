@@ -1,8 +1,8 @@
 import path from "node:path";
 
-export * from "../src/lib/types";
+export * from "../../src/lib/types";
 
-export const ROOT = path.resolve(__dirname, "..");
+export const ROOT = path.resolve(__dirname, "../..");
 export const SOURCE_DIR = path.join(ROOT, "source");
 export const DEFAULT_CONFIG_PATH = path.join(ROOT, "config.default.yaml");
 export const PUBLIC_EPISODES_DIR = path.join(ROOT, "public", "episodes");

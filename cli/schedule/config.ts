@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
-import { ROOT } from "../types";
+import { ROOT } from "../helpers/types";
 import type { PlatformId, ScheduleConfig } from "./types";
 
 export const SCHEDULE_CONFIG_PATH = path.join(ROOT, "schedule.config.yaml");

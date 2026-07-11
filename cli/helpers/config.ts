@@ -7,7 +7,7 @@ import {
 } from "./constants";
 import {
   DEFAULT_CONFIG_PATH,
-  EpisodeConfig,
+  type EpisodeConfig,
   SOURCE_DIR,
   VIDEO_EXTENSIONS,
 } from "./types";
@@ -107,6 +107,8 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
       merged.titleDurationSec ?? DEFAULT_TITLE_DURATION_SEC,
     ),
     listicle: Boolean(merged.listicle ?? false),
+    punchIns: Boolean(merged.punchIns ?? false),
+    emphasis: Boolean(merged.emphasis ?? false),
   };
 }
 

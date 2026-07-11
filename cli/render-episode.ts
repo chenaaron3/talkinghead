@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import type { EpisodeProps } from "./types";
-import { ROOT } from "./types";
+import type { EpisodeProps } from "./helpers/types";
+import { ROOT } from "./helpers/types";
 
 function runRemotion(args: string[], label: string) {
   console.log(`[${label}] pnpm ${args.join(" ")}`);

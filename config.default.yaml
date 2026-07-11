@@ -1,2 +1,4 @@
 titleDurationSec: 5
-captionsAtATime: 3
+captionsAtATime: 5
+punchIns: true
+emphasis: true

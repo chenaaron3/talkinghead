@@ -1,9 +1,15 @@
 import React from 'react';
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 
-import { FADE_DURATION_SEC } from '../lib/constants';
+import { CAPTION_FADE_DURATION_SEC } from '../lib/constants';
 
-import type { CaptionGroup, CaptionWord } from "../lib/types";
+import type { CaptionEmphasis, CaptionGroup, CaptionWord } from "../lib/types";
+
+const EMPHASIS_COLORS: Record<CaptionEmphasis, string> = {
+  positive: "#00E676",
+  negative: "#FF5252",
+};
+const EMPHASIS_POP_SEC = 0.18;
 
 const CAPTION_STYLE: React.CSSProperties = {
   fontFamily: '"Montserrat", "Arial Black", Impact, sans-serif',
@@ -66,7 +72,7 @@ export const TikTokCaptions: React.FC<{
 }> = ({ groups }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const fadeFrames = Math.max(1, Math.round(FADE_DURATION_SEC * fps));
+  const fadeFrames = Math.max(1, Math.round(CAPTION_FADE_DURATION_SEC * fps));
 
   const active = groups.find(
     (group) => frame >= group.startFrame && frame < group.endFrame,
@@ -97,6 +103,22 @@ export const TikTokCaptions: React.FC<{
       >
         {active.words.map((word, index) => {
           const spoken = frame >= word.startFrame;
+
+          let color: string | undefined;
+          let transform: string | undefined;
+          if (word.emphasis) {
+            color = EMPHASIS_COLORS[word.emphasis];
+            // Overshoot pop on reveal; transform keeps layout stable.
+            const popFrames = Math.max(2, Math.round(EMPHASIS_POP_SEC * fps));
+            const pop = interpolate(
+              frame - word.startFrame,
+              [0, popFrames * 0.6, popFrames],
+              [0.4, 1.25, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+            );
+            transform = `scale(${pop})`;
+          }
+
           return (
             <span
               key={`${word.startFrame}-${word.text}-${index}`}
@@ -106,6 +128,8 @@ export const TikTokCaptions: React.FC<{
                   ? wordOpacity(frame, word, active.endFrame, fadeFrames)
                   : 0,
                 display: "inline-block",
+                color,
+                transform,
               }}
             >
               {word.text}

@@ -1,4 +1,4 @@
-import { newPage, withBrowser } from "./schedule/browser";
+import { newPage, withBrowser } from "./browser";
 
 /**
  * Opens Instagram (Meta Business Suite) and TikTok in the persistent Playwright

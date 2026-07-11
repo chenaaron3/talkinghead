@@ -3,6 +3,8 @@ export type EpisodeConfig = {
   titleDurationSec: number;
   captionsAtATime: number;
   listicle: boolean;
+  punchIns: boolean;
+  emphasis: boolean;
 };
 
 export type ListicleItem = {
@@ -14,6 +16,12 @@ export type ListicleOverlay = {
   startFrame: number;
   endFrame: number;
   items: ListicleItem[];
+};
+
+export type PunchInSegment = {
+  startFrame: number;
+  endFrame: number;
+  scale: number;
 };
 
 export type TranscriptWord = {
@@ -44,12 +52,15 @@ export type KeepSegment = {
   durationInFrames: number;
 };
 
+export type CaptionEmphasis = "positive" | "negative";
+
 export type CaptionWord = {
   text: string;
   startSec: number;
   endSec: number;
   startFrame: number;
   endFrame: number;
+  emphasis?: CaptionEmphasis;
 };
 
 export type CaptionGroup = {
@@ -75,4 +86,6 @@ export type EpisodeProps = {
   }>;
   captionGroups: CaptionGroup[];
   listicle: ListicleOverlay | null;
+  /** Optional: cached props.json files from before this feature lack the field. */
+  punchIns?: PunchInSegment[] | null;
 };

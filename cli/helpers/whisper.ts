@@ -16,6 +16,7 @@ import {
 import type { Transcript, TranscriptWord } from "./types";
 import { ROOT } from "./types";
 
+
 const WHISPER_DIR = path.join(ROOT, "whisper.cpp");
 
 function msToSec(ms: number): number {

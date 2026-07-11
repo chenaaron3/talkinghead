@@ -1,4 +1,4 @@
-import { authorizeYouTubeInteractive } from "./schedule/platforms/youtube";
+import { authorizeYouTubeInteractive } from "./platforms/youtube";
 
 authorizeYouTubeInteractive().catch((error) => {
   console.error(error instanceof Error ? error.message : error);

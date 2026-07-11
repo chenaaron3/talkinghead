@@ -86,7 +86,7 @@ Scheduling uses a one-per-day cadence from `schedule-manifest.json` (gitignored)
 | `titleDurationSec` | `5` | How long the title stays on screen |
 | `captionsAtATime` | `1` | Words shown together in the caption line |
 
-Whisper model, fillers, gap threshold, fade timing, etc. are hardcoded in `cli/constants.ts` and `src/lib/constants.ts`.
+Whisper model, fillers, gap threshold, fade timing, etc. are hardcoded in `cli/helpers/constants.ts` and `src/lib/constants.ts`.
 
 ## Output
 

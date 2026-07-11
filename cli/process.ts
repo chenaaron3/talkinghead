@@ -6,17 +6,19 @@ import {
   listProcessedEpisodes,
   loadEpisodeConfig,
   resolveEpisodeDir,
-} from "./config";
-import { buildCaptionGroups, buildKeepSegments } from "./cuts";
-import { buildListicle } from "./listicle";
-import type { EpisodeProps, Transcript } from "./types";
+} from "./helpers/config";
+import { buildCaptionGroups, buildKeepSegments } from "./helpers/cuts";
+import type { EpisodeProps, Transcript } from "./helpers/types";
 import {
   GENERATED_EPISODES_INDEX,
   PUBLIC_EPISODES_DIR,
   ROOT,
   SOURCE_DIR,
-} from "./types";
-import { probeVideoFps, runWhisper } from "./whisper";
+} from "./helpers/types";
+import { probeVideoFps, runWhisper } from "./helpers/whisper";
+import { buildEmphasis } from "./modules/emphasis";
+import { buildListicle } from "./modules/listicles";
+import { buildPunchIns } from "./modules/punchin";
 import { renderEpisode } from "./render-episode";
 
 const ALL_PROPS_PATH = path.join(ROOT, "src", "generated", "all-props.json");
@@ -167,11 +169,20 @@ async function main() {
     fps,
   });
 
+  const emphasis = await buildEmphasis({
+    enabled: config.emphasis,
+    words: transcript.words,
+    transcriptPath,
+    cachePath: path.join(generatedDir, "emphasis.json"),
+    force,
+  });
+
   const captionGroups = buildCaptionGroups({
     words: transcript.words,
     segments,
     fps,
     captionsAtATime: config.captionsAtATime,
+    emphasis,
   });
 
   const listicle = await buildListicle({
@@ -181,6 +192,16 @@ async function main() {
     fps,
     transcriptPath,
     cachePath: path.join(generatedDir, "listicle.json"),
+    force,
+  });
+
+  const punchIns = await buildPunchIns({
+    enabled: config.punchIns,
+    words: transcript.words,
+    segments,
+    fps,
+    transcriptPath,
+    cachePath: path.join(generatedDir, "punch-ins.json"),
     force,
   });
 
@@ -208,6 +229,7 @@ async function main() {
     })),
     captionGroups,
     listicle,
+    punchIns,
   };
 
   writeJson(path.join(generatedDir, "props.json"), props);

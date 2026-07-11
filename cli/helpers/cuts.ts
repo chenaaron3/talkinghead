@@ -5,11 +5,17 @@ import {
   TRANSCRIPTION_ARTIFACTS,
 } from "./constants";
 import type {
+  CaptionEmphasis,
   CaptionGroup,
   CaptionWord,
   KeepSegment,
   TranscriptWord,
 } from "./types";
+
+/** Numbered word list for OpenAI prompts that return word indices. */
+export function buildNumberedTranscript(words: TranscriptWord[]): string {
+  return words.map((w, i) => `${i}: ${w.word}`).join("\n");
+}
 
 function normalizeToken(word: string): string {
   return word
@@ -182,28 +188,45 @@ export function mapSourceTimeToOutput(
   return null;
 }
 
+/** Map a transcript word index to an output-timeline frame, or null if cut. */
+export function wordIndexToOutputFrame(
+  wordIndex: number,
+  words: TranscriptWord[],
+  segments: KeepSegment[],
+  fps: number,
+  prefer: "start" | "end",
+): number | null {
+  if (wordIndex < 0 || wordIndex >= words.length) return null;
+  const word = words[wordIndex]!;
+  const sourceSec = prefer === "start" ? word.start : word.end;
+  const outSec = mapSourceTimeToOutput(sourceSec, segments);
+  if (outSec == null) return null;
+  return Math.max(0, Math.round(outSec * fps));
+}
+
 export function buildCaptionGroups(options: {
   words: TranscriptWord[];
   segments: KeepSegment[];
   fps: number;
   captionsAtATime: number;
+  emphasis?: Map<number, CaptionEmphasis> | null;
 }): CaptionGroup[] {
-  const { words, segments, fps, captionsAtATime } = options;
+  const { words, segments, fps, captionsAtATime, emphasis } = options;
 
   const captionWords: CaptionWord[] = [];
-  for (const word of words) {
-    if (isSkippedWord(word.word)) continue;
+  words.forEach((word, wordIndex) => {
+    if (isSkippedWord(word.word)) return;
 
     const outStart = mapSourceTimeToOutput(word.start, segments);
     const outEnd = mapSourceTimeToOutput(word.end, segments);
-    if (outStart == null || outEnd == null) continue;
+    if (outStart == null || outEnd == null) return;
 
     const startFrame = Math.max(0, Math.round(outStart * fps));
     const rawEnd = Math.round(Math.max(outEnd, outStart + 1 / fps) * fps);
     const endFrame = Math.max(startFrame + 3, rawEnd);
 
     const text = captionText(word.word);
-    if (!text) continue;
+    if (!text) return;
 
     captionWords.push({
       text,
@@ -211,8 +234,9 @@ export function buildCaptionGroups(options: {
       endSec: Math.max(outEnd, outStart + 1 / fps),
       startFrame,
       endFrame,
+      emphasis: emphasis?.get(wordIndex),
     });
-  }
+  });
 
   const groups: CaptionGroup[] = [];
   for (let i = 0; i < captionWords.length; i += captionsAtATime) {

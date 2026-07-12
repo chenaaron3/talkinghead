@@ -9,6 +9,7 @@
     "@remotion/cli": "4.0.487",
     "@remotion/install-whisper-cpp": "4.0.487",
     "@remotion/media": "4.0.487",
+    "@remotion/player": "4.0.487",
     "@remotion/renderer": "4.0.487",
     "dotenv": "^17.4.2",
     "googleapis": "^173.0.0",
@@ -18,22 +19,30 @@
     "react-dom": "19.2.3",
     "remotion": "4.0.487",
     "yaml": "^2.8.0",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@remotion/eslint-config-flat": "4.0.487",
+    "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^22.15.0",
     "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
     "@types/web": "0.0.166",
+    "@vitejs/plugin-react": "^6.0.3",
     "eslint": "9.19.0",
     "prettier": "3.8.1",
+    "tailwindcss": "^4.3.2",
     "tsx": "^4.20.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vite": "^8.1.4"
   },
   "scripts": {
     "dev": "remotion studio",
     "studio": "remotion studio",
+    "editor": "tsx cli/editor.ts",
     "process": "tsx cli/process.ts",
+    "bulk": "tsx cli/bulk.ts",
     "schedule": "tsx cli/schedule/index.ts",
     "schedule:auth-youtube": "tsx cli/schedule/auth-youtube.ts",
     "schedule:login": "tsx cli/schedule/login.ts",

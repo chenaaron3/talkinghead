@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --color-panel: #1a1d26;
+  --color-panel-2: #222632;
+  --color-border: #2e3444;
+  --color-muted: #8b93a7;
+  --color-accent: #5b8cff;
+  --color-broll: #c9a227;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}

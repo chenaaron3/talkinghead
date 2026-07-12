@@ -1,4 +1,4 @@
-import type { Page } from "playwright";
+import type { BrowserContext, Page } from "playwright";
 import { fillContentEditable, newPage, readClipboard, settle, withBrowser } from '../browser';
 import { META } from '../selectors';
 import { TIMEOUTS } from '../timeouts';
@@ -129,97 +129,97 @@ async function copyPostLink(page: Page, title: string): Promise<string> {
 async function scheduleReel(
   input: ScheduleInput,
   timeZone: string,
+  context: BrowserContext,
 ): Promise<ScheduleResult> {
-  return withBrowser(async (context) => {
-    const page = await newPage(context);
-    const when = dateParts(input.publishAt, timeZone);
+  const page = await newPage(context);
+  const when = dateParts(input.publishAt, timeZone);
 
-    console.log("[instagram] Create reel");
-    await page.goto(META.homeUrl, {
-      waitUntil: "commit",
-      timeout: TIMEOUTS.navigation,
-    });
-    await clickButton(page, /^Create reel$/i, TIMEOUTS.navigation);
-
-    console.log("[instagram] video");
-    const [videoChooser] = await Promise.all([
-      page.waitForEvent("filechooser", { timeout: TIMEOUTS.fileChooser }),
-      clickButton(page, /^Add Video$/i),
-    ]);
-    await videoChooser.setFiles(input.videoPath);
-    await page
-      .getByText(/video\.mp4|1080\s*[x×]\s*1920|100%/i)
-      .first()
-      .waitFor({ state: "visible", timeout: TIMEOUTS.videoUpload });
-
-    console.log("[instagram] caption");
-    await fillContentEditable(
-      page,
-      page.locator(META.captionEditorFallback).first(),
-      input.title,
-    );
-
-    console.log("[instagram] cover");
-    await page.getByText("Thumbnail", { exact: true }).scrollIntoViewIfNeeded();
-    const mode = page.getByRole("button", { name: "Upload image" });
-    if ((await mode.getAttribute("aria-pressed")) !== "true") {
-      await mode.click({ timeout: TIMEOUTS.action });
-    }
-    const [coverChooser] = await Promise.all([
-      page.waitForEvent("filechooser", { timeout: TIMEOUTS.coverUpload }),
-      page.getByRole("link", { name: "Upload image" }).click(),
-    ]);
-    await coverChooser.setFiles(input.coverPath);
-    await settle(page, TIMEOUTS.settleMedium);
-
-    console.log("[instagram] Next → Next → Schedule");
-    await clickButton(page, /^Next$/i, TIMEOUTS.videoUpload);
-    await settle(page, TIMEOUTS.settleMedium);
-    await clickButton(page, /^Next$/i, TIMEOUTS.videoUpload);
-    await page
-      .getByText(/Scheduling options/i)
-      .first()
-      .waitFor({ state: "visible", timeout: TIMEOUTS.scheduleUi });
-
-    await page
-      .getByRole("button", { name: "Schedule", exact: true })
-      .first()
-      .click({ timeout: TIMEOUTS.scheduleUi });
-
-    const dateBox = page.getByRole("textbox", { name: /Date picker/i });
-    await dateBox.click({ timeout: TIMEOUTS.dateTime });
-    await page.keyboard.press(
-      process.platform === "darwin" ? "Meta+A" : "Control+A",
-    );
-    await page.keyboard.type(when.date, { delay: 30 });
-    await page.keyboard.press("Enter");
-
-    console.log(
-      `[instagram] schedule → ${when.date} ${when.hour}:${when.minute} ${when.meridiem}`,
-    );
-    await fillSpin(page, "hours", when.hour);
-    await fillSpin(page, "minutes", when.minute);
-    await fillSpin(page, "meridiem", when.meridiem);
-
-    await page
-      .getByRole("button", { name: "Schedule", exact: true })
-      .last()
-      .click({ timeout: TIMEOUTS.confirm });
-    await settle(page, TIMEOUTS.settleMedium);
-
-    console.log("[instagram] copy post link");
-    const url = await copyPostLink(page, input.title);
-    console.log(`[instagram] scheduled → ${url}`);
-
-    return { url };
+  console.log("[instagram] Create reel");
+  await page.goto(META.homeUrl, {
+    waitUntil: "commit",
+    timeout: TIMEOUTS.navigation,
   });
+  await clickButton(page, /^Create reel$/i, TIMEOUTS.navigation);
+
+  console.log("[instagram] video");
+  const [videoChooser] = await Promise.all([
+    page.waitForEvent("filechooser", { timeout: TIMEOUTS.fileChooser }),
+    clickButton(page, /^Add Video$/i),
+  ]);
+  await videoChooser.setFiles(input.videoPath);
+  await page
+    .getByText(/video\.mp4|1080\s*[x×]\s*1920|100%/i)
+    .first()
+    .waitFor({ state: "visible", timeout: TIMEOUTS.videoUpload });
+
+  console.log("[instagram] caption");
+  await fillContentEditable(
+    page,
+    page.locator(META.captionEditorFallback).first(),
+    input.title,
+  );
+
+  console.log("[instagram] cover");
+  await page.getByText("Thumbnail", { exact: true }).scrollIntoViewIfNeeded();
+  const mode = page.getByRole("button", { name: "Upload image" });
+  if ((await mode.getAttribute("aria-pressed")) !== "true") {
+    await mode.click({ timeout: TIMEOUTS.action });
+  }
+  const [coverChooser] = await Promise.all([
+    page.waitForEvent("filechooser", { timeout: TIMEOUTS.coverUpload }),
+    page.getByRole("link", { name: "Upload image" }).click(),
+  ]);
+  await coverChooser.setFiles(input.coverPath);
+  await settle(page, TIMEOUTS.settleMedium);
+
+  console.log("[instagram] Next → Next → Schedule");
+  await clickButton(page, /^Next$/i, TIMEOUTS.videoUpload);
+  await settle(page, TIMEOUTS.settleMedium);
+  await clickButton(page, /^Next$/i, TIMEOUTS.videoUpload);
+  await page
+    .getByText(/Scheduling options/i)
+    .first()
+    .waitFor({ state: "visible", timeout: TIMEOUTS.scheduleUi });
+
+  await page
+    .getByRole("button", { name: "Schedule", exact: true })
+    .first()
+    .click({ timeout: TIMEOUTS.scheduleUi });
+
+  const dateBox = page.getByRole("textbox", { name: /Date picker/i });
+  await dateBox.click({ timeout: TIMEOUTS.dateTime });
+  await page.keyboard.press(
+    process.platform === "darwin" ? "Meta+A" : "Control+A",
+  );
+  await page.keyboard.type(when.date, { delay: 30 });
+  await page.keyboard.press("Enter");
+
+  console.log(
+    `[instagram] schedule → ${when.date} ${when.hour}:${when.minute} ${when.meridiem}`,
+  );
+  await fillSpin(page, "hours", when.hour);
+  await fillSpin(page, "minutes", when.minute);
+  await fillSpin(page, "meridiem", when.meridiem);
+
+  await page
+    .getByRole("button", { name: "Schedule", exact: true })
+    .last()
+    .click({ timeout: TIMEOUTS.confirm });
+  await settle(page, TIMEOUTS.settleMedium);
+
+  console.log("[instagram] copy post link");
+  const url = await copyPostLink(page, input.title);
+  console.log(`[instagram] scheduled → ${url}`);
+
+  return { url };
 }
 
 export function createInstagramPublisher(timeZone: string): PlatformPublisher {
   return {
     id: "instagram",
-    schedule(input) {
-      return scheduleReel(input, timeZone);
+    schedule(input, context) {
+      if (context) return scheduleReel(input, timeZone, context);
+      return withBrowser((ctx) => scheduleReel(input, timeZone, ctx));
     },
   };
 }

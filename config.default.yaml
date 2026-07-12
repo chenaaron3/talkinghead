@@ -1,4 +1,5 @@
 titleDurationSec: 5
 captionsAtATime: 5
+listicle: true
 punchIns: true
 emphasis: true

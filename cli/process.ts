@@ -3,25 +3,20 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   findSourceVideo,
-  listProcessedEpisodes,
   loadEpisodeConfig,
   resolveEpisodeDir,
+  writeEpisodeTitle,
 } from "./helpers/config";
 import { buildCaptionGroups, buildKeepSegments } from "./helpers/cuts";
+import { rebuildAllPropsIndex } from "./helpers/props-index";
 import type { EpisodeProps, Transcript } from "./helpers/types";
-import {
-  GENERATED_EPISODES_INDEX,
-  PUBLIC_EPISODES_DIR,
-  ROOT,
-  SOURCE_DIR,
-} from "./helpers/types";
+import { PUBLIC_EPISODES_DIR, ROOT } from "./helpers/types";
 import { probeVideoFps, runWhisper } from "./helpers/whisper";
 import { buildEmphasis } from "./modules/emphasis";
 import { buildListicle } from "./modules/listicles";
 import { buildPunchIns } from "./modules/punchin";
+import { buildTitle } from "./modules/title";
 import { renderEpisode } from "./render-episode";
-
-const ALL_PROPS_PATH = path.join(ROOT, "src", "generated", "all-props.json");
 
 function parseArgs(argv: string[]) {
   const force = argv.includes("--force");
@@ -44,41 +39,7 @@ function writeJson(filePath: string, data: unknown) {
 }
 
 function refreshEpisodesIndex(latest?: EpisodeProps) {
-  const episodes = listProcessedEpisodes();
-  writeJson(GENERATED_EPISODES_INDEX, { episodes });
-
-  const allProps: Record<string, EpisodeProps> = {};
-  if (fs.existsSync(ALL_PROPS_PATH)) {
-    Object.assign(
-      allProps,
-      JSON.parse(fs.readFileSync(ALL_PROPS_PATH, "utf8")) as Record<
-        string,
-        EpisodeProps
-      >,
-    );
-  }
-
-  // Drop props for episodes that no longer have generated output
-  for (const key of Object.keys(allProps)) {
-    if (!episodes.includes(key)) {
-      delete allProps[key];
-    }
-  }
-
-  if (latest) {
-    allProps[latest.episodeId] = latest;
-  } else {
-    for (const id of episodes) {
-      const propsPath = path.join(SOURCE_DIR, id, "generated", "props.json");
-      if (fs.existsSync(propsPath)) {
-        allProps[id] = JSON.parse(
-          fs.readFileSync(propsPath, "utf8"),
-        ) as EpisodeProps;
-      }
-    }
-  }
-
-  writeJson(ALL_PROPS_PATH, allProps);
+  const episodes = rebuildAllPropsIndex(latest);
   console.log(
     `[index] ${episodes.length} processed episode(s): ${episodes.join(", ") || "(none)"}`,
   );
@@ -109,8 +70,8 @@ function linkVideo(videoPath: string, episodeId: string): string {
   return `episodes/${episodeId}/${destName}`;
 }
 
-async function main() {
-  const { input, force } = parseArgs(process.argv.slice(2));
+export async function runProcess(argv: string[]): Promise<{ episodeId: string }> {
+  const { input, force } = parseArgs(argv);
   const { episodeId, episodeDir } = resolveEpisodeDir(input);
   const config = loadEpisodeConfig(episodeDir);
   const videoPath = findSourceVideo(episodeDir);
@@ -126,7 +87,6 @@ async function main() {
     `[process] episode=${episodeId} fps=${fps.toFixed(3)} duration=${probe.durationInSeconds.toFixed(2)}s`,
   );
   console.log(`[process] video=${videoPath}`);
-  console.log(`[process] title="${config.title}"`);
 
   let transcript: Transcript | null = null;
   if (!force && fs.existsSync(transcriptPath)) {
@@ -157,16 +117,38 @@ async function main() {
     console.log(`[cache] wrote ${transcriptPath}`);
   }
 
+  let title = config.title;
+  if (!title) {
+    title = await buildTitle({
+      words: transcript.words,
+      transcriptPath,
+      cachePath: path.join(generatedDir, "title.json"),
+      force,
+    });
+    writeEpisodeTitle(episodeDir, title);
+    console.log(`[title] wrote config.yaml`);
+  }
+  console.log(`[process] title="${title}"`);
+
   const durationSec = Math.max(
     transcript.duration,
     probe.durationInSeconds,
     ...transcript.words.map((w) => w.end),
   );
 
+  if (config.holds.length > 0) {
+    console.log(
+      `[holds] ${config.holds.length} range(s): ${config.holds
+        .map((h) => `${h.start.toFixed(1)}–${h.end.toFixed(1)}s`)
+        .join(", ")}`,
+    );
+  }
+
   const segments = buildKeepSegments({
     words: transcript.words,
     durationSec,
     fps,
+    holds: config.holds,
   });
 
   const emphasis = await buildEmphasis({
@@ -212,9 +194,20 @@ async function main() {
 
   const videoSrc = linkVideo(videoPath, episodeId);
 
+  const propsPath = path.join(generatedDir, "props.json");
+  let existingBRolls: EpisodeProps["bRolls"] = [];
+  if (fs.existsSync(propsPath)) {
+    try {
+      const prev = JSON.parse(fs.readFileSync(propsPath, "utf8")) as EpisodeProps;
+      existingBRolls = prev.bRolls ?? [];
+    } catch {
+      existingBRolls = [];
+    }
+  }
+
   const props: EpisodeProps = {
     episodeId,
-    title: config.title,
+    title,
     videoSrc,
     fps,
     width: 1080,
@@ -230,6 +223,7 @@ async function main() {
     captionGroups,
     listicle,
     punchIns,
+    bRolls: existingBRolls,
   };
 
   writeJson(path.join(generatedDir, "props.json"), props);
@@ -244,9 +238,12 @@ async function main() {
   console.log(`[done] props → source/${episodeId}/generated/props.json`);
 
   renderEpisode({ episodeId, episodeDir });
+  return { episodeId };
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+if (require.main === module) {
+  runProcess(process.argv.slice(2)).catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

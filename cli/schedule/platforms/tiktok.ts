@@ -1,4 +1,4 @@
-import type { Page } from "playwright";
+import type { BrowserContext, Page } from "playwright";
 import {
   fillContentEditable,
   newPage,
@@ -116,82 +116,82 @@ async function capturePostLink(page: Page, title: string): Promise<string> {
 async function scheduleVideo(
   input: ScheduleInput,
   timeZone: string,
+  context: BrowserContext,
 ): Promise<ScheduleResult> {
-  return withBrowser(async (context) => {
-    const page = await newPage(context);
-    const when = dateParts(input.publishAt, timeZone);
+  const page = await newPage(context);
+  const when = dateParts(input.publishAt, timeZone);
 
-    console.log("[tiktok] upload");
-    await page.goto(TIKTOK.uploadUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: TIMEOUTS.navigation,
-    });
-    await page
-      .locator(TIKTOK.fileInput)
-      .first()
-      .setInputFiles(input.videoPath);
-    await page
-      .locator(TIKTOK.coverContainer)
-      .or(page.locator(TIKTOK.captionEditor))
-      .first()
-      .waitFor({ state: "visible", timeout: TIMEOUTS.videoUpload });
-
-    console.log("[tiktok] description");
-    await fillContentEditable(
-      page,
-      page.locator(TIKTOK.captionEditor).first(),
-      input.title,
-    );
-
-    console.log("[tiktok] cover");
-    const cover = page.locator(TIKTOK.coverContainer);
-    await cover.getByText(/Edit cover/i).click({ timeout: TIMEOUTS.action });
-    await page
-      .getByRole("button", { name: /Upload cover/i })
-      .waitFor({ state: "visible", timeout: TIMEOUTS.action });
-    await page.locator('input[type="file"]').last().setInputFiles(input.coverPath);
-    await page
-      .getByRole("button", { name: /^Save$/i })
-      .click({ timeout: TIMEOUTS.action });
-    await settle(page, TIMEOUTS.settleMedium);
-
-    console.log("[tiktok] schedule");
-    const schedule = page.locator(TIKTOK.scheduleContainer);
-    await schedule.scrollIntoViewIfNeeded();
-    await schedule
-      .locator("label")
-      .filter({ hasText: /^Schedule$/i })
-      .click({ timeout: TIMEOUTS.scheduleUi });
-    await settle(page, 800);
-    const scheduleRadio = schedule.locator(
-      'input.Radio__input[value="schedule"]',
-    );
-    if (!(await scheduleRadio.isChecked().catch(() => false))) {
-      await scheduleRadio.check({ force: true, timeout: TIMEOUTS.scheduleUi });
-      await settle(page, 500);
-    }
-
-    const fields = schedule.locator("input.TUXTextInputCore-input");
-    await fields.first().waitFor({ state: "visible", timeout: TIMEOUTS.dateTime });
-    await setScheduleDateTime(page, schedule, when);
-
-    console.log("[tiktok] post");
-    const postBtn = page.locator(TIKTOK.postButton);
-    await postBtn.click({ timeout: TIMEOUTS.videoUpload });
-    await postBtn.click({ timeout: TIMEOUTS.confirm }).catch(() => undefined);
-
-    console.log("[tiktok] copy post link");
-    const url = await capturePostLink(page, input.title);
-    console.log(`[tiktok] scheduled → ${url}`);
-    return { url };
+  console.log("[tiktok] upload");
+  await page.goto(TIKTOK.uploadUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: TIMEOUTS.navigation,
   });
+  await page
+    .locator(TIKTOK.fileInput)
+    .first()
+    .setInputFiles(input.videoPath);
+  await page
+    .locator(TIKTOK.coverContainer)
+    .or(page.locator(TIKTOK.captionEditor))
+    .first()
+    .waitFor({ state: "visible", timeout: TIMEOUTS.videoUpload });
+
+  console.log("[tiktok] description");
+  await fillContentEditable(
+    page,
+    page.locator(TIKTOK.captionEditor).first(),
+    input.title,
+  );
+
+  console.log("[tiktok] cover");
+  const cover = page.locator(TIKTOK.coverContainer);
+  await cover.getByText(/Edit cover/i).click({ timeout: TIMEOUTS.action });
+  await page
+    .getByRole("button", { name: /Upload cover/i })
+    .waitFor({ state: "visible", timeout: TIMEOUTS.action });
+  await page.locator('input[type="file"]').last().setInputFiles(input.coverPath);
+  await page
+    .getByRole("button", { name: /^Save$/i })
+    .click({ timeout: TIMEOUTS.action });
+  await settle(page, TIMEOUTS.settleMedium);
+
+  console.log("[tiktok] schedule");
+  const schedule = page.locator(TIKTOK.scheduleContainer);
+  await schedule.scrollIntoViewIfNeeded();
+  await schedule
+    .locator("label")
+    .filter({ hasText: /^Schedule$/i })
+    .click({ timeout: TIMEOUTS.scheduleUi });
+  await settle(page, 800);
+  const scheduleRadio = schedule.locator(
+    'input.Radio__input[value="schedule"]',
+  );
+  if (!(await scheduleRadio.isChecked().catch(() => false))) {
+    await scheduleRadio.check({ force: true, timeout: TIMEOUTS.scheduleUi });
+    await settle(page, 500);
+  }
+
+  const fields = schedule.locator("input.TUXTextInputCore-input");
+  await fields.first().waitFor({ state: "visible", timeout: TIMEOUTS.dateTime });
+  await setScheduleDateTime(page, schedule, when);
+
+  console.log("[tiktok] post");
+  const postBtn = page.locator(TIKTOK.postButton);
+  await postBtn.click({ timeout: TIMEOUTS.videoUpload });
+  await postBtn.click({ timeout: TIMEOUTS.confirm }).catch(() => undefined);
+
+  console.log("[tiktok] copy post link");
+  const url = await capturePostLink(page, input.title);
+  console.log(`[tiktok] scheduled → ${url}`);
+  return { url };
 }
 
 export function createTikTokPublisher(timeZone: string): PlatformPublisher {
   return {
     id: "tiktok",
-    schedule(input) {
-      return scheduleVideo(input, timeZone);
+    schedule(input, context) {
+      if (context) return scheduleVideo(input, timeZone, context);
+      return withBrowser((ctx) => scheduleVideo(input, timeZone, ctx));
     },
   };
 }

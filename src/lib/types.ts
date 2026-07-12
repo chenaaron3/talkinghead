@@ -1,10 +1,19 @@
+/** Source-timeline range (seconds) kept even when silent — e.g. on-camera holds. */
+export type HoldRange = {
+  start: number;
+  end: number;
+};
+
 export type EpisodeConfig = {
-  title: string;
+  /** Null when omitted — process generates via OpenAI and writes config.yaml. */
+  title: string | null;
   titleDurationSec: number;
   captionsAtATime: number;
   listicle: boolean;
   punchIns: boolean;
   emphasis: boolean;
+  /** Silence inside these source ranges is not cut. */
+  holds: HoldRange[];
 };
 
 export type ListicleItem = {
@@ -22,6 +31,14 @@ export type PunchInSegment = {
   startFrame: number;
   endFrame: number;
   scale: number;
+};
+
+export type BRollClip = {
+  id: string;
+  /** Path under public/, e.g. `b-roll/glowup/Perm_Before.jpg` */
+  src: string;
+  startFrame: number;
+  endFrame: number;
 };
 
 export type TranscriptWord = {
@@ -88,4 +105,6 @@ export type EpisodeProps = {
   listicle: ListicleOverlay | null;
   /** Optional: cached props.json files from before this feature lack the field. */
   punchIns?: PunchInSegment[] | null;
+  /** Optional: image overlays on the output timeline. */
+  bRolls?: BRollClip[] | null;
 };

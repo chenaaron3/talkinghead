@@ -20,7 +20,7 @@ export const TIMEOUTS = {
   fileChooser: 5_000,
 
   /** Video upload + processing */
-  videoUpload: 30_000,
+  videoUpload: 60_000,
 
   /** Cover/thumbnail upload */
   coverUpload: 30_000,

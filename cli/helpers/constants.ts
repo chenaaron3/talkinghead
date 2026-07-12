@@ -1,16 +1,16 @@
 /** Hardcoded editing / transcription defaults (not configurable). */
 
-/** whisper.cpp model size (English-tuned) */
-export const WHISPER_MODEL = "base.en" as const;
+/** whisper.cpp model size */
+export const WHISPER_MODEL = "large-v3-turbo" as const;
 /** Whisper language code */
 export const WHISPER_LANGUAGE = "en" as const;
 /** Remotion-supported whisper.cpp release */
-export const WHISPER_CPP_VERSION = "1.5.5";
+export const WHISPER_CPP_VERSION = "1.7.6";
 
 /** Silence longer than this (seconds) is cut */
 export const GAP_THRESHOLD_SEC = 0.5;
 /** Extra audio kept around filler cuts so consonants aren't clipped */
-export const FILLER_PADDING_SEC = 0.09;
+export const FILLER_PADDING_SEC = 0.5;
 /** Title/caption fade in/out duration (seconds) */
 export const FADE_DURATION_SEC = 0.15;
 

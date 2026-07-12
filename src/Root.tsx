@@ -2,6 +2,7 @@ import React from "react";
 import { CalculateMetadataFunction, Composition } from "remotion";
 import { Cover } from "./Cover";
 import { TalkingHead } from "./TalkingHead";
+/** Generated cache of per-episode props.json — rebuilt by process/editor. */
 import allProps from "./generated/all-props.json";
 import episodesIndex from "./generated/episodes.json";
 import type { EpisodeProps } from "./lib/types";
@@ -23,6 +24,7 @@ const fallbackProps: EpisodeProps = {
   captionGroups: [],
   listicle: null,
   punchIns: null,
+  bRolls: [],
 };
 
 const propsMap = allProps as Record<string, EpisodeProps>;
@@ -52,6 +54,12 @@ const calculateCoverMetadata: CalculateMetadataFunction<EpisodeProps> = ({
     height: HEIGHT,
   };
 };
+
+function remotionCompositionId(prefix: string, episodeId: string): string {
+  // Remotion allows only a-z, A-Z, 0-9, CJK, and -
+  const safe = episodeId.replace(/[^a-zA-Z0-9-]/g, "-");
+  return `${prefix}-${safe}`;
+}
 
 export const RemotionRoot: React.FC = () => {
   const episodeIds =
@@ -89,7 +97,7 @@ export const RemotionRoot: React.FC = () => {
         return (
           <React.Fragment key={id}>
             <Composition
-              id={`TalkingHead-${id}`}
+              id={remotionCompositionId("TalkingHead", id)}
               component={TalkingHead}
               durationInFrames={props.durationInFrames}
               fps={props.fps}
@@ -99,7 +107,7 @@ export const RemotionRoot: React.FC = () => {
               calculateMetadata={calculateMetadata}
             />
             <Composition
-              id={`Cover-${id}`}
+              id={remotionCompositionId("Cover", id)}
               component={Cover}
               durationInFrames={1}
               fps={props.fps}

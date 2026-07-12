@@ -13,8 +13,12 @@
     "noUnusedLocals": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": ["src/*"]
+    }
   },
-  "include": ["src/**/*", "cli/**/*"],
+  "include": ["src/**/*", "cli/**/*", "editor/**/*"],
   "exclude": ["remotion.config.ts", "node_modules"]
 }

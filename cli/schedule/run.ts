@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { BrowserContext } from "playwright";
 import { loadEpisodeConfig, resolveEpisodeDir } from "../helpers/config";
 import { ROOT } from "../helpers/types";
+import { withBrowser } from "./browser";
 import { formatLocalSlot, nextPublishAt } from "./cadence";
 import { loadScheduleConfig } from "./config";
 import {
@@ -14,7 +16,12 @@ import {
   upsertEntry,
 } from "./manifest";
 import { getPublishers } from "./platforms";
-import type { ManifestEntry, PlatformId } from "./types";
+import type {
+  ManifestEntry,
+  PlatformId,
+  PlatformPublisher,
+  ScheduleInput,
+} from "./types";
 
 function parseArgs(argv: string[]) {
   const platformsFlagIdx = argv.indexOf("--platforms");
@@ -63,6 +70,13 @@ export async function runSchedule(argv: string[]): Promise<void> {
   const { input, platformsOverride } = parseArgs(argv);
   const { episodeId, episodeDir } = resolveEpisodeDir(input);
   const episodeConfig = loadEpisodeConfig(episodeDir);
+  if (!episodeConfig.title) {
+    throw new Error(
+      `Missing "title" in ${path.join(episodeDir, "config.yaml")}\n` +
+        `Run: pnpm process -- source/${episodeId}  (auto-generates title when omitted)`,
+    );
+  }
+  const title = episodeConfig.title;
   const scheduleConfig = loadScheduleConfig();
   const platforms = platformsOverride ?? scheduleConfig.platforms;
   const { videoPath, coverPath } = requireRenderedAssets(episodeId);
@@ -111,7 +125,7 @@ export async function runSchedule(argv: string[]): Promise<void> {
     scheduledAt: publishAt.toISOString(),
     videoSrc: path.relative(ROOT, videoPath),
     coverSrc: path.relative(ROOT, coverPath),
-    title: episodeConfig.title,
+    title,
     youtube: null,
     instagram: null,
     tiktok: null,
@@ -119,42 +133,67 @@ export async function runSchedule(argv: string[]): Promise<void> {
 
   // Ensure scheduledAt is set for new entries
   entry.scheduledAt = publishAt.toISOString();
-  entry.title = episodeConfig.title;
+  entry.title = title;
   entry.videoSrc = path.relative(ROOT, videoPath);
   entry.coverSrc = path.relative(ROOT, coverPath);
 
   console.log(`[schedule] episode=${episodeId}`);
-  console.log(`[schedule] title="${episodeConfig.title}"`);
-  console.log(`[schedule] platforms: ${toRun.join(", ")}`);
+  console.log(`[schedule] title="${title}"`);
+  console.log(`[schedule] platforms: ${toRun.join(", ")} (parallel)`);
 
   const publishers = getPublishers(toRun, scheduleConfig.timezone);
+  const scheduleInput: ScheduleInput = {
+    title,
+    videoPath,
+    coverPath,
+    publishAt,
+  };
   const failures: string[] = [];
 
-  for (const publisher of publishers) {
+  const persist = () => {
+    manifest = upsertEntry(manifest, entry);
+    saveManifest(manifest);
+  };
+
+  const runPublisher = async (
+    publisher: PlatformPublisher,
+    context?: BrowserContext,
+  ): Promise<void> => {
     try {
-      console.log(`\n[schedule] → ${publisher.id}`);
-      const result = await publisher.schedule({
-        title: episodeConfig.title,
-        videoPath,
-        coverPath,
-        publishAt,
-      });
+      console.log(`[schedule] → ${publisher.id}`);
+      const result = await publisher.schedule(scheduleInput, context);
       if (!result.url) {
         throw new Error(`${publisher.id} returned no post link`);
       }
       entry[publisher.id] = result.url;
-      manifest = upsertEntry(manifest, entry);
-      saveManifest(manifest);
+      persist();
       console.log(`[schedule] ${publisher.id} ok → ${result.url}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[schedule] ${publisher.id} failed: ${message}`);
       failures.push(`${publisher.id}: ${message}`);
-      // Persist partial progress
-      manifest = upsertEntry(manifest, entry);
-      saveManifest(manifest);
+      persist();
     }
+  };
+
+  const youtube = publishers.find((p) => p.id === "youtube");
+  const browserPublishers = publishers.filter((p) => p.id !== "youtube");
+  const tasks: Promise<void>[] = [];
+
+  if (youtube) {
+    tasks.push(runPublisher(youtube));
   }
+  if (browserPublishers.length > 0) {
+    tasks.push(
+      withBrowser(async (context) => {
+        await Promise.all(
+          browserPublishers.map((publisher) => runPublisher(publisher, context)),
+        );
+      }),
+    );
+  }
+
+  await Promise.all(tasks);
 
   console.log(`\n[schedule] manifest → schedule-manifest.json`);
   if (failures.length > 0) {

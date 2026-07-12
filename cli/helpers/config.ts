@@ -90,12 +90,8 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
   const local = readYaml(path.join(episodeDir, "config.yaml"));
   const merged = deepMerge(defaults, local);
 
-  const title = String(merged.title ?? "").trim();
-  if (!title) {
-    throw new Error(
-      `Missing required "title" in ${path.join(episodeDir, "config.yaml")}`,
-    );
-  }
+  const titleRaw = String(merged.title ?? "").trim();
+  const title = titleRaw.length > 0 ? titleRaw : null;
 
   return {
     title,
@@ -109,7 +105,59 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     listicle: Boolean(merged.listicle ?? false),
     punchIns: Boolean(merged.punchIns ?? false),
     emphasis: Boolean(merged.emphasis ?? false),
+    // Episode-only — not inherited from config.default.yaml
+    holds: parseHolds(local.holds, path.join(episodeDir, "config.yaml")),
   };
+}
+
+/** Merge `title` into episode config.yaml (creates the file if missing). */
+export function writeEpisodeTitle(episodeDir: string, title: string): void {
+  const configPath = path.join(episodeDir, "config.yaml");
+  const existing = readYaml(configPath);
+  const next = { ...existing, title };
+  fs.writeFileSync(configPath, `${YAML.stringify(next)}\n`, "utf8");
+}
+
+/** Accepts `[[start, end], ...]` or `[{ start, end }, ...]`. */
+function parseHolds(
+  value: unknown,
+  configPath: string,
+): Array<{ start: number; end: number }> {
+  if (value == null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `"holds" must be a list of [start, end] ranges in ${configPath}`,
+    );
+  }
+
+  return value.map((entry, index) => {
+    let start: number;
+    let end: number;
+
+    if (Array.isArray(entry) && entry.length === 2) {
+      start = Number(entry[0]);
+      end = Number(entry[1]);
+    } else if (
+      isPlainObject(entry) &&
+      entry.start != null &&
+      entry.end != null
+    ) {
+      start = Number(entry.start);
+      end = Number(entry.end);
+    } else {
+      throw new Error(
+        `"holds[${index}]" must be [start, end] or { start, end } in ${configPath}`,
+      );
+    }
+
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      throw new Error(
+        `"holds[${index}]" needs end > start (got ${start}–${end}) in ${configPath}`,
+      );
+    }
+
+    return { start: Math.max(0, start), end };
+  });
 }
 
 export function listProcessedEpisodes(): string[] {
@@ -118,6 +166,7 @@ export function listProcessedEpisodes(): string[] {
     .readdirSync(SOURCE_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
+    .filter((name) => name !== "_bulk")
     .filter((name) =>
       fs.existsSync(path.join(SOURCE_DIR, name, "generated", "props.json")),
     )

@@ -13,6 +13,7 @@ import type {
 } from "../helpers/types";
 
 const MODEL = "gpt-4.1-mini";
+const MIN_ITEMS = 3;
 const MAX_ITEMS = 5;
 const MAX_LABEL_WORDS = 5;
 
@@ -41,7 +42,9 @@ export const ListicleDetectionSchema = z.object({
       }),
     )
     .max(MAX_ITEMS)
-    .describe("Ordered list items; empty if no listicle found"),
+    .describe(
+      `Ordered list items (${MIN_ITEMS}–${MAX_ITEMS}); empty if no clear enumerated list`,
+    ),
 });
 
 export type ListicleDetection = z.infer<typeof ListicleDetectionSchema>;
@@ -62,7 +65,7 @@ export function buildListicleOverlay(options: {
   fps: number;
 }): ListicleOverlay | null {
   const { detection, words, segments, fps } = options;
-  if (detection.items.length === 0) return null;
+  if (detection.items.length < MIN_ITEMS) return null;
 
   const items = [];
   for (const item of detection.items.slice(0, MAX_ITEMS)) {
@@ -79,7 +82,7 @@ export function buildListicleOverlay(options: {
     items.push({ label, revealFrame });
   }
 
-  if (items.length === 0) return null;
+  if (items.length < MIN_ITEMS) return null;
 
   let startFrame = wordIndexToOutputFrame(
     detection.listStartWordIndex,
@@ -127,9 +130,12 @@ async function callOpenAI(words: TranscriptWord[]): Promise<ListicleDetection> {
         role: "system",
         content: [
           "You extract a single ordered listicle from a talking-head transcript.",
+          "ONLY return a list when the speaker explicitly enumerates distinct points",
+          "(e.g. one / two / three, first / second / third, number 1 / number 2, tip one / tip two).",
+          "Vague sequential tips, 'also…', 'next…', or implied structure without enumeration → items: [].",
+          `Require at least ${MIN_ITEMS} enumerated points; fewer than ${MIN_ITEMS} → items: [].`,
           "Return short on-screen labels (max 5 words each) and word indices into the numbered transcript.",
-          "If there is no clear numbered/ordered list of tips or points, return items: [].",
-          "Prefer the main list the speaker walks through (e.g. One / Number 2 / Number 3).",
+          "Prefer the main enumerated list the speaker walks through.",
           "startWordIndex must be the first word of that point in the transcript.",
           "listStartWordIndex/listEndWordIndex should cover the whole list section.",
           `At most ${MAX_ITEMS} items.`,

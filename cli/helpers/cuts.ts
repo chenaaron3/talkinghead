@@ -8,6 +8,7 @@ import type {
   CaptionEmphasis,
   CaptionGroup,
   CaptionWord,
+  HoldRange,
   KeepSegment,
   TranscriptWord,
 } from "./types";
@@ -49,13 +50,15 @@ function captionText(word: string): string {
  * Build keep-segments from word timestamps:
  * - drop filler words (with small padding so consonants aren't clipped)
  * - collapse gaps longer than GAP_THRESHOLD_SEC between keep regions
+ * - re-include config `holds` (intentional on-camera silence)
  */
 export function buildKeepSegments(options: {
   words: TranscriptWord[];
   durationSec: number;
   fps: number;
+  holds?: HoldRange[];
 }): KeepSegment[] {
-  const { words, durationSec, fps } = options;
+  const { words, durationSec, fps, holds = [] } = options;
 
   type Interval = { start: number; end: number };
   const remove: Interval[] = [];
@@ -138,6 +141,16 @@ export function buildKeepSegments(options: {
       }
     }
   }
+
+  // Intentional silence (show something on camera without talking).
+  for (const hold of holds) {
+    const start = Math.max(0, Math.min(hold.start, durationSec));
+    const end = Math.max(start, Math.min(hold.end, durationSec));
+    if (end - start < 1 / fps) continue;
+    speechKeep.push({ start, end });
+  }
+
+  speechKeep.sort((a, b) => a.start - b.start);
 
   const mergedKeep: Interval[] = [];
   for (const interval of speechKeep) {

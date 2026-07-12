@@ -1,22 +1,16 @@
-import { spawnSync } from "node:child_process";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import {
-  downloadWhisperModel,
-  installWhisperCpp,
-  toCaptions,
-  transcribe,
-} from "@remotion/install-whisper-cpp";
-import {
-  WHISPER_CPP_VERSION,
-  WHISPER_LANGUAGE,
-  WHISPER_MODEL,
-} from "./constants";
+    downloadWhisperModel, installWhisperCpp, toCaptions, transcribe
+} from '@remotion/install-whisper-cpp';
+
+import { WHISPER_CPP_VERSION, WHISPER_LANGUAGE, WHISPER_MODEL } from './constants';
+import { ROOT } from './types';
+
 import type { Transcript, TranscriptWord } from "./types";
-import { ROOT } from "./types";
-
-
 const WHISPER_DIR = path.join(ROOT, "whisper.cpp");
 
 function msToSec(ms: number): number {
@@ -26,7 +20,18 @@ function msToSec(ms: number): number {
 function extractWav(videoPath: string, wavPath: string): void {
   const result = spawnSync(
     "ffmpeg",
-    ["-y", "-i", videoPath, "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wavPath],
+    [
+      "-y",
+      "-i",
+      videoPath,
+      "-ar",
+      "16000",
+      "-ac",
+      "1",
+      "-c:a",
+      "pcm_s16le",
+      wavPath,
+    ],
     { encoding: "utf8" },
   );
   if (result.status !== 0) {
@@ -55,7 +60,9 @@ export async function runWhisper(options: {
 }): Promise<Omit<Transcript, "source">> {
   await ensureWhisperCpp();
 
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "talking-head-whisper-"));
+  const tmpDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "talking-head-whisper-"),
+  );
   const wavPath = path.join(tmpDir, "audio.wav");
 
   try {
@@ -72,7 +79,9 @@ export async function runWhisper(options: {
       model: WHISPER_MODEL,
       language: WHISPER_LANGUAGE,
       tokenLevelTimestamps: true,
-      splitOnWord: true,
+      // Remotion's splitOnWord passes `--split-on-word true`; whisper-cli
+      // treats that boolean as a positional input path. Pass the flag alone.
+      additionalArgs: ["--split-on-word"],
       printOutput: true,
     });
 

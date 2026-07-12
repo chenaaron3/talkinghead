@@ -1,3 +1,5 @@
+import type { BrowserContext } from "playwright";
+
 export type PlatformId = "youtube" | "instagram" | "tiktok";
 
 export type ScheduleConfig = {
@@ -19,7 +21,11 @@ export type ScheduleResult = {
 
 export type PlatformPublisher = {
   id: PlatformId;
-  schedule(input: ScheduleInput): Promise<ScheduleResult>;
+  /** Browser platforms accept a shared Playwright context for parallel runs. */
+  schedule(
+    input: ScheduleInput,
+    context?: BrowserContext,
+  ): Promise<ScheduleResult>;
 };
 
 export type ManifestEntry = {

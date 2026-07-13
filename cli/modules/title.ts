@@ -1,10 +1,8 @@
-import OpenAI from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod';
-import { z } from 'zod';
-
-import { getResultsOrCached } from '../helpers/transcript-cache';
-
-import type { TranscriptWord } from "../helpers/types";
+import OpenAI from "openai";
+import { zodResponseFormat } from "openai/helpers/zod";
+import { z } from "zod";
+import { getResultsOrCached } from "../helpers/transcript-cache";
+import type { TranscriptCaption } from "../helpers/types";
 
 const MODEL = "gpt-4.1-mini";
 const MAX_TITLE_WORDS = 5;
@@ -26,14 +24,11 @@ export const TitleDetectionSchema = z.object({
 
 export type TitleDetection = z.infer<typeof TitleDetectionSchema>;
 
-function transcriptText(words: TranscriptWord[]): string {
-  return words
-    .map((w) => w.word.trim())
-    .filter(Boolean)
-    .join(" ");
+function transcriptText(captions: TranscriptCaption[]): string {
+  return captions.map((c) => c.text.trim()).filter(Boolean).join(" ");
 }
 
-async function callOpenAI(words: TranscriptWord[]): Promise<TitleDetection> {
+async function callOpenAI(captions: TranscriptCaption[]): Promise<TitleDetection> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -42,7 +37,7 @@ async function callOpenAI(words: TranscriptWord[]): Promise<TitleDetection> {
   }
 
   const client = new OpenAI({ apiKey });
-  const text = transcriptText(words);
+  const text = transcriptText(captions);
 
   const completion = await client.chat.completions.parse({
     model: MODEL,
@@ -75,14 +70,14 @@ async function callOpenAI(words: TranscriptWord[]): Promise<TitleDetection> {
   return parsed;
 }
 
-/** Generate a ≤5-word title from the transcript (cached). */
+/** Generate a ≤5-word title from captions (cached). */
 export async function buildTitle(options: {
-  words: TranscriptWord[];
+  captions: TranscriptCaption[];
   transcriptPath: string;
   cachePath: string;
   force: boolean;
 }): Promise<string> {
-  const { words, transcriptPath, cachePath, force } = options;
+  const { captions, transcriptPath, cachePath, force } = options;
 
   const detection = await getResultsOrCached({
     cachePath,
@@ -91,7 +86,7 @@ export async function buildTitle(options: {
     schema: TitleDetectionSchema,
     compute: async () => {
       console.log(`[title] generating via OpenAI (${MODEL})`);
-      return callOpenAI(words);
+      return callOpenAI(captions);
     },
   });
 

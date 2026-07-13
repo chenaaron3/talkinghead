@@ -3,14 +3,10 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import {
   buildNumberedTranscript,
-  wordIndexToOutputFrame,
+  captionIndexToSourceSec,
 } from "../helpers/cuts";
 import { getResultsOrCached } from "../helpers/transcript-cache";
-import type {
-  KeepSegment,
-  ListicleOverlay,
-  TranscriptWord,
-} from "../helpers/types";
+import type { TranscriptCaption, SourceListicle } from "../helpers/types";
 
 const MODEL = "gpt-4.1-mini";
 const MIN_ITEMS = 3;
@@ -58,61 +54,53 @@ function clampLabel(label: string): string {
     .join(" ");
 }
 
-export function buildListicleOverlay(options: {
-  detection: ListicleDetection;
-  words: TranscriptWord[];
-  segments: KeepSegment[];
-  fps: number;
-}): ListicleOverlay | null {
-  const { detection, words, segments, fps } = options;
+export function detectionToListicleOverlay(
+  detection: ListicleDetection,
+  captions: TranscriptCaption[],
+): SourceListicle | null {
   if (detection.items.length < MIN_ITEMS) return null;
 
   const items = [];
   for (const item of detection.items.slice(0, MAX_ITEMS)) {
     const label = clampLabel(item.label);
     if (!label) continue;
-    const revealFrame = wordIndexToOutputFrame(
+    const reveal = captionIndexToSourceSec(
       item.startWordIndex,
-      words,
-      segments,
-      fps,
+      captions,
       "start",
     );
-    if (revealFrame == null) continue;
-    items.push({ label, revealFrame });
+    if (reveal == null) continue;
+    items.push({ label, reveal });
   }
 
   if (items.length < MIN_ITEMS) return null;
 
-  let startFrame = wordIndexToOutputFrame(
+  let start = captionIndexToSourceSec(
     detection.listStartWordIndex,
-    words,
-    segments,
-    fps,
+    captions,
     "start",
   );
-  let endFrame = wordIndexToOutputFrame(
+  let end = captionIndexToSourceSec(
     detection.listEndWordIndex,
-    words,
-    segments,
-    fps,
+    captions,
     "end",
   );
 
-  if (startFrame == null) startFrame = items[0]!.revealFrame;
-  if (endFrame == null) {
-    endFrame = items[items.length - 1]!.revealFrame + Math.round(fps * 2);
+  if (start == null) start = items[0]!.reveal;
+  if (end == null) {
+    const last = captions[captions.length - 1];
+    end = last ? last.end : items[items.length - 1]!.reveal + 2;
   }
 
-  startFrame = Math.min(startFrame, items[0]!.revealFrame);
-  endFrame = Math.max(endFrame, items[items.length - 1]!.revealFrame + 1);
+  start = Math.min(start, items[0]!.reveal);
+  end = Math.max(end, items[items.length - 1]!.reveal + 0.5);
 
-  if (endFrame <= startFrame) return null;
+  if (end <= start) return null;
 
-  return { startFrame, endFrame, items };
+  return { start, end, items };
 }
 
-async function callOpenAI(words: TranscriptWord[]): Promise<ListicleDetection> {
+async function callOpenAI(captions: TranscriptCaption[]): Promise<ListicleDetection> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -121,7 +109,7 @@ async function callOpenAI(words: TranscriptWord[]): Promise<ListicleDetection> {
   }
 
   const client = new OpenAI({ apiKey });
-  const numbered = buildNumberedTranscript(words);
+  const numbered = buildNumberedTranscript(captions);
 
   const completion = await client.chat.completions.parse({
     model: MODEL,
@@ -164,12 +152,12 @@ async function callOpenAI(words: TranscriptWord[]): Promise<ListicleDetection> {
 }
 
 export async function detectListicle(options: {
-  words: TranscriptWord[];
+  captions: TranscriptCaption[];
   transcriptPath: string;
   cachePath: string;
   force: boolean;
 }): Promise<ListicleDetection> {
-  const { words, transcriptPath, cachePath, force } = options;
+  const { captions, transcriptPath, cachePath, force } = options;
 
   return getResultsOrCached({
     cachePath,
@@ -177,10 +165,8 @@ export async function detectListicle(options: {
     force,
     schema: ListicleDetectionSchema,
     compute: async () => {
-      console.log(
-        `[listicle] detecting list via OpenAI (${MODEL})`,
-      );
-      const detection = await callOpenAI(words);
+      console.log(`[listicle] detecting list via OpenAI (${MODEL})`);
+      const detection = await callOpenAI(captions);
       console.log(
         `[listicle] ${detection.items.length} item(s) → ${cachePath}`,
       );
@@ -189,39 +175,32 @@ export async function detectListicle(options: {
   });
 }
 
-/** Detect + map listicle timings into the edited timeline (or null if disabled / none found). */
-export async function buildListicle(options: {
+/** Detect listicle and return source-time overlay (or null if disabled / none found). */
+export async function buildListicleOverlay(options: {
   enabled: boolean;
-  words: TranscriptWord[];
-  segments: KeepSegment[];
-  fps: number;
+  captions: TranscriptCaption[];
   transcriptPath: string;
   cachePath: string;
   force: boolean;
-}): Promise<ListicleOverlay | null> {
+}): Promise<SourceListicle | null> {
   if (!options.enabled) return null;
 
   const detection = await detectListicle({
-    words: options.words,
+    captions: options.captions,
     transcriptPath: options.transcriptPath,
     cachePath: options.cachePath,
     force: options.force,
   });
 
-  const listicle = buildListicleOverlay({
-    detection,
-    words: options.words,
-    segments: options.segments,
-    fps: options.fps,
-  });
+  const overlay = detectionToListicleOverlay(detection, options.captions);
 
-  if (listicle) {
+  if (overlay) {
     console.log(
-      `[listicle] overlay frames ${listicle.startFrame}–${listicle.endFrame} (${listicle.items.length} items)`,
+      `[listicle] overlay ${overlay.start.toFixed(2)}–${overlay.end.toFixed(2)}s (${overlay.items.length} items)`,
     );
   } else {
     console.log("[listicle] no list detected — skipping overlay");
   }
 
-  return listicle;
+  return overlay;
 }

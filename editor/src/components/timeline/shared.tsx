@@ -48,20 +48,20 @@ export function Handle({
 
 /** Edge-drag helper: local scrub lock + needle pixel callback. */
 export function useTrackDrag(onNeedleX: (x: number | null) => void) {
-  const pxPerFrame = useEditor((s) => s.pxPerFrame);
-  const seek = useEditor((s) => s.seek);
+  const pxPerSec = useEditor((s) => s.pxPerSec);
+  const duration = useEditor((s) => s.transcript?.duration ?? 0);
+  const seekSource = useEditor((s) => s.seekSource);
   const beginGesture = useEditor((s) => s.beginGesture);
 
-  const scrubTo = (frame: number, needleX: number) => {
-    const duration = useEditor.getState().props?.durationInFrames ?? 1;
-    const clamped = Math.max(0, Math.min(duration - 1, frame));
+  const scrubTo = (sourceSec: number, needleX: number) => {
+    const clamped = Math.max(0, Math.min(duration, sourceSec));
     onNeedleX(needleX);
-    seek(clamped);
+    seekSource(clamped);
   };
 
   const startDrag = (
     e: ReactMouseEvent,
-    onMove: (dxFrames: number, dxPx: number) => void,
+    onMove: (dxSec: number, dxPx: number) => void,
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -70,7 +70,7 @@ export function useTrackDrag(onNeedleX: (x: number | null) => void) {
     const startX = e.clientX;
     const onPointerMove = (ev: MouseEvent) => {
       const dxPx = ev.clientX - startX;
-      onMove(Math.round(dxPx / pxPerFrame), dxPx);
+      onMove(dxPx / pxPerSec, dxPx);
     };
     const onUp = () => {
       setTimelineScrubbing(false);
@@ -82,7 +82,7 @@ export function useTrackDrag(onNeedleX: (x: number | null) => void) {
     window.addEventListener("mouseup", onUp);
   };
 
-  return { startDrag, scrubTo, pxPerFrame };
+  return { startDrag, scrubTo, pxPerSec };
 }
 
 /** Parent owns the needle pixel override while any track is dragging. */

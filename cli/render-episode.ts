@@ -1,66 +1,115 @@
-import { spawnSync } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
+import { bundle } from "@remotion/bundler";
+import {
+  renderMedia,
+  renderStill,
+  selectComposition,
+} from "@remotion/renderer";
 import type { EpisodeProps } from "./helpers/types";
 import { ROOT } from "./helpers/types";
 
-function runRemotion(args: string[], label: string) {
-  console.log(`[${label}] pnpm ${args.join(" ")}`);
-  const result = spawnSync("pnpm", args, {
-    cwd: ROOT,
-    stdio: "inherit",
-  });
-  if (result.status !== 0) {
-    throw new Error(`${label} failed`);
+export type RenderProgress = {
+  phase: "bundle" | "video" | "cover";
+  /** 0–1 within the current phase. */
+  progress: number;
+  /** 0–1 across the whole export (video ~90%, cover ~10%). */
+  overall: number;
+};
+
+type ProgressCb = (p: RenderProgress) => void;
+
+let bundlePromise: Promise<string> | null = null;
+
+async function getServeUrl(): Promise<string> {
+  if (!bundlePromise) {
+    bundlePromise = bundle({
+      entryPoint: path.join(ROOT, "src", "index.ts"),
+      webpackOverride: (config) => config,
+    }).catch((err) => {
+      bundlePromise = null;
+      throw err;
+    });
   }
+  return bundlePromise;
 }
 
-export function renderEpisode(options: {
+function overallFor(phase: RenderProgress["phase"], progress: number): number {
+  if (phase === "bundle") return progress * 0.05;
+  if (phase === "video") return 0.05 + progress * 0.85;
+  return 0.9 + progress * 0.1;
+}
+
+export async function renderEpisode(options: {
   episodeId: string;
   episodeDir: string;
-}): { videoPath: string; coverPath: string } {
+  onProgress?: ProgressCb;
+}): Promise<{ videoPath: string; coverPath: string }> {
   const propsPath = path.join(options.episodeDir, "generated", "props.json");
+  const { readFileSync, mkdirSync, existsSync } = await import("node:fs");
 
-  if (!fs.existsSync(propsPath)) {
+  if (!existsSync(propsPath)) {
     throw new Error(
       `Missing ${propsPath} for episode ${options.episodeId}`,
     );
   }
 
-  const props = JSON.parse(fs.readFileSync(propsPath, "utf8")) as EpisodeProps;
+  const props = JSON.parse(readFileSync(propsPath, "utf8")) as EpisodeProps;
   const outDir = path.join(ROOT, "out", options.episodeId);
-  fs.mkdirSync(outDir, { recursive: true });
+  mkdirSync(outDir, { recursive: true });
 
   const videoPath = path.join(outDir, "video.mp4");
   const coverPath = path.join(outDir, "cover.jpg");
+  const report = options.onProgress;
 
   console.log(`[render] episode=${options.episodeId} fps=${props.fps}`);
 
-  runRemotion(
-    [
-      "remotion",
-      "render",
-      "TalkingHead",
-      videoPath,
-      `--props=${propsPath}`,
-    ],
-    "render",
-  );
+  report?.({ phase: "bundle", progress: 0, overall: 0 });
+  const serveUrl = await getServeUrl();
+  report?.({ phase: "bundle", progress: 1, overall: overallFor("bundle", 1) });
+
+  const videoComposition = await selectComposition({
+    serveUrl,
+    id: "TalkingHead",
+    inputProps: props,
+  });
+
+  await renderMedia({
+    composition: videoComposition,
+    serveUrl,
+    codec: "h264",
+    outputLocation: videoPath,
+    inputProps: props,
+    onProgress: ({ progress }) => {
+      report?.({
+        phase: "video",
+        progress,
+        overall: overallFor("video", progress),
+      });
+    },
+  });
   console.log(`[done] ${videoPath}`);
 
-  runRemotion(
-    [
-      "remotion",
-      "still",
-      "Cover",
-      coverPath,
-      `--props=${propsPath}`,
-      "--frame=0",
-      "--image-format=jpeg",
-    ],
-    "cover",
-  );
+  const coverComposition = await selectComposition({
+    serveUrl,
+    id: "Cover",
+    inputProps: props,
+  });
+
+  report?.({
+    phase: "cover",
+    progress: 0,
+    overall: overallFor("cover", 0),
+  });
+  await renderStill({
+    composition: coverComposition,
+    serveUrl,
+    output: coverPath,
+    inputProps: props,
+    frame: 0,
+    imageFormat: "jpeg",
+  });
   console.log(`[done] ${coverPath}`);
+  report?.({ phase: "cover", progress: 1, overall: 1 });
 
   return { videoPath, coverPath };
 }

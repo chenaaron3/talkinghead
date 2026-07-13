@@ -1,9 +1,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
-import type { BRollClip } from "@src/lib/types";
-import type { FlatWord } from "../../lib/captions";
+import type { SourceBRoll } from "@src/lib/types";
+import type { FlatCaption } from "../../lib/captions";
 import { useEditor } from "../../store";
-
-const NO_BROLLS: BRollClip[] = [];
 
 type ResizeState = {
   id: string;
@@ -11,8 +9,8 @@ type ResizeState = {
 };
 
 export function useBRollResize() {
-  const bRolls = useEditor((s) => s.props?.bRolls ?? NO_BROLLS);
-  const seek = useEditor((s) => s.seek);
+  const bRolls = useEditor((s) => s.config?.bRolls ?? []);
+  const seekSource = useEditor((s) => s.seekSource);
   const selectBRoll = useEditor((s) => s.selectBRoll);
   const updateBRollRange = useEditor((s) => s.updateBRollRange);
   const beginGesture = useEditor((s) => s.beginGesture);
@@ -26,27 +24,27 @@ export function useBRollResize() {
     return () => window.removeEventListener("mouseup", onUp);
   }, [resize]);
 
-  const snapToWord = (word: FlatWord) => {
+  const snapToCaption = (caption: FlatCaption) => {
     if (!resize) return;
     const clip = bRolls.find((c) => c.id === resize.id);
     if (!clip) return;
 
     if (resize.edge === "start") {
-      const start = word.startFrame;
-      const end = Math.max(start + 1, clip.endFrame);
+      const start = caption.start;
+      const end = Math.max(start + 0.04, clip.end);
       updateBRollRange(clip.id, start, end, true);
-      seek(start);
+      seekSource(start);
     } else {
-      const end = word.endFrame;
-      const start = Math.min(clip.startFrame, end - 1);
-      updateBRollRange(clip.id, start, Math.max(start + 1, end), true);
-      seek(Math.max(start, end - 1));
+      const end = caption.end;
+      const start = Math.min(clip.start, end - 0.04);
+      updateBRollRange(clip.id, start, Math.max(start + 0.04, end), true);
+      seekSource(end);
     }
   };
 
   const startResize = (
     e: MouseEvent,
-    clip: BRollClip,
+    clip: SourceBRoll,
     edge: "start" | "end",
   ) => {
     e.preventDefault();
@@ -54,12 +52,8 @@ export function useBRollResize() {
     beginGesture();
     selectBRoll(clip.id);
     setResize({ id: clip.id, edge });
-    seek(
-      edge === "start"
-        ? clip.startFrame
-        : Math.max(clip.startFrame, clip.endFrame - 1),
-    );
+    seekSource(edge === "start" ? clip.start : clip.end);
   };
 
-  return { resize, startResize, snapToWord };
+  return { resize, startResize, snapToCaption };
 }

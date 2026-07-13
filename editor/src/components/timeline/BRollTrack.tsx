@@ -3,22 +3,24 @@ import { Handle, TrackLabel, useTrackDrag } from "./shared";
 
 type Props = {
   width: number;
-  outputX: (outputFrame: number) => number;
+  sourceX: (sourceSec: number) => number;
   onNeedleX: (x: number | null) => void;
 };
 
-export function BRollTrack({ width, outputX, onNeedleX }: Props) {
-  const bRolls = useEditor((s) => s.props?.bRolls ?? []);
+export function BRollTrack({ width, sourceX, onNeedleX }: Props) {
+  const bRolls = useEditor((s) => s.config?.bRolls ?? []);
+  const pxPerSec = useEditor((s) => s.pxPerSec);
   const selectedBRollId = useEditor((s) => s.selectedBRollId);
   const selectBRoll = useEditor((s) => s.selectBRoll);
   const updateBRollRange = useEditor((s) => s.updateBRollRange);
+  const seekSource = useEditor((s) => s.seekSource);
   const { startDrag, scrubTo } = useTrackDrag(onNeedleX);
 
   return (
     <TrackLabel label="B-roll" width={width}>
       {bRolls.map((clip) => {
-        const left = outputX(clip.startFrame);
-        const right = outputX(clip.endFrame);
+        const left = sourceX(clip.start);
+        const right = sourceX(clip.end);
         return (
           <div
             key={clip.id}
@@ -36,13 +38,14 @@ export function BRollTrack({ width, outputX, onNeedleX }: Props) {
             <Handle
               side="left"
               onMouseDown={(e) => {
-                const origin = clip.startFrame;
-                const end = clip.endFrame;
+                const origin = clip.start;
+                const end = clip.end;
                 const originX = left;
-                startDrag(e, (dx, dxPx) => {
-                  const start = Math.max(0, Math.min(origin + dx, end - 1));
+                startDrag(e, (dx) => {
+                  const start = Math.max(0, Math.min(origin + dx / pxPerSec, end - 0.04));
                   updateBRollRange(clip.id, start, end, true);
-                  scrubTo(start, originX + dxPx);
+                  seekSource(start);
+                  scrubTo(start, originX + dx);
                 });
               }}
             />
@@ -50,13 +53,14 @@ export function BRollTrack({ width, outputX, onNeedleX }: Props) {
             <Handle
               side="right"
               onMouseDown={(e) => {
-                const origin = clip.endFrame;
-                const start = clip.startFrame;
+                const origin = clip.end;
+                const start = clip.start;
                 const originX = right;
-                startDrag(e, (dx, dxPx) => {
-                  const end = Math.max(start + 1, origin + dx);
+                startDrag(e, (dx) => {
+                  const end = Math.max(start + 0.04, origin + dx / pxPerSec);
                   updateBRollRange(clip.id, start, end, true);
-                  scrubTo(Math.max(start, end - 1), originX + dxPx);
+                  seekSource(end);
+                  scrubTo(end, originX + dx);
                 });
               }}
             />

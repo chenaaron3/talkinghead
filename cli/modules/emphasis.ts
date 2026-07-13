@@ -1,11 +1,9 @@
-import OpenAI from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod';
-import { z } from 'zod';
-
-import { buildNumberedTranscript } from '../helpers/cuts';
-import { getResultsOrCached } from '../helpers/transcript-cache';
-
-import type { CaptionEmphasis, TranscriptWord } from "../helpers/types";
+import OpenAI from "openai";
+import { zodResponseFormat } from "openai/helpers/zod";
+import { z } from "zod";
+import { buildNumberedTranscript } from "../helpers/cuts";
+import { getResultsOrCached } from "../helpers/transcript-cache";
+import type { CaptionEmphasis, TranscriptCaption } from "../helpers/types";
 
 const MODEL = "gpt-4.1-mini";
 
@@ -33,7 +31,7 @@ export const EmphasisDetectionSchema = z.object({
 
 export type EmphasisDetection = z.infer<typeof EmphasisDetectionSchema>;
 
-async function callOpenAI(words: TranscriptWord[]): Promise<EmphasisDetection> {
+async function callOpenAI(captions: TranscriptCaption[]): Promise<EmphasisDetection> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -42,7 +40,7 @@ async function callOpenAI(words: TranscriptWord[]): Promise<EmphasisDetection> {
   }
 
   const client = new OpenAI({ apiKey });
-  const numbered = buildNumberedTranscript(words);
+  const numbered = buildNumberedTranscript(captions);
 
   const completion = await client.chat.completions.parse({
     model: MODEL,
@@ -79,34 +77,64 @@ async function callOpenAI(words: TranscriptWord[]): Promise<EmphasisDetection> {
   return parsed;
 }
 
-/** Detect emphasis words and return a wordIndex → kind map (or null if disabled). */
-export async function buildEmphasis(options: {
-  enabled: boolean;
-  words: TranscriptWord[];
+export async function detectEmphasis(options: {
+  captions: TranscriptCaption[];
   transcriptPath: string;
   cachePath: string;
   force: boolean;
-}): Promise<Map<number, CaptionEmphasis> | null> {
-  const { enabled, words, transcriptPath, cachePath, force } = options;
-  if (!enabled) return null;
+}): Promise<EmphasisDetection> {
+  const { captions, transcriptPath, cachePath, force } = options;
 
-  const detection = await getResultsOrCached({
+  return getResultsOrCached({
     cachePath,
     transcriptPath,
     force,
     schema: EmphasisDetectionSchema,
     compute: async () => {
       console.log(`[emphasis] detecting highlight words via OpenAI (${MODEL})`);
-      return callOpenAI(words);
+      return callOpenAI(captions);
     },
   });
+}
 
-  const map = new Map<number, CaptionEmphasis>();
+/** Apply emphasis detection onto flat captions. */
+export function applyEmphasisToCaptions(
+  captions: TranscriptCaption[],
+  detection: EmphasisDetection,
+): TranscriptCaption[] {
+  const emphasisByIndex = new Map<number, CaptionEmphasis>();
   for (const entry of detection.words) {
-    if (entry.wordIndex < 0 || entry.wordIndex >= words.length) continue;
-    map.set(entry.wordIndex, entry.kind);
+    if (entry.wordIndex < 0 || entry.wordIndex >= captions.length) continue;
+    emphasisByIndex.set(entry.wordIndex, entry.kind);
   }
+  return captions.map((cap, i) => {
+    const emphasis = emphasisByIndex.get(i);
+    if (!emphasis) return cap;
+    return { ...cap, emphasis };
+  });
+}
 
-  console.log(`[emphasis] ${map.size} highlight word(s)`);
-  return map;
+/** Detect emphasis and merge onto captions (or return unchanged if disabled). */
+export async function buildEmphasisCaptions(options: {
+  enabled: boolean;
+  captions: TranscriptCaption[];
+  transcriptPath: string;
+  cachePath: string;
+  force: boolean;
+}): Promise<TranscriptCaption[]> {
+  const { enabled, captions, transcriptPath, cachePath, force } = options;
+  if (!enabled) return captions;
+
+  const detection = await detectEmphasis({
+    captions,
+    transcriptPath,
+    cachePath,
+    force,
+  });
+
+  const next = applyEmphasisToCaptions(captions, detection);
+  console.log(
+    `[emphasis] ${detection.words.length} highlight word(s) merged into transcript`,
+  );
+  return next;
 }

@@ -10,24 +10,27 @@ type Props = {
 
 export function SectionCell({ item, label, onNeedleX }: Props) {
   const adjustSection = useEditor((s) => s.adjustSection);
+  const pxPerSec = useEditor((s) => s.pxPerSec);
+  const seekSource = useEditor((s) => s.seekSource);
   const { startDrag, scrubTo } = useTrackDrag(onNeedleX);
 
   return (
     <div
-      className="absolute top-1 bottom-1 flex items-center overflow-hidden rounded bg-blue-500 px-1.5 text-[10px] text-white select-none"
+      className="absolute top-1 bottom-1 flex items-center overflow-hidden rounded bg-yellow-500/80 px-1.5 text-[10px] text-[#1a1508] select-none"
       style={{ left: item.x, width: item.width }}
-      title={`Section ${item.index + 1}`}
+      title={`Keep ${item.start.toFixed(2)}–${item.end.toFixed(2)}s`}
     >
       <Handle
         side="left"
         onMouseDown={(e) => {
-          let last = 0;
+          let lastSec = 0;
           const originX = item.x;
           startDrag(e, (dx, dxPx) => {
-            const step = dx - last;
-            last = dx;
-            adjustSection(item.index, "start", -step, true);
-            scrubTo(item.outputStart, originX + dxPx);
+            const deltaSec = dx / pxPerSec;
+            const step = deltaSec - lastSec;
+            lastSec = deltaSec;
+            adjustSection(item.keepRegionIndex, "start", step, true);
+            scrubTo(item.start + deltaSec, originX + dxPx);
           });
         }}
       />
@@ -37,17 +40,15 @@ export function SectionCell({ item, label, onNeedleX }: Props) {
       <Handle
         side="right"
         onMouseDown={(e) => {
-          let last = 0;
-          const originEnd = item.outputEnd;
+          let lastSec = 0;
           const originX = item.x + item.width;
           startDrag(e, (dx, dxPx) => {
-            const step = dx - last;
-            last = dx;
-            adjustSection(item.index, "end", step, true);
-            scrubTo(
-              Math.max(item.outputStart, originEnd + last - 1),
-              originX + dxPx,
-            );
+            const deltaSec = dx / pxPerSec;
+            const step = deltaSec - lastSec;
+            lastSec = deltaSec;
+            adjustSection(item.keepRegionIndex, "end", step, true);
+            seekSource(item.end + deltaSec);
+            scrubTo(item.end + deltaSec, originX + dxPx);
           });
         }}
       />

@@ -1,20 +1,22 @@
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
+import { buildProps } from "../src/lib/build-props";
 import {
   findSourceVideo,
   loadEpisodeConfig,
   resolveEpisodeDir,
+  writeEpisodeConfig,
   writeEpisodeTitle,
 } from "./helpers/config";
-import { buildCaptionGroups, buildKeepSegments } from "./helpers/cuts";
+import { buildCutsFromWords } from "./helpers/cuts";
 import { rebuildAllPropsIndex } from "./helpers/props-index";
 import type { EpisodeProps, Transcript } from "./helpers/types";
 import { PUBLIC_EPISODES_DIR, ROOT } from "./helpers/types";
 import { probeVideoFps, runWhisper } from "./helpers/whisper";
-import { buildEmphasis } from "./modules/emphasis";
-import { buildListicle } from "./modules/listicles";
-import { buildPunchIns } from "./modules/punchin";
+import { buildEmphasisCaptions } from "./modules/emphasis";
+import { buildListicleOverlay } from "./modules/listicles";
+import { buildPunchInSegments } from "./modules/punchin";
 import { buildTitle } from "./modules/title";
 import { renderEpisode } from "./render-episode";
 
@@ -59,8 +61,6 @@ function linkVideo(videoPath: string, episodeId: string): string {
     // dest does not exist yet
   }
 
-  // Remotion's render bundle does not follow symlinks out of public/,
-  // so hardlink (or copy) the file into public/episodes/<id>/.
   try {
     fs.linkSync(videoPath, destPath);
   } catch {
@@ -73,7 +73,7 @@ function linkVideo(videoPath: string, episodeId: string): string {
 export async function runProcess(argv: string[]): Promise<{ episodeId: string }> {
   const { input, force } = parseArgs(argv);
   const { episodeId, episodeDir } = resolveEpisodeDir(input);
-  const config = loadEpisodeConfig(episodeDir);
+  let config = loadEpisodeConfig(episodeDir);
   const videoPath = findSourceVideo(episodeDir);
   const videoStat = fs.statSync(videoPath);
   const generatedDir = path.join(episodeDir, "generated");
@@ -89,11 +89,13 @@ export async function runProcess(argv: string[]): Promise<{ episodeId: string }>
   console.log(`[process] video=${videoPath}`);
 
   let transcript: Transcript | null = null;
+
   if (!force && fs.existsSync(transcriptPath)) {
     const cached = JSON.parse(
       fs.readFileSync(transcriptPath, "utf8"),
     ) as Transcript;
     if (
+      cached.captions?.length &&
       cached.source &&
       cached.source.size === videoStat.size &&
       Math.abs(cached.source.mtimeMs - videoStat.mtimeMs) < 1
@@ -106,7 +108,9 @@ export async function runProcess(argv: string[]): Promise<{ episodeId: string }>
   if (!transcript) {
     const raw = await runWhisper({ videoPath });
     transcript = {
-      ...raw,
+      language: raw.language,
+      duration: raw.duration,
+      captions: raw.captions,
       source: {
         path: path.relative(ROOT, videoPath),
         size: videoStat.size,
@@ -114,130 +118,111 @@ export async function runProcess(argv: string[]): Promise<{ episodeId: string }>
       },
     };
     writeJson(transcriptPath, transcript);
-    console.log(`[cache] wrote ${transcriptPath}`);
+    console.log(
+      `[cache] wrote ${transcriptPath} (${raw.captions.length} captions)`,
+    );
   }
+
+  const durationSec = Math.max(
+    transcript.duration,
+    probe.durationInSeconds,
+    ...transcript.captions.map((c) => c.end),
+  );
+  transcript = { ...transcript, duration: durationSec };
 
   let title = config.title;
   if (!title) {
     title = await buildTitle({
-      words: transcript.words,
+      captions: transcript.captions,
       transcriptPath,
       cachePath: path.join(generatedDir, "title.json"),
       force,
     });
     writeEpisodeTitle(episodeDir, title);
+    config = { ...config, title };
     console.log(`[title] wrote config.yaml`);
   }
   console.log(`[process] title="${title}"`);
 
-  const durationSec = Math.max(
-    transcript.duration,
-    probe.durationInSeconds,
-    ...transcript.words.map((w) => w.end),
-  );
-
-  if (config.holds.length > 0) {
+  if (config.cuts.length === 0) {
+    const cuts = buildCutsFromWords({
+      captions: transcript.captions,
+      durationSec,
+      fps,
+    });
+    writeEpisodeConfig(episodeDir, { cuts });
+    config = { ...config, cuts };
+    console.log(`[cuts] auto-generated ${cuts.length} cut(s)`);
+  } else {
     console.log(
-      `[holds] ${config.holds.length} range(s): ${config.holds
-        .map((h) => `${h.start.toFixed(1)}–${h.end.toFixed(1)}s`)
-        .join(", ")}`,
+      `[cuts] preserving ${config.cuts.length} editor-defined cut(s)`,
     );
   }
 
-  const segments = buildKeepSegments({
-    words: transcript.words,
-    durationSec,
-    fps,
-    holds: config.holds,
-  });
+  let captions = transcript.captions;
+  if (config.emphasis) {
+    captions = await buildEmphasisCaptions({
+      enabled: config.emphasis,
+      captions,
+      transcriptPath,
+      cachePath: path.join(generatedDir, "emphasis.json"),
+      force,
+    });
+    transcript = { ...transcript, captions };
+    writeJson(transcriptPath, transcript);
+  }
 
-  const emphasis = await buildEmphasis({
-    enabled: config.emphasis,
-    words: transcript.words,
-    transcriptPath,
-    cachePath: path.join(generatedDir, "emphasis.json"),
-    force,
-  });
-
-  const captionGroups = buildCaptionGroups({
-    words: transcript.words,
-    segments,
-    fps,
-    captionsAtATime: config.captionsAtATime,
-    emphasis,
-  });
-
-  const listicle = await buildListicle({
-    enabled: config.listicle,
-    words: transcript.words,
-    segments,
-    fps,
-    transcriptPath,
-    cachePath: path.join(generatedDir, "listicle.json"),
-    force,
-  });
-
-  const punchIns = await buildPunchIns({
-    enabled: config.punchIns,
-    words: transcript.words,
-    segments,
-    fps,
-    transcriptPath,
-    cachePath: path.join(generatedDir, "punch-ins.json"),
-    force,
-  });
-
-  const durationInFrames = segments.reduce(
-    (sum, seg) => sum + seg.durationInFrames,
-    0,
-  );
-
-  const videoSrc = linkVideo(videoPath, episodeId);
-
-  const propsPath = path.join(generatedDir, "props.json");
-  let existingBRolls: EpisodeProps["bRolls"] = [];
-  if (fs.existsSync(propsPath)) {
-    try {
-      const prev = JSON.parse(fs.readFileSync(propsPath, "utf8")) as EpisodeProps;
-      existingBRolls = prev.bRolls ?? [];
-    } catch {
-      existingBRolls = [];
+  if (config.listicle && !config.listicleOverlay) {
+    const overlay = await buildListicleOverlay({
+      enabled: config.listicle,
+      captions,
+      transcriptPath,
+      cachePath: path.join(generatedDir, "listicle.json"),
+      force,
+    });
+    if (overlay) {
+      writeEpisodeConfig(episodeDir, { listicleOverlay: overlay });
+      config = { ...config, listicleOverlay: overlay };
     }
   }
 
-  const props: EpisodeProps = {
+  if (config.punchIns && config.punchInSegments.length === 0) {
+    const punchInSegments = await buildPunchInSegments({
+      enabled: config.punchIns,
+      captions,
+      transcriptPath,
+      cachePath: path.join(generatedDir, "punch-ins.json"),
+      force,
+    });
+    if (punchInSegments.length > 0) {
+      writeEpisodeConfig(episodeDir, { punchInSegments });
+      config = { ...config, punchInSegments };
+    }
+  }
+
+  const videoSrc = linkVideo(videoPath, episodeId);
+
+  const props = buildProps({
     episodeId,
     title,
     videoSrc,
     fps,
-    width: 1080,
-    height: 1920,
-    durationInFrames: Math.max(1, durationInFrames),
-    titleDurationSec: config.titleDurationSec,
-    captionsAtATime: config.captionsAtATime,
-    sections: segments.map((seg) => ({
-      trimBefore: seg.trimBefore,
-      trimAfter: seg.trimAfter,
-      durationInFrames: seg.durationInFrames,
-    })),
-    captionGroups,
-    listicle,
-    punchIns,
-    bRolls: existingBRolls,
-  };
+    width: probe.width,
+    height: probe.height,
+    config,
+    transcript,
+  });
 
   writeJson(path.join(generatedDir, "props.json"), props);
-
   refreshEpisodesIndex(props);
 
-  const originalSec = durationSec;
-  const editedSec = durationInFrames / fps;
+  const editedSec = props.durationInFrames / fps;
   console.log(
-    `[done] kept ${segments.length} segment(s); ${originalSec.toFixed(1)}s → ${editedSec.toFixed(1)}s (${captionGroups.length} caption groups)`,
+    `[done] ${durationSec.toFixed(1)}s source → ${editedSec.toFixed(1)}s output (${props.captionGroups.length} caption groups)`,
   );
   console.log(`[done] props → source/${episodeId}/generated/props.json`);
 
-  renderEpisode({ episodeId, episodeDir });
+  await renderEpisode({ episodeId, episodeDir });
   return { episodeId };
 }
 

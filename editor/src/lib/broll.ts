@@ -1,38 +1,52 @@
-import type { BRollClip, EpisodeProps } from "@src/lib/types";
+import type { SourceBRoll } from "@src/lib/types";
 
 export function bRollsOverlap(
-  clips: BRollClip[],
-  candidate: { startFrame: number; endFrame: number; id?: string },
+  clips: SourceBRoll[],
+  candidate: { start: number; end: number; id?: string },
 ): boolean {
   return clips.some((clip) => {
     if (candidate.id && clip.id === candidate.id) return false;
-    return (
-      candidate.startFrame < clip.endFrame &&
-      candidate.endFrame > clip.startFrame
-    );
+    return candidate.start < clip.end && candidate.end > clip.start;
   });
 }
 
 export function upsertBRoll(
-  props: EpisodeProps,
-  clip: BRollClip,
-): EpisodeProps | { error: string } {
-  const others = (props.bRolls ?? []).filter((c) => c.id !== clip.id);
-  if (clip.endFrame <= clip.startFrame) {
+  bRolls: SourceBRoll[],
+  clip: SourceBRoll,
+): SourceBRoll[] | { error: string } {
+  const others = bRolls.filter((c) => c.id !== clip.id);
+  if (clip.end <= clip.start) {
     return { error: "B-roll end must be after start" };
   }
   if (bRollsOverlap(others, clip)) {
     return { error: "B-roll overlaps another clip" };
   }
-  return {
-    ...props,
-    bRolls: [...others, clip].sort((a, b) => a.startFrame - b.startFrame),
-  };
+  return [...others, clip].sort((a, b) => a.start - b.start);
 }
 
-export function removeBRoll(props: EpisodeProps, id: string): EpisodeProps {
-  return {
-    ...props,
-    bRolls: (props.bRolls ?? []).filter((c) => c.id !== id),
-  };
+export function removeBRoll(
+  bRolls: SourceBRoll[],
+  id: string,
+): SourceBRoll[] {
+  return bRolls.filter((c) => c.id !== id);
+}
+
+/** Snap a source timestamp to the nearest caption boundary. */
+export function snapToCaptionBoundary(
+  sec: number,
+  captions: { start: number; end: number }[],
+  edge: "start" | "end",
+): number {
+  if (captions.length === 0) return sec;
+  let best = sec;
+  let bestDist = Infinity;
+  for (const cap of captions) {
+    const point = edge === "start" ? cap.start : cap.end;
+    const dist = Math.abs(point - sec);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = point;
+    }
+  }
+  return best;
 }

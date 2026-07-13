@@ -1,70 +1,63 @@
 import { useMemo, type ReactNode } from "react";
-import type { BRollClip } from "@src/lib/types";
-import type { FlatWord } from "../../lib/captions";
-import type { Section } from "../../lib/frames";
-import { gapsBetweenSections } from "../../lib/sections";
-import { useEditor, useFlatWords } from "../../store";
+import type { SourceBRoll } from "@src/lib/types";
+import type { FlatCaption } from "../../lib/captions";
+import { sourceGaps } from "../../lib/sections";
+import { useEditor, useFlatCaptions } from "../../store";
 import { BRollHandle } from "./BRollHandle";
 import { Gap } from "./Gap";
 import { useBRollResize } from "./useBRollResize";
 import { Word } from "./Word";
 
-const NO_SECTIONS: Section[] = [];
-
 function brollCovering(
-  bRolls: BRollClip[],
-  word: FlatWord,
-): BRollClip | undefined {
+  bRolls: SourceBRoll[],
+  caption: FlatCaption,
+): SourceBRoll | undefined {
   return bRolls.find(
-    (c) => word.startFrame < c.endFrame && word.endFrame > c.startFrame,
+    (c) => caption.start < c.end && caption.end > c.start,
   );
 }
 
 export function TranscriptPanel() {
-  const props = useEditor((s) => s.props);
+  const config = useEditor((s) => s.config);
   const selectedBRollId = useEditor((s) => s.selectedBRollId);
   const selectBRoll = useEditor((s) => s.selectBRoll);
   const selectGap = useEditor((s) => s.selectGap);
-  const words = useFlatWords();
-  const { resize, startResize, snapToWord } = useBRollResize();
+  const captions = useFlatCaptions();
+  const { resize, startResize, snapToCaption } = useBRollResize();
 
-  const sections = props?.sections ?? NO_SECTIONS;
-  const bRolls = props?.bRolls ?? [];
+  const bRolls = config?.bRolls ?? [];
 
   const gapMarkers = useMemo(
-    () => gapsBetweenSections(sections),
-    [sections],
+    () => (config ? sourceGaps(config) : []),
+    [config],
   );
 
   const nodes: ReactNode[] = [];
   let gapIdx = 0;
   let i = 0;
-  while (i < words.length) {
-    const word = words[i]!;
+
+  while (i < captions.length) {
+    const caption = captions[i]!;
     while (
       gapIdx < gapMarkers.length &&
-      gapMarkers[gapIdx]!.outputFrame <= word.startFrame
+      gapMarkers[gapIdx]!.end <= caption.start
     ) {
       const gap = gapMarkers[gapIdx]!;
       nodes.push(
-        <Gap
-          key={`gap-${gap.id}`}
-          id={gap.id}
-          frames={gap.frames}
-          outputFrame={gap.outputFrame}
-        />,
+        <Gap key={`gap-${gap.id}`} id={gap.id} start={gap.start} end={gap.end} />,
       );
       gapIdx += 1;
     }
-    const cover = brollCovering(bRolls, word);
+
+    const cover = brollCovering(bRolls, caption);
     if (!cover) {
       nodes.push(
         <Word
-          key={word.flatIndex}
-          word={word}
+          key={caption.index}
+          caption={caption}
           insideHighlight={false}
           isResizing={!!resize}
-          onResizeEnter={() => snapToWord(word)}
+          onResizeEnter={() => snapToCaption(caption)}
         />,
       );
       i += 1;
@@ -73,12 +66,12 @@ export function TranscriptPanel() {
 
     const runStart = i;
     while (
-      i < words.length &&
-      brollCovering(bRolls, words[i]!)?.id === cover.id
+      i < captions.length &&
+      brollCovering(bRolls, captions[i]!)?.id === cover.id
     ) {
       i += 1;
     }
-    const run = words.slice(runStart, i);
+    const run = captions.slice(runStart, i);
     const selected = selectedBRollId === cover.id || resize?.id === cover.id;
 
     nodes.push(
@@ -94,13 +87,13 @@ export function TranscriptPanel() {
         }}
       >
         <BRollHandle clip={cover} edge="start" onResizeStart={startResize} />
-        {run.map((w) => (
+        {run.map((c) => (
           <Word
-            key={w.flatIndex}
-            word={w}
+            key={c.index}
+            caption={c}
             insideHighlight
             isResizing={!!resize}
-            onResizeEnter={() => snapToWord(w)}
+            onResizeEnter={() => snapToCaption(c)}
           />
         ))}
         <BRollHandle clip={cover} edge="end" onResizeStart={startResize} />
@@ -111,12 +104,7 @@ export function TranscriptPanel() {
   while (gapIdx < gapMarkers.length) {
     const gap = gapMarkers[gapIdx]!;
     nodes.push(
-      <Gap
-        key={`gap-${gap.id}`}
-        id={gap.id}
-        frames={gap.frames}
-        outputFrame={gap.outputFrame}
-      />,
+      <Gap key={`gap-${gap.id}`} id={gap.id} start={gap.start} end={gap.end} />,
     );
     gapIdx += 1;
   }

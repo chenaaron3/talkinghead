@@ -1,15 +1,12 @@
 import { useMemo } from "react";
-import type { Section } from "../../lib/frames";
-import { gapsBetweenSections } from "../../lib/sections";
+import { cutsToTimelineRegions } from "@src/lib/source-timeline";
 import { useEditor } from "../../store";
-
-const NO_SECTIONS: Section[] = [];
 
 export type SectionLayoutItem = {
   kind: "section";
-  index: number;
-  outputStart: number;
-  outputEnd: number;
+  keepRegionIndex: number;
+  start: number;
+  end: number;
   x: number;
   width: number;
 };
@@ -17,7 +14,8 @@ export type SectionLayoutItem = {
 export type GapLayoutItem = {
   kind: "gap";
   id: number;
-  frames: number;
+  start: number;
+  end: number;
   x: number;
   width: number;
 };
@@ -25,69 +23,48 @@ export type GapLayoutItem = {
 export type LayoutItem = SectionLayoutItem | GapLayoutItem;
 
 export function useTimelineLayout() {
-  const sections = useEditor((s) => s.props?.sections ?? NO_SECTIONS);
-  const pxPerFrame = useEditor((s) => s.pxPerFrame);
+  const cuts = useEditor((s) => s.config?.cuts ?? []);
+  const duration = useEditor((s) => s.transcript?.duration ?? 0);
+  const pxPerSec = useEditor((s) => s.pxPerSec);
 
   return useMemo(() => {
-    const gaps = gapsBetweenSections(sections);
+    const regions = cutsToTimelineRegions(cuts, duration);
     const items: LayoutItem[] = [];
     let x = 0;
-    let outputCursor = 0;
-    let gi = 0;
+    let keepRegionIndex = 0;
+    let gapId = 0;
 
-    const pushGap = () => {
-      const gap = gaps[gi];
-      if (!gap) return;
-      const width = Math.max(8, gap.frames * pxPerFrame);
-      items.push({
-        kind: "gap",
-        id: gap.id,
-        frames: gap.frames,
-        x,
-        width,
-      });
-      x += width;
-      gi += 1;
-    };
-
-    const first = sections[0];
-    if (first && first.trimBefore > 0) pushGap();
-
-    sections.forEach((section, index) => {
-      const width = Math.max(8, section.durationInFrames * pxPerFrame);
-      items.push({
-        kind: "section",
-        index,
-        outputStart: outputCursor,
-        outputEnd: outputCursor + section.durationInFrames,
-        x,
-        width,
-      });
-      x += width;
-      outputCursor += section.durationInFrames;
-
-      const next = sections[index + 1];
-      if (next && next.trimBefore - section.trimAfter > 0) pushGap();
-    });
-
-    const outputX = (outputFrame: number) => {
-      let ox = 0;
-      let cursor = 0;
-      for (const item of items) {
-        if (item.kind === "section") {
-          if (outputFrame <= item.outputEnd) {
-            const local = Math.max(0, outputFrame - item.outputStart);
-            return ox + local * pxPerFrame;
-          }
-          ox += item.width;
-          cursor = item.outputEnd;
-        } else {
-          ox += item.width;
-        }
+    for (const region of regions) {
+      const width = Math.max(8, (region.end - region.start) * pxPerSec);
+      if (region.keep) {
+        items.push({
+          kind: "section",
+          keepRegionIndex: keepRegionIndex++,
+          start: region.start,
+          end: region.end,
+          x,
+          width,
+        });
+      } else {
+        items.push({
+          kind: "gap",
+          id: gapId++,
+          start: region.start,
+          end: region.end,
+          x,
+          width,
+        });
       }
-      return ox + Math.max(0, outputFrame - cursor) * pxPerFrame;
-    };
+      x += width;
+    }
 
-    return { items, totalWidth: x + 40, outputX };
-  }, [sections, pxPerFrame]);
+    const sourceX = (sourceSec: number) => sourceSec * pxPerSec;
+
+    return {
+      items,
+      totalWidth: Math.max(x + 40, duration * pxPerSec + 40),
+      sourceX,
+      duration,
+    };
+  }, [cuts, pxPerSec, duration]);
 }

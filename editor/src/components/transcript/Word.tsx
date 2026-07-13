@@ -1,42 +1,40 @@
 import { useEffect, useState } from "react";
-import type { BRollClip } from "@src/lib/types";
-import type { FlatWord } from "../../lib/captions";
+import type { SourceBRoll } from "@src/lib/types";
+import type { FlatCaption } from "../../lib/captions";
 import { useEditor, type Asset } from "../../store";
 
-const NO_BROLLS: BRollClip[] = [];
-
 function brollCoveringId(
-  bRolls: BRollClip[],
-  word: FlatWord,
+  bRolls: SourceBRoll[],
+  caption: FlatCaption,
 ): string | undefined {
   return bRolls.find(
-    (c) => word.startFrame < c.endFrame && word.endFrame > c.startFrame,
+    (c) => caption.start < c.end && caption.end > c.start,
   )?.id;
 }
 
 type Props = {
-  word: FlatWord;
+  caption: FlatCaption;
   insideHighlight: boolean;
   isResizing: boolean;
   onResizeEnter?: () => void;
 };
 
 export function Word({
-  word,
+  caption,
   insideHighlight,
   isResizing,
   onResizeEnter,
 }: Props) {
-  const frame = useEditor((s) => s.frame);
-  const bRolls = useEditor((s) => s.props?.bRolls ?? NO_BROLLS);
-  const seek = useEditor((s) => s.seek);
+  const sourceSec = useEditor((s) => s.sourceSec);
+  const bRolls = useEditor((s) => s.config?.bRolls ?? []);
+  const seekSource = useEditor((s) => s.seekSource);
   const selectBRoll = useEditor((s) => s.selectBRoll);
-  const setWordText = useEditor((s) => s.setWordText);
-  const setWordEmphasis = useEditor((s) => s.setWordEmphasis);
-  const placeBRollOnWord = useEditor((s) => s.placeBRollOnWord);
+  const setCaptionText = useEditor((s) => s.setCaptionText);
+  const setCaptionEmphasis = useEditor((s) => s.setCaptionEmphasis);
+  const placeBRollOnCaption = useEditor((s) => s.placeBRollOnCaption);
 
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(word.text);
+  const [draft, setDraft] = useState(caption.text);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -47,8 +45,7 @@ export function Word({
   }, [menu]);
 
   const active =
-    frame >= word.startFrame &&
-    frame < Math.max(word.endFrame, word.startFrame + 1);
+    sourceSec >= caption.start && sourceSec < caption.end;
 
   if (editing) {
     return (
@@ -58,12 +55,12 @@ export function Word({
         autoFocus
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
-          setWordText(word, draft.trim() || word.text);
+          setCaptionText(caption, draft.trim() || caption.text);
           setEditing(false);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
-            setWordText(word, draft.trim() || word.text);
+            setCaptionText(caption, draft.trim() || caption.text);
             setEditing(false);
           }
           if (e.key === "Escape") setEditing(false);
@@ -81,8 +78,8 @@ export function Word({
           active && !insideHighlight ? "bg-accent/20 border-accent" : "",
           active && insideHighlight ? "bg-black/10" : "",
           !insideHighlight ? "hover:bg-accent/15" : "hover:bg-broll/50",
-          word.emphasis === "positive" ? "font-semibold text-[#00e676]" : "",
-          word.emphasis === "negative" ? "font-semibold text-[#ff5252]" : "",
+          caption.emphasis === "positive" ? "font-semibold text-[#00e676]" : "",
+          caption.emphasis === "negative" ? "font-semibold text-[#ff5252]" : "",
           isResizing ? "cursor-ew-resize" : "",
         ]
           .filter(Boolean)
@@ -92,13 +89,13 @@ export function Word({
         }}
         onClick={(e) => {
           e.stopPropagation();
-          seek(word.startFrame);
-          const coverId = brollCoveringId(bRolls, word);
+          seekSource(caption.start);
+          const coverId = brollCoveringId(bRolls, caption);
           if (coverId) selectBRoll(coverId);
         }}
         onDoubleClick={(e) => {
           e.stopPropagation();
-          setDraft(word.text);
+          setDraft(caption.text);
           setEditing(true);
         }}
         onContextMenu={(e) => {
@@ -115,11 +112,11 @@ export function Word({
           e.preventDefault();
           const raw = e.dataTransfer.getData("application/x-broll-asset");
           if (!raw) return;
-          placeBRollOnWord(JSON.parse(raw) as Asset, word);
+          placeBRollOnCaption(JSON.parse(raw) as Asset, caption);
         }}
-        title={`${word.text}  ${word.startFrame}–${word.endFrame}`}
+        title={`${caption.text}  ${caption.start.toFixed(2)}–${caption.end.toFixed(2)}s`}
       >
-        {word.text}{" "}
+        {caption.text}{" "}
       </span>
 
       {menu ? (
@@ -140,7 +137,7 @@ export function Word({
               type="button"
               className="block w-full rounded px-2.5 py-2 text-left hover:bg-[#3d4a66]"
               onClick={() => {
-                setWordEmphasis(word, value);
+                setCaptionEmphasis(caption, value);
                 setMenu(null);
               }}
             >

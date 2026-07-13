@@ -10,7 +10,8 @@ import {
 import { WHISPER_CPP_VERSION, WHISPER_LANGUAGE, WHISPER_MODEL } from './constants';
 import { ROOT } from './types';
 
-import type { Transcript, TranscriptWord } from "./types";
+import { filterCaptions } from "./cuts";
+import type { Transcript, TranscriptCaption } from "./types";
 const WHISPER_DIR = path.join(ROOT, "whisper.cpp");
 
 function msToSec(ms: number): number {
@@ -89,27 +90,26 @@ export async function runWhisper(options: {
     // (e.g. "it's"). toCaptions() maps those items — don't walk BPE tokens.
     const { captions } = toCaptions({ whisperCppOutput });
 
-    const words: TranscriptWord[] = captions
+    const rawCaptions: TranscriptCaption[] = captions
       .map((caption) => {
-        const word = caption.text.trim();
+        const text = caption.text.trim();
         const startMs =
           caption.timestampMs != null && caption.timestampMs >= 0
             ? caption.timestampMs
             : caption.startMs;
         const endMs = Math.max(startMs + 40, caption.endMs);
         return {
-          word,
+          text,
           start: msToSec(startMs),
           end: msToSec(endMs),
-          probability: caption.confidence ?? null,
         };
       })
-      .filter((w) => w.word.length > 0 && !/\[BLANK_AUDIO\]/i.test(w.word));
+      .filter((c) => c.text.length > 0 && !/\[BLANK_AUDIO\]/i.test(c.text));
 
     // Snap ends so words don't overlap
-    for (let i = 0; i < words.length - 1; i++) {
-      const current = words[i]!;
-      const next = words[i + 1]!;
+    for (let i = 0; i < rawCaptions.length - 1; i++) {
+      const current = rawCaptions[i]!;
+      const next = rawCaptions[i + 1]!;
       if (next.start > current.start) {
         current.end = Math.max(
           current.start + 0.04,
@@ -118,9 +118,10 @@ export async function runWhisper(options: {
       }
     }
 
-    const duration = Math.max(0, ...words.map((w) => w.end));
+    const filtered = filterCaptions(rawCaptions);
+    const duration = Math.max(0, ...filtered.map((c) => c.end));
 
-    console.log(`[whisper] wrote ${words.length} words`);
+    console.log(`[whisper] wrote ${filtered.length} captions`);
 
     // Remotion's whisper.cpp wrapper leaves tmp.json in the project root
     const leftover = path.join(ROOT, "tmp.json");
@@ -131,7 +132,7 @@ export async function runWhisper(options: {
     return {
       language: whisperCppOutput.result.language || WHISPER_LANGUAGE,
       duration,
-      words,
+      captions: filtered,
     };
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });

@@ -8,6 +8,10 @@ import {
 import {
   DEFAULT_CONFIG_PATH,
   type EpisodeConfig,
+  type SourceBRoll,
+  type SourceListicle,
+  type SourcePunchIn,
+  type SourceCut,
   SOURCE_DIR,
   VIDEO_EXTENSIONS,
 } from "./types";
@@ -44,6 +48,11 @@ function readYaml(filePath: string): Record<string, unknown> {
     throw new Error(`Config must be a YAML object: ${filePath}`);
   }
   return parsed;
+}
+
+function writeYaml(filePath: string, data: Record<string, unknown>): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${YAML.stringify(data)}\n`, "utf8");
 }
 
 export function resolveEpisodeDir(input: string): {
@@ -85,9 +94,113 @@ export function findSourceVideo(episodeDir: string): string {
   return path.join(episodeDir, entries[0]!);
 }
 
+function parseCuts(value: unknown, configPath: string): SourceCut[] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error(`"cuts" must be a list in ${configPath}`);
+  }
+  return value.map((entry, index) => {
+    if (!isPlainObject(entry)) {
+      throw new Error(`"cuts[${index}]" must be an object in ${configPath}`);
+    }
+    const start = Number(entry.start);
+    const end = Number(entry.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      throw new Error(
+        `"cuts[${index}]" needs valid start/end in ${configPath}`,
+      );
+    }
+    return { start, end };
+  });
+}
+
+function parseListicleOverlay(
+  value: unknown,
+  configPath: string,
+): SourceListicle | null {
+  if (value == null) return null;
+  if (!isPlainObject(value)) {
+    throw new Error(`"listicleOverlay" must be an object in ${configPath}`);
+  }
+  const start = Number(value.start);
+  const end = Number(value.end);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    throw new Error(`"listicleOverlay" needs valid start/end in ${configPath}`);
+  }
+  const itemsRaw = value.items;
+  if (!Array.isArray(itemsRaw)) {
+    throw new Error(`"listicleOverlay.items" must be a list in ${configPath}`);
+  }
+  const items = itemsRaw.map((item, i) => {
+    if (!isPlainObject(item)) {
+      throw new Error(
+        `"listicleOverlay.items[${i}]" must be an object in ${configPath}`,
+      );
+    }
+    const label = String(item.label ?? "").trim();
+    const reveal = Number(item.reveal);
+    if (!label || !Number.isFinite(reveal)) {
+      throw new Error(
+        `"listicleOverlay.items[${i}]" needs label + reveal in ${configPath}`,
+      );
+    }
+    return { label, reveal };
+  });
+  return { start, end, items };
+}
+
+function parsePunchInSegments(
+  value: unknown,
+  configPath: string,
+): SourcePunchIn[] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error(`"punchInSegments" must be a list in ${configPath}`);
+  }
+  return value.map((entry, index) => {
+    if (!isPlainObject(entry)) {
+      throw new Error(
+        `"punchInSegments[${index}]" must be an object in ${configPath}`,
+      );
+    }
+    const start = Number(entry.start);
+    const end = Number(entry.end);
+    const scale = Number(entry.scale ?? 1.12);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      throw new Error(
+        `"punchInSegments[${index}]" needs valid start/end in ${configPath}`,
+      );
+    }
+    return { start, end, scale };
+  });
+}
+
+function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error(`"bRolls" must be a list in ${configPath}`);
+  }
+  return value.map((entry, index) => {
+    if (!isPlainObject(entry)) {
+      throw new Error(`"bRolls[${index}]" must be an object in ${configPath}`);
+    }
+    const id = String(entry.id ?? "").trim();
+    const src = String(entry.src ?? "").trim();
+    const start = Number(entry.start);
+    const end = Number(entry.end);
+    if (!id || !src || !Number.isFinite(start) || !Number.isFinite(end)) {
+      throw new Error(
+        `"bRolls[${index}]" needs id, src, start, end in ${configPath}`,
+      );
+    }
+    return { id, src, start, end };
+  });
+}
+
 export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
+  const configPath = path.join(episodeDir, "config.yaml");
   const defaults = readYaml(DEFAULT_CONFIG_PATH);
-  const local = readYaml(path.join(episodeDir, "config.yaml"));
+  const local = readYaml(configPath);
   const merged = deepMerge(defaults, local);
 
   const titleRaw = String(merged.title ?? "").trim();
@@ -105,59 +218,26 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     listicle: Boolean(merged.listicle ?? false),
     punchIns: Boolean(merged.punchIns ?? false),
     emphasis: Boolean(merged.emphasis ?? false),
-    // Episode-only — not inherited from config.default.yaml
-    holds: parseHolds(local.holds, path.join(episodeDir, "config.yaml")),
+    cuts: parseCuts(local.cuts, configPath),
+    listicleOverlay: parseListicleOverlay(local.listicleOverlay, configPath),
+    punchInSegments: parsePunchInSegments(local.punchInSegments, configPath),
+    bRolls: parseBRolls(local.bRolls, configPath),
   };
+}
+
+/** Merge fields into episode config.yaml (creates the file if missing). */
+export function writeEpisodeConfig(
+  episodeDir: string,
+  patch: Record<string, unknown>,
+): void {
+  const configPath = path.join(episodeDir, "config.yaml");
+  const existing = readYaml(configPath);
+  writeYaml(configPath, { ...existing, ...patch });
 }
 
 /** Merge `title` into episode config.yaml (creates the file if missing). */
 export function writeEpisodeTitle(episodeDir: string, title: string): void {
-  const configPath = path.join(episodeDir, "config.yaml");
-  const existing = readYaml(configPath);
-  const next = { ...existing, title };
-  fs.writeFileSync(configPath, `${YAML.stringify(next)}\n`, "utf8");
-}
-
-/** Accepts `[[start, end], ...]` or `[{ start, end }, ...]`. */
-function parseHolds(
-  value: unknown,
-  configPath: string,
-): Array<{ start: number; end: number }> {
-  if (value == null) return [];
-  if (!Array.isArray(value)) {
-    throw new Error(
-      `"holds" must be a list of [start, end] ranges in ${configPath}`,
-    );
-  }
-
-  return value.map((entry, index) => {
-    let start: number;
-    let end: number;
-
-    if (Array.isArray(entry) && entry.length === 2) {
-      start = Number(entry[0]);
-      end = Number(entry[1]);
-    } else if (
-      isPlainObject(entry) &&
-      entry.start != null &&
-      entry.end != null
-    ) {
-      start = Number(entry.start);
-      end = Number(entry.end);
-    } else {
-      throw new Error(
-        `"holds[${index}]" must be [start, end] or { start, end } in ${configPath}`,
-      );
-    }
-
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-      throw new Error(
-        `"holds[${index}]" needs end > start (got ${start}–${end}) in ${configPath}`,
-      );
-    }
-
-    return { start: Math.max(0, start), end };
-  });
+  writeEpisodeConfig(episodeDir, { title });
 }
 
 export function listProcessedEpisodes(): string[] {

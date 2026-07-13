@@ -1,18 +1,22 @@
 import { useMemo } from "react";
 import { create } from "zustand";
+import { buildProps } from "@src/lib/build-props";
+import { snapSourceSecToKeep } from "@src/lib/source-timeline";
 import type {
-  BRollClip,
   CaptionEmphasis,
+  EpisodeConfig,
   EpisodeProps,
-  TranscriptWord,
+  SourceBRoll,
+  Transcript,
 } from "@src/lib/types";
-import { removeBRoll, upsertBRoll } from "./lib/broll";
+import { removeBRoll, snapToCaptionBoundary, upsertBRoll } from "./lib/broll";
 import {
-  flattenWords,
-  updateCaptionWord,
-  type FlatWord,
+  flattenCaptions,
+  updateCaption,
+  type FlatCaption,
 } from "./lib/captions";
-import { adjustSectionEdge, deleteGap } from "./lib/sections";
+import { sourceSecToOutputFrame } from "./lib/frames";
+import { adjustSectionEdge, restoreGap } from "./lib/sections";
 
 export type Asset = {
   key: string;
@@ -21,61 +25,71 @@ export type Asset = {
   thumbUrl: string;
 };
 
+type EpisodeSnapshot = {
+  config: EpisodeConfig;
+  transcript: Transcript;
+};
+
 type EditorState = {
   loadState: "loading" | "ready" | "error";
   error: string | null;
+  episodeId: string | null;
+  title: string;
+  videoSrc: string;
+  fps: number;
+  width: number;
+  height: number;
+  config: EpisodeConfig | null;
+  transcript: Transcript | null;
   props: EpisodeProps | null;
-  transcriptWords: TranscriptWord[] | null;
   assets: Asset[];
   dirty: boolean;
   saving: boolean;
-  /** Playhead position on the output timeline. */
+  /** Playhead on output timeline (for Remotion preview). */
   frame: number;
-  /** Timeline zoom. */
-  pxPerFrame: number;
+  /** Source playhead position in seconds (for timeline display). */
+  sourceSec: number;
+  pxPerSec: number;
   selectedBRollId: string | null;
-  /** GapInfo.id of the focused gap. */
   selectedGap: number | null;
 };
 
 type EditorActions = {
   load: () => Promise<void>;
   save: () => Promise<void>;
-  seek: (frame: number) => void;
-  setPxPerFrame: (v: number) => void;
+  seekSource: (sourceSec: number) => void;
+  seekOutput: (frame: number) => void;
+  setPxPerSec: (v: number) => void;
   selectBRoll: (id: string | null) => void;
   selectGap: (gapId: number | null) => void;
   clearSelection: () => void;
-  /** Push one undo point before a drag so live updates collapse into it. */
   beginGesture: () => void;
   undo: () => void;
   redo: () => void;
-  /** Delete the focused gap or b-roll. Returns false if nothing was focused. */
   deleteSelection: () => boolean;
-  setWordText: (word: FlatWord, text: string) => void;
-  setWordEmphasis: (
-    word: FlatWord,
+  setCaptionText: (caption: FlatCaption, text: string) => void;
+  setCaptionEmphasis: (
+    caption: FlatCaption,
     emphasis: CaptionEmphasis | undefined,
   ) => void;
-  placeBRollOnWord: (asset: Asset, word: FlatWord) => void;
+  placeBRollOnCaption: (asset: Asset, caption: FlatCaption) => void;
   updateBRollRange: (
     id: string,
-    startFrame: number,
-    endFrame: number,
+    start: number,
+    end: number,
     live?: boolean,
   ) => void;
   adjustSection: (
     sectionIndex: number,
     edge: "start" | "end",
-    deltaFrames: number,
+    deltaSec: number,
     live?: boolean,
   ) => void;
 };
 
-const history: EpisodeProps[] = [];
-const future: EpisodeProps[] = [];
+const history: EpisodeSnapshot[] = [];
+const future: EpisodeSnapshot[] = [];
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-/** True while a timeline handle drag is in progress — Player must not write frame. */
 let scrubbing = false;
 
 export function setTimelineScrubbing(active: boolean) {
@@ -90,9 +104,31 @@ function newId(): string {
   return `broll-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function recomputeProps(state: {
+  episodeId: string;
+  title: string;
+  videoSrc: string;
+  fps: number;
+  width: number;
+  height: number;
+  config: EpisodeConfig;
+  transcript: Transcript;
+}): EpisodeProps {
+  return buildProps({
+    episodeId: state.episodeId,
+    title: state.title,
+    videoSrc: state.videoSrc,
+    fps: state.fps,
+    width: state.width,
+    height: state.height,
+    config: state.config,
+    transcript: state.transcript,
+  });
+}
+
 export const useEditor = create<EditorState & EditorActions>((set, get) => {
-  const pushHistory = (props: EpisodeProps) => {
-    history.push(props);
+  const pushHistory = (snapshot: EpisodeSnapshot) => {
+    history.push(snapshot);
     if (history.length > 50) history.shift();
     future.length = 0;
   };
@@ -102,29 +138,89 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     saveTimer = setTimeout(() => void get().save(), 400);
   };
 
-  /** Apply an edit. `live` = mid-drag: history was already pushed by beginGesture. */
-  const commit = (next: EpisodeProps, live = false) => {
-    const prev = get().props;
+  const snapshot = (): EpisodeSnapshot | null => {
+    const { config, transcript } = get();
+    if (!config || !transcript) return null;
+    return { config, transcript };
+  };
+
+  const commit = (next: EpisodeSnapshot, live = false) => {
+    const prev = snapshot();
     if (!live && prev) pushHistory(prev);
-    set({ props: next, dirty: true, error: null });
+
+    const state = get();
+    if (!state.episodeId) return;
+
+    const props = recomputeProps({
+      episodeId: state.episodeId,
+      title: state.title,
+      videoSrc: state.videoSrc,
+      fps: state.fps,
+      width: state.width,
+      height: state.height,
+      config: next.config,
+      transcript: next.transcript,
+    });
+
+    const sourceSec = state.sourceSec;
+
+    set({
+      config: next.config,
+      transcript: next.transcript,
+      props,
+      frame: sourceSecToOutputFrame(
+        sourceSec,
+        next.config,
+        state.fps,
+        next.transcript.duration,
+      ),
+      sourceSec,
+      dirty: true,
+      error: null,
+    });
     scheduleSave();
   };
 
-  const restore = (props: EpisodeProps) => {
-    set({ props, dirty: true });
+  const restore = (snap: EpisodeSnapshot) => {
+    const state = get();
+    if (!state.episodeId) return;
+    const props = recomputeProps({
+      episodeId: state.episodeId,
+      title: state.title,
+      videoSrc: state.videoSrc,
+      fps: state.fps,
+      width: state.width,
+      height: state.height,
+      config: snap.config,
+      transcript: snap.transcript,
+    });
+    set({
+      config: snap.config,
+      transcript: snap.transcript,
+      props,
+      dirty: true,
+    });
     scheduleSave();
   };
 
   return {
     loadState: "loading",
     error: null,
+    episodeId: null,
+    title: "",
+    videoSrc: "",
+    fps: 30,
+    width: 1080,
+    height: 1920,
+    config: null,
+    transcript: null,
     props: null,
-    transcriptWords: null,
     assets: [],
     dirty: false,
     saving: false,
     frame: 0,
-    pxPerFrame: 0.35,
+    sourceSec: 0,
+    pxPerSec: 40,
     selectedBRollId: null,
     selectedGap: null,
 
@@ -135,8 +231,10 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           fetch("/api/assets"),
         ]);
         const ep = (await epRes.json()) as {
+          episodeId?: string;
+          config?: EpisodeConfig;
+          transcript?: Transcript;
           props?: EpisodeProps;
-          transcript?: { words: TranscriptWord[] } | null;
           error?: string;
         };
         const as = (await assetsRes.json()) as {
@@ -145,11 +243,23 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         };
         if (!epRes.ok) throw new Error(ep.error ?? "Failed to load episode");
         if (!assetsRes.ok) throw new Error(as.error ?? "Failed to load assets");
+        if (!ep.config || !ep.transcript || !ep.props) {
+          throw new Error("Episode payload incomplete");
+        }
         set({
-          props: { ...ep.props!, bRolls: ep.props!.bRolls ?? [] },
-          transcriptWords: ep.transcript?.words ?? null,
+          episodeId: ep.episodeId ?? ep.props.episodeId,
+          title: ep.props.title,
+          videoSrc: ep.props.videoSrc,
+          fps: ep.props.fps,
+          width: ep.props.width,
+          height: ep.props.height,
+          config: ep.config,
+          transcript: ep.transcript,
+          props: ep.props,
           assets: as.assets ?? [],
           loadState: "ready",
+          frame: 0,
+          sourceSec: 0,
         });
       } catch (err) {
         set({
@@ -160,17 +270,22 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     },
 
     save: async () => {
-      const props = get().props;
-      if (!props) return;
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
       set({ saving: true });
       try {
-        const res = await fetch("/api/props", {
+        const res = await fetch("/api/episode", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ props }),
+          body: JSON.stringify({ config, transcript }),
         });
-        const data = (await res.json()) as { ok?: boolean; error?: string };
+        const data = (await res.json()) as {
+          ok?: boolean;
+          props?: EpisodeProps;
+          error?: string;
+        };
         if (!res.ok) throw new Error(data.error ?? "Save failed");
+        if (data.props) set({ props: data.props });
         set({ dirty: false });
       } catch (err) {
         set({ error: err instanceof Error ? err.message : String(err) });
@@ -179,8 +294,42 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       }
     },
 
-    seek: (frame) => set({ frame }),
-    setPxPerFrame: (pxPerFrame) => set({ pxPerFrame }),
+    seekSource: (sourceSec) => {
+      const { config, fps, transcript } = get();
+      if (!config || !transcript) return;
+      const snapped = snapSourceSecToKeep(
+        sourceSec,
+        config.cuts,
+        transcript.duration,
+      );
+      const frame = sourceSecToOutputFrame(
+        snapped,
+        config,
+        fps,
+        transcript.duration,
+      );
+      set({ sourceSec: snapped, frame });
+    },
+
+    seekOutput: (frame) => {
+      const { props } = get();
+      if (!props) return;
+      const fps = props.fps;
+      const outputSec = frame / fps;
+      let cursor = 0;
+      let sourceSec = 0;
+      for (const s of props.sections) {
+        const segEnd = cursor + s.durationInFrames / fps;
+        if (outputSec >= cursor && outputSec <= segEnd + 0.001) {
+          sourceSec = s.trimBefore / fps + (outputSec - cursor);
+          break;
+        }
+        cursor = segEnd;
+      }
+      set({ frame, sourceSec });
+    },
+
+    setPxPerSec: (pxPerSec) => set({ pxPerSec }),
 
     selectBRoll: (id) =>
       set({ selectedBRollId: id, ...(id != null ? { selectedGap: null } : {}) }),
@@ -192,12 +341,12 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     clearSelection: () => set({ selectedBRollId: null, selectedGap: null }),
 
     beginGesture: () => {
-      const props = get().props;
-      if (props) pushHistory(props);
+      const snap = snapshot();
+      if (snap) pushHistory(snap);
     },
 
     undo: () => {
-      const current = get().props;
+      const current = snapshot();
       const prev = history.pop();
       if (!current || !prev) return;
       future.push(current);
@@ -205,7 +354,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     },
 
     redo: () => {
-      const current = get().props;
+      const current = snapshot();
       const next = future.pop();
       if (!current || !next) return;
       history.push(current);
@@ -213,82 +362,115 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     },
 
     deleteSelection: () => {
-      const { props, transcriptWords, selectedGap, selectedBRollId } = get();
-      if (!props) return false;
+      const { config, transcript, selectedGap, selectedBRollId } = get();
+      if (!config || !transcript) return false;
       if (selectedGap != null) {
-        commit(deleteGap(props, selectedGap, transcriptWords));
+        commit({
+          config: restoreGap(config, selectedGap),
+          transcript,
+        });
         set({ selectedGap: null });
         return true;
       }
       if (selectedBRollId) {
-        commit(removeBRoll(props, selectedBRollId));
+        commit({
+          config: {
+            ...config,
+            bRolls: removeBRoll(config.bRolls, selectedBRollId),
+          },
+          transcript,
+        });
         set({ selectedBRollId: null });
         return true;
       }
       return false;
     },
 
-    setWordText: (word, text) => {
-      const props = get().props;
-      if (!props) return;
-      commit(updateCaptionWord(props, word.groupIndex, word.wordIndex, { text }));
+    setCaptionText: (caption, text) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      commit({
+        config,
+        transcript: updateCaption(transcript, caption.index, { text }),
+      });
     },
 
-    setWordEmphasis: (word, emphasis) => {
-      const props = get().props;
-      if (!props) return;
-      commit(
-        updateCaptionWord(
-          props,
-          word.groupIndex,
-          word.wordIndex,
+    setCaptionEmphasis: (caption, emphasis) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      commit({
+        config,
+        transcript: updateCaption(
+          transcript,
+          caption.index,
           emphasis == null ? { clearEmphasis: true } : { emphasis },
         ),
-      );
+      });
     },
 
-    placeBRollOnWord: (asset, word) => {
-      const props = get().props;
-      if (!props) return;
-      const clip: BRollClip = {
+    placeBRollOnCaption: (asset, caption) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip: SourceBRoll = {
         id: newId(),
         src: asset.src,
-        startFrame: word.startFrame,
-        endFrame: Math.max(word.startFrame + 1, word.endFrame),
+        start: caption.start,
+        end: Math.max(caption.start + 0.04, caption.end),
       };
-      const result = upsertBRoll(props, clip);
+      const result = upsertBRoll(config.bRolls, clip);
       if ("error" in result) return;
-      commit(result);
+      commit({ config: { ...config, bRolls: result }, transcript });
       set({ selectedBRollId: clip.id, selectedGap: null });
     },
 
-    updateBRollRange: (id, startFrame, endFrame, live = false) => {
-      const props = get().props;
-      if (!props) return;
-      const clip = (props.bRolls ?? []).find((c) => c.id === id);
+    updateBRollRange: (id, start, end, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = config.bRolls.find((c) => c.id === id);
       if (!clip) return;
-      const result = upsertBRoll(props, {
+      const snappedStart = snapToCaptionBoundary(
+        start,
+        transcript.captions,
+        "start",
+      );
+      const snappedEnd = snapToCaptionBoundary(
+        Math.max(start + 0.04, end),
+        transcript.captions,
+        "end",
+      );
+      const result = upsertBRoll(config.bRolls, {
         ...clip,
-        startFrame,
-        endFrame: Math.max(startFrame + 1, endFrame),
+        start: snappedStart,
+        end: Math.max(snappedStart + 0.04, snappedEnd),
       });
       if ("error" in result) return;
-      commit(result, live);
+      commit({ config: { ...config, bRolls: result }, transcript }, live);
     },
 
-    adjustSection: (sectionIndex, edge, deltaFrames, live = false) => {
-      const { props, transcriptWords } = get();
-      if (!props) return;
+    adjustSection: (sectionIndex, edge, deltaSec, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
       commit(
-        adjustSectionEdge(props, sectionIndex, edge, deltaFrames, transcriptWords),
+        {
+          config: adjustSectionEdge(
+            config,
+            sectionIndex,
+            edge,
+            deltaSec,
+            transcript.duration,
+          ),
+          transcript,
+        },
         live,
       );
     },
   };
 });
 
-/** Captions flattened to a single word list, annotated with their group position. */
-export function useFlatWords(): FlatWord[] {
-  const groups = useEditor((s) => s.props?.captionGroups);
-  return useMemo(() => (groups ? flattenWords(groups) : []), [groups]);
+export function useFlatCaptions(): FlatCaption[] {
+  const captions = useEditor((s) => s.transcript?.captions);
+  return useMemo(
+    () => (captions ? flattenCaptions(captions) : []),
+    [captions],
+  );
 }

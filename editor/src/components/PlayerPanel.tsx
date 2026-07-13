@@ -1,15 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from "react";
+import { Player, type PlayerRef } from "@remotion/player";
+import { TalkingHead } from "@src/TalkingHead";
+import { isTimelineScrubbing, useEditor } from "../store";
+import { ExportButton } from "./ExportButton";
 
-import { Player } from '@remotion/player';
-import { TalkingHead } from '@src/TalkingHead';
-
-import { useEditor } from '../store';
-
-import type { PlayerRef } from '@remotion/player';
 export function PlayerPanel() {
   const props = useEditor((s) => s.props);
   const frame = useEditor((s) => s.frame);
-  const seek = useEditor((s) => s.seek);
+  const seekOutput = useEditor((s) => s.seekOutput);
 
   const ref = useRef<PlayerRef>(null);
   /** While set, ignore player→store frame sync until player catches up. */
@@ -20,6 +18,7 @@ export function PlayerPanel() {
     if (!player) return;
 
     const onUpdate = () => {
+      if (isTimelineScrubbing()) return;
       const current = player.getCurrentFrame();
       const target = seekTargetRef.current;
       if (target != null) {
@@ -28,18 +27,23 @@ export function PlayerPanel() {
         }
         return;
       }
-      seek(current);
+      seekOutput(current);
     };
 
     player.addEventListener("frameupdate", onUpdate);
     return () => {
       player.removeEventListener("frameupdate", onUpdate);
     };
-  }, [seek]);
+  }, [seekOutput]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const player = ref.current;
     if (!player) return;
+    if (isTimelineScrubbing()) {
+      seekTargetRef.current = frame;
+      player.seekTo(frame);
+      return;
+    }
     const current = player.getCurrentFrame();
     if (Math.abs(current - frame) <= 1) {
       seekTargetRef.current = null;
@@ -55,7 +59,8 @@ export function PlayerPanel() {
   if (!props) return null;
 
   return (
-    <div className="flex min-h-0 flex-col items-center justify-center bg-[#0b0c10] p-3">
+    <div className="flex min-h-0 flex-col items-center justify-center gap-2 bg-[#0b0c10] p-3">
+      <ExportButton />
       <div className="aspect-[9/16] w-full max-w-[240px] overflow-hidden rounded-lg border border-border bg-black [&_>div]:h-full! [&_>div]:w-full!">
         <Player
           ref={ref}
@@ -72,7 +77,7 @@ export function PlayerPanel() {
           acknowledgeRemotionLicense
         />
       </div>
-      <div className="mt-2 text-xs text-muted">
+      <div className="text-xs text-muted">
         f{frame} / {props.durationInFrames}
       </div>
     </div>

@@ -1,13 +1,22 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
+import { buildProps } from "../../src/lib/build-props";
+import {
+  findSourceVideo,
+  loadEpisodeConfig,
+  writeEpisodeConfig,
+} from "../../cli/helpers/config";
+import { probeVideoFps } from "../../cli/helpers/whisper";
 import { rebuildAllPropsIndex } from "../../cli/helpers/props-index";
 import {
   IMAGE_EXTENSIONS,
   ROOT,
   SOURCE_DIR,
 } from "../../cli/helpers/types";
-import type { EpisodeProps, Transcript } from "../../src/lib/types";
+import { renderEpisode } from "../../cli/render-episode";
+import type { EpisodeConfig, Transcript } from "../../cli/helpers/types";
+import YAML from "yaml";
 
 function ensureDir(dir: string) {
   fs.mkdirSync(dir, { recursive: true });
@@ -35,7 +44,6 @@ function linkIntoPublic(absPath: string, publicRel: string): string {
   return publicRel.split(path.sep).join("/");
 }
 
-/** Images living in the episode folder (not generated/). */
 function listEpisodeImages(episodeId: string) {
   const absDir = path.join(SOURCE_DIR, episodeId);
   if (!fs.existsSync(absDir)) return [];
@@ -81,6 +89,49 @@ function sendJson(
   res.end(JSON.stringify(data));
 }
 
+function loadEpisodeData(episodeId: string) {
+  const episodeDir = path.join(SOURCE_DIR, episodeId);
+  const config = loadEpisodeConfig(episodeDir);
+  const transcriptPath = path.join(episodeDir, "generated", "transcript.json");
+  if (!fs.existsSync(transcriptPath)) {
+    throw new Error(`No transcript.json for episode ${episodeId}`);
+  }
+  const transcript = JSON.parse(
+    fs.readFileSync(transcriptPath, "utf8"),
+  ) as Transcript;
+
+  const videoPath = findSourceVideo(episodeDir);
+  const probe = probeVideoFps(videoPath);
+  const ext = path.extname(videoPath).toLowerCase();
+  const videoSrc = `episodes/${episodeId}/video${ext}`;
+  const title = config.title ?? episodeId;
+
+  const props = buildProps({
+    episodeId,
+    title,
+    videoSrc,
+    fps: probe.fps,
+    width: probe.width,
+    height: probe.height,
+    config,
+    transcript,
+  });
+
+  return { episodeDir, config, transcript, props, probe };
+}
+
+function ensureBRollAssets(bRolls: EpisodeConfig["bRolls"]) {
+  for (const clip of bRolls) {
+    const absPublic = path.join(ROOT, "public", clip.src);
+    if (fs.existsSync(absPublic)) continue;
+    const key = clip.src.replace(/^b-roll\//, "");
+    const absSource = path.join(SOURCE_DIR, key);
+    if (fs.existsSync(absSource)) {
+      linkIntoPublic(absSource, clip.src);
+    }
+  }
+}
+
 export function editorApiPlugin(episodeId: string): Plugin {
   return {
     name: "talking-head-editor-api",
@@ -91,28 +142,8 @@ export function editorApiPlugin(episodeId: string): Plugin {
 
         try {
           if (req.method === "GET" && pathname === "/api/episode") {
-            const episodeDir = path.join(SOURCE_DIR, episodeId);
-            const propsPath = path.join(episodeDir, "generated", "props.json");
-            if (!fs.existsSync(propsPath)) {
-              return sendJson(res, 404, {
-                error: `No props.json for episode ${episodeId}`,
-              });
-            }
-            const props = JSON.parse(
-              fs.readFileSync(propsPath, "utf8"),
-            ) as EpisodeProps;
-            let transcript: Transcript | null = null;
-            const transcriptPath = path.join(
-              episodeDir,
-              "generated",
-              "transcript.json",
-            );
-            if (fs.existsSync(transcriptPath)) {
-              transcript = JSON.parse(
-                fs.readFileSync(transcriptPath, "utf8"),
-              ) as Transcript;
-            }
-            return sendJson(res, 200, { episodeId, props, transcript });
+            const { config, transcript, props } = loadEpisodeData(episodeId);
+            return sendJson(res, 200, { episodeId, config, transcript, props });
           }
 
           if (req.method === "GET" && pathname === "/api/assets") {
@@ -128,34 +159,48 @@ export function editorApiPlugin(episodeId: string): Plugin {
             return sendJson(res, 200, { assets });
           }
 
-          if (req.method === "PUT" && pathname === "/api/props") {
+          if (req.method === "PUT" && pathname === "/api/episode") {
             const raw = await readBody(req);
-            const body = JSON.parse(raw) as { props: EpisodeProps };
-            if (!body.props || body.props.episodeId !== episodeId) {
-              return sendJson(res, 400, { error: "Invalid props payload" });
+            const body = JSON.parse(raw) as {
+              config: EpisodeConfig;
+              transcript: Transcript;
+            };
+            if (!body.config || !body.transcript) {
+              return sendJson(res, 400, { error: "Invalid episode payload" });
             }
 
-            for (const clip of body.props.bRolls ?? []) {
-              const absPublic = path.join(ROOT, "public", clip.src);
-              if (fs.existsSync(absPublic)) continue;
-              const key = clip.src.replace(/^b-roll\//, "");
-              const absSource = path.join(SOURCE_DIR, key);
-              if (fs.existsSync(absSource)) {
-                linkIntoPublic(absSource, clip.src);
-              }
-            }
+            ensureBRollAssets(body.config.bRolls);
 
-            const propsPath = path.join(
-              SOURCE_DIR,
-              episodeId,
+            const episodeDir = path.join(SOURCE_DIR, episodeId);
+            const configPath = path.join(episodeDir, "config.yaml");
+            const existingYaml = fs.existsSync(configPath)
+              ? (YAML.parse(fs.readFileSync(configPath, "utf8")) as Record<
+                  string,
+                  unknown
+                >) ?? {}
+              : {};
+
+            writeEpisodeConfig(episodeDir, {
+              ...existingYaml,
+              title: body.config.title,
+              cuts: body.config.cuts,
+              listicleOverlay: body.config.listicleOverlay,
+              punchInSegments: body.config.punchInSegments,
+              bRolls: body.config.bRolls,
+            });
+
+            const transcriptPath = path.join(
+              episodeDir,
               "generated",
-              "props.json",
+              "transcript.json",
             );
-            writeJson(propsPath, body.props);
-            // Rebuild Studio cache from all per-episode props.json files
-            rebuildAllPropsIndex(body.props);
+            writeJson(transcriptPath, body.transcript);
 
-            return sendJson(res, 200, { ok: true });
+            const { props } = loadEpisodeData(episodeId);
+            writeJson(path.join(episodeDir, "generated", "props.json"), props);
+            rebuildAllPropsIndex(props);
+
+            return sendJson(res, 200, { ok: true, props });
           }
 
           if (req.method === "POST" && pathname === "/api/ensure-broll") {
@@ -167,10 +212,89 @@ export function editorApiPlugin(episodeId: string): Plugin {
             }
             const publicSrc = path
               .join("b-roll", body.key)
-              .split(path.sep)
-              .join("/");
+              .split(path.sep).join("/");
             linkIntoPublic(absSource, publicSrc);
             return sendJson(res, 200, { src: publicSrc });
+          }
+
+          if (req.method === "POST" && pathname === "/api/export") {
+            const episodeDir = path.join(SOURCE_DIR, episodeId);
+            const raw = await readBody(req);
+            if (raw.trim()) {
+              const body = JSON.parse(raw) as {
+                config?: EpisodeConfig;
+                transcript?: Transcript;
+              };
+              if (body.config && body.transcript) {
+                ensureBRollAssets(body.config.bRolls);
+                writeEpisodeConfig(episodeDir, {
+                  cuts: body.config.cuts,
+                  listicleOverlay: body.config.listicleOverlay,
+                  punchInSegments: body.config.punchInSegments,
+                  bRolls: body.config.bRolls,
+                });
+                writeJson(
+                  path.join(episodeDir, "generated", "transcript.json"),
+                  body.transcript,
+                );
+                const { props } = loadEpisodeData(episodeId);
+                writeJson(
+                  path.join(episodeDir, "generated", "props.json"),
+                  props,
+                );
+                rebuildAllPropsIndex(props);
+              }
+            }
+
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+            res.setHeader("Cache-Control", "no-cache");
+            res.setHeader("X-Accel-Buffering", "no");
+            if (typeof (res as { flushHeaders?: () => void }).flushHeaders === "function") {
+              (res as { flushHeaders: () => void }).flushHeaders();
+            }
+
+            const writeEvent = (data: unknown) => {
+              res.write(`${JSON.stringify(data)}\n`);
+            };
+
+            try {
+              await renderEpisode({
+                episodeId,
+                episodeDir,
+                onProgress: (p) => {
+                  writeEvent({ type: "progress", ...p });
+                },
+              });
+              writeEvent({
+                type: "done",
+                downloadUrl: "/api/export/download",
+                filename: `${episodeId}.mp4`,
+              });
+              res.end();
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              writeEvent({ type: "error", error: message });
+              res.end();
+            }
+            return;
+          }
+
+          if (req.method === "GET" && pathname === "/api/export/download") {
+            const videoPath = path.join(ROOT, "out", episodeId, "video.mp4");
+            if (!fs.existsSync(videoPath)) {
+              return sendJson(res, 404, { error: "No exported video yet" });
+            }
+            const stat = fs.statSync(videoPath);
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "video/mp4");
+            res.setHeader(
+              "Content-Disposition",
+              `attachment; filename="${episodeId}.mp4"`,
+            );
+            res.setHeader("Content-Length", String(stat.size));
+            fs.createReadStream(videoPath).pipe(res);
+            return;
           }
 
           next();
@@ -191,14 +315,16 @@ export function resolveEpisodeId(argv: string[]): string {
     );
   }
   const episodeId = positional[0]!;
-  const propsPath = path.join(
+  const transcriptPath = path.join(
     SOURCE_DIR,
     episodeId,
     "generated",
-    "props.json",
+    "transcript.json",
   );
-  if (!fs.existsSync(propsPath)) {
-    throw new Error(`Episode not processed (missing props.json): ${episodeId}`);
+  if (!fs.existsSync(transcriptPath)) {
+    throw new Error(
+      `Episode not processed (missing transcript.json): ${episodeId}`,
+    );
   }
   return episodeId;
 }

@@ -3,14 +3,10 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import {
   buildNumberedTranscript,
-  wordIndexToOutputFrame,
+  captionIndexToSourceSec,
 } from "../helpers/cuts";
 import { getResultsOrCached } from "../helpers/transcript-cache";
-import type {
-  KeepSegment,
-  PunchInSegment,
-  TranscriptWord,
-} from "../helpers/types";
+import type { TranscriptCaption, SourcePunchIn } from "../helpers/types";
 
 const MODEL = "gpt-4.1-mini";
 const MAX_PUNCH_INS = 10;
@@ -50,78 +46,54 @@ export const PunchInDetectionSchema = z.object({
 
 export type PunchInDetection = z.infer<typeof PunchInDetectionSchema>;
 
-export function buildPunchInSegments(options: {
-  detection: PunchInDetection;
-  words: TranscriptWord[];
-  segments: KeepSegment[];
-  fps: number;
-}): PunchInSegment[] {
-  const { detection, words, segments, fps } = options;
+export function detectionToPunchInSegments(
+  detection: PunchInDetection,
+  captions: TranscriptCaption[],
+): SourcePunchIn[] {
+  const mapped: SourcePunchIn[] = [];
 
-  const minFrames = Math.round(MIN_DURATION_SEC * fps);
-  const maxFrames = Math.round(MAX_DURATION_SEC * fps);
-  const minGapFrames = Math.round(MIN_GAP_SEC * fps);
-
-  const segmentRanges: Array<{ start: number; end: number }> = [];
-  let cursor = 0;
-  for (const seg of segments) {
-    segmentRanges.push({ start: cursor, end: cursor + seg.durationInFrames });
-    cursor += seg.durationInFrames;
-  }
-
-  const mapped: PunchInSegment[] = [];
   for (const item of detection.punchIns.slice(0, MAX_PUNCH_INS)) {
     if (item.endWordIndex < item.startWordIndex) continue;
 
-    const startFrame = wordIndexToOutputFrame(
+    const start = captionIndexToSourceSec(
       item.startWordIndex,
-      words,
-      segments,
-      fps,
+      captions,
       "start",
     );
-    const endFrameRaw = wordIndexToOutputFrame(
+    const endRaw = captionIndexToSourceSec(
       item.endWordIndex,
-      words,
-      segments,
-      fps,
+      captions,
       "end",
     );
-    if (startFrame == null || endFrameRaw == null) continue;
-    if (endFrameRaw < startFrame) continue;
+    if (start == null || endRaw == null) continue;
+    if (endRaw < start) continue;
 
     const duration = Math.min(
-      maxFrames,
-      Math.max(minFrames, endFrameRaw - startFrame),
+      MAX_DURATION_SEC,
+      Math.max(MIN_DURATION_SEC, endRaw - start),
     );
-    const endFrame = startFrame + duration;
-
-    // A zoom that persists across a hard cut reads as a glitch.
-    const withinOneSegment = segmentRanges.some(
-      (range) => startFrame >= range.start && endFrame <= range.end,
-    );
-    if (!withinOneSegment) continue;
+    const end = start + duration;
 
     mapped.push({
-      startFrame,
-      endFrame,
+      start,
+      end,
       scale: SCALE_BY_STRENGTH[item.strength],
     });
   }
 
-  mapped.sort((a, b) => a.startFrame - b.startFrame);
+  mapped.sort((a, b) => a.start - b.start);
 
-  const result: PunchInSegment[] = [];
+  const result: SourcePunchIn[] = [];
   for (const punchIn of mapped) {
     const last = result[result.length - 1];
-    if (last && punchIn.startFrame - last.endFrame < minGapFrames) continue;
+    if (last && punchIn.start - last.end < MIN_GAP_SEC) continue;
     result.push(punchIn);
   }
 
   return result;
 }
 
-async function callOpenAI(words: TranscriptWord[]): Promise<PunchInDetection> {
+async function callOpenAI(captions: TranscriptCaption[]): Promise<PunchInDetection> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -130,7 +102,7 @@ async function callOpenAI(words: TranscriptWord[]): Promise<PunchInDetection> {
   }
 
   const client = new OpenAI({ apiKey });
-  const numbered = buildNumberedTranscript(words);
+  const numbered = buildNumberedTranscript(captions);
 
   const completion = await client.chat.completions.parse({
     model: MODEL,
@@ -170,12 +142,12 @@ async function callOpenAI(words: TranscriptWord[]): Promise<PunchInDetection> {
 }
 
 export async function detectPunchIns(options: {
-  words: TranscriptWord[];
+  captions: TranscriptCaption[];
   transcriptPath: string;
   cachePath: string;
   force: boolean;
 }): Promise<PunchInDetection> {
-  const { words, transcriptPath, cachePath, force } = options;
+  const { captions, transcriptPath, cachePath, force } = options;
 
   return getResultsOrCached({
     cachePath,
@@ -186,7 +158,7 @@ export async function detectPunchIns(options: {
       console.log(
         `[punch-in] detecting emphasis moments via OpenAI (${MODEL})`,
       );
-      const detection = await callOpenAI(words);
+      const detection = await callOpenAI(captions);
       console.log(
         `[punch-in] ${detection.punchIns.length} candidate(s) → ${cachePath}`,
       );
@@ -195,40 +167,33 @@ export async function detectPunchIns(options: {
   });
 }
 
-/** Detect + map punch-ins into the edited timeline (or null if disabled / none survive). */
-export async function buildPunchIns(options: {
+/** Detect punch-ins and return source-time segments (or empty if disabled). */
+export async function buildPunchInSegments(options: {
   enabled: boolean;
-  words: TranscriptWord[];
-  segments: KeepSegment[];
-  fps: number;
+  captions: TranscriptCaption[];
   transcriptPath: string;
   cachePath: string;
   force: boolean;
-}): Promise<PunchInSegment[] | null> {
-  if (!options.enabled) return null;
+}): Promise<SourcePunchIn[]> {
+  if (!options.enabled) return [];
 
   const detection = await detectPunchIns({
-    words: options.words,
+    captions: options.captions,
     transcriptPath: options.transcriptPath,
     cachePath: options.cachePath,
     force: options.force,
   });
 
-  const punchIns = buildPunchInSegments({
-    detection,
-    words: options.words,
-    segments: options.segments,
-    fps: options.fps,
-  });
+  const punchIns = detectionToPunchInSegments(detection, options.captions);
 
   if (punchIns.length === 0) {
     console.log("[punch-in] no usable punch-ins — skipping");
-    return null;
+    return [];
   }
 
   console.log(
-    `[punch-in] ${punchIns.length} punch-in(s) at frames ${punchIns
-      .map((p) => `${p.startFrame}–${p.endFrame}`)
+    `[punch-in] ${punchIns.length} punch-in(s) at ${punchIns
+      .map((p) => `${p.start.toFixed(2)}–${p.end.toFixed(2)}s`)
       .join(", ")}`,
   );
   return punchIns;

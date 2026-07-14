@@ -1,3 +1,4 @@
+import { clampRangeEdge } from "../../lib/range";
 import { maybeSnapTimelineSec } from "../../lib/snap";
 import { useEditor, useFlatCaptions } from "../../store";
 import { Handle, useTrackDrag } from "./shared";
@@ -10,15 +11,28 @@ type Props = {
 };
 
 export function SectionCell({ item, onNeedleX }: Props) {
-  const adjustSection = useEditor((s) => s.adjustSection);
+  const setSectionEdge = useEditor((s) => s.setSectionEdge);
+  const selectedKeepRegionIndex = useEditor((s) => s.selectedKeepRegionIndex);
+  const selectKeepRegion = useEditor((s) => s.selectKeepRegion);
   const captions = useFlatCaptions();
   const { startDrag, scrubTo } = useTrackDrag(onNeedleX);
 
+  const selected = selectedKeepRegionIndex === item.keepRegionIndex;
+  const duration = item.end - item.start;
+
   return (
     <div
-      className="absolute top-1 bottom-1 overflow-hidden rounded bg-yellow-500/80 text-[10px] text-[#1a1508] select-none"
+      className={`absolute top-1 bottom-1 cursor-pointer overflow-hidden rounded text-[10px] text-[#1a1508] select-none ${
+        selected
+          ? "z-[2] bg-yellow-400 outline outline-2 outline-white"
+          : "bg-yellow-500/80 hover:bg-yellow-500"
+      }`}
       style={{ left: item.x, width: item.width }}
-      title={`Keep ${item.start.toFixed(2)}–${item.end.toFixed(2)}s`}
+      title={`Keep ${duration.toFixed(2)}s — click to select, press Delete to remove`}
+      onClick={(e) => {
+        e.stopPropagation();
+        selectKeepRegion(selected ? null : item.keepRegionIndex);
+      }}
     >
       <VoiceBand
         start={item.start}
@@ -30,21 +44,18 @@ export function SectionCell({ item, onNeedleX }: Props) {
         side="left"
         className="z-20"
         onMouseDown={(e) => {
-          const originEdge = item.start;
-          let lastTarget = originEdge;
+          const origin = item.start;
+          const fixedEnd = item.end;
           const originX = item.x;
           startDrag(e, (dxSec, dxPx, shiftKey) => {
-            const target = maybeSnapTimelineSec(
-              originEdge + dxSec,
-              captions,
-              shiftKey,
-            );
-            const step = target - lastTarget;
-            lastTarget = target;
-            if (step !== 0) {
-              adjustSection(item.keepRegionIndex, "start", step, true);
-            }
-            scrubTo(target, originX + dxPx);
+            const raw = Math.max(0, origin + dxSec);
+            const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+            const { start } = clampRangeEdge("start", snapped, {
+              start: origin,
+              end: fixedEnd,
+            });
+            setSectionEdge(item.keepRegionIndex, "start", start, true);
+            scrubTo(start, originX + dxPx);
           });
         }}
       />
@@ -52,21 +63,18 @@ export function SectionCell({ item, onNeedleX }: Props) {
         side="right"
         className="z-20"
         onMouseDown={(e) => {
-          const originEdge = item.end;
-          let lastTarget = originEdge;
+          const origin = item.end;
+          const fixedStart = item.start;
           const originX = item.x + item.width;
           startDrag(e, (dxSec, dxPx, shiftKey) => {
-            const target = maybeSnapTimelineSec(
-              originEdge + dxSec,
-              captions,
-              shiftKey,
-            );
-            const step = target - lastTarget;
-            lastTarget = target;
-            if (step !== 0) {
-              adjustSection(item.keepRegionIndex, "end", step, true);
-            }
-            scrubTo(target, originX + dxPx);
+            const raw = origin + dxSec;
+            const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+            const { end } = clampRangeEdge("end", snapped, {
+              start: fixedStart,
+              end: origin,
+            });
+            setSectionEdge(item.keepRegionIndex, "end", end, true);
+            scrubTo(end, originX + dxPx);
           });
         }}
       />

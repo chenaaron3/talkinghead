@@ -1,10 +1,12 @@
-import { useMemo, type ReactNode } from "react";
-import { buildWordAnnotations } from "../../lib/word-annotations";
-import { sourceGaps } from "../../lib/sections";
-import { useEditor, useFlatCaptions } from "../../store";
-import { Gap } from "./Gap";
-import { useRangeResize } from "./useRangeResize";
-import { Word } from "./Word";
+import { ReactNode, type, useMemo } from 'react';
+
+import { captionInCut } from '../../lib/cuts';
+import { sourceGaps } from '../../lib/sections';
+import { buildWordAnnotations } from '../../lib/word-annotations';
+import { useEditor, useFlatCaptions } from '../../store';
+import { Gap } from './Gap';
+import { useRangeResize } from './useRangeResize';
+import { Word } from './Word';
 
 export function TranscriptPanel() {
   const config = useEditor((s) => s.config);
@@ -29,6 +31,8 @@ export function TranscriptPanel() {
   let gapIdx = 0;
 
   for (const caption of captions) {
+    if (config && captionInCut(caption, config.cuts)) continue;
+
     while (
       gapIdx < gapMarkers.length &&
       gapMarkers[gapIdx]!.end <= caption.start
@@ -61,7 +65,7 @@ export function TranscriptPanel() {
         onStartPunchInResize={
           annotation.punchInIndex != null
             ? (e, edge) =>
-                startPunchInResize(e, annotation.punchInIndex!, edge)
+              startPunchInResize(e, annotation.punchInIndex!, edge)
             : undefined
         }
         onStartListicleDrag={

@@ -233,14 +233,23 @@ export function cutsToGaps(cuts: SourceCut[]): SourceGap[] {
   }));
 }
 
+function findCutByStart(
+  cuts: SourceCut[],
+  start: number,
+): SourceCut | undefined {
+  return cuts.find((cut) => Math.abs(cut.start - start) < 0.001);
+}
+
 function cutBeforeKeep(
   cuts: SourceCut[],
   keep: KeepRegion,
 ): SourceCut | undefined {
   const merged = normalizeCuts(cuts);
   for (let i = merged.length - 1; i >= 0; i--) {
-    const cut = merged[i]!;
-    if (cut.end <= keep.start + 0.001) return cut;
+    const ref = merged[i]!;
+    if (ref.end <= keep.start + 0.001) {
+      return findCutByStart(cuts, ref.start);
+    }
   }
   return undefined;
 }
@@ -249,22 +258,27 @@ function cutAfterKeep(
   cuts: SourceCut[],
   keep: KeepRegion,
 ): SourceCut | undefined {
-  return normalizeCuts(cuts).find((cut) => cut.start >= keep.end - 0.001);
+  const ref = normalizeCuts(cuts).find(
+    (cut) => cut.start >= keep.end - 0.001,
+  );
+  return ref ? findCutByStart(cuts, ref.start) : undefined;
 }
 
-/** Expand/shrink a keep region edge by adjusting adjacent cuts. */
-export function adjustKeepEdge(
+/** Move a keep region edge to an absolute source timestamp. */
+export function setKeepEdge(
   cuts: SourceCut[],
   keepRegionIndex: number,
   edge: "start" | "end",
-  deltaSec: number,
+  targetSec: number,
   durationSec: number,
 ): SourceCut[] {
-  if (deltaSec === 0) return cuts;
-
   const keeps = cutsToKeepRegions(cuts, durationSec);
   const keep = keeps[keepRegionIndex];
   if (!keep) return cuts;
+
+  const current = edge === "start" ? keep.start : keep.end;
+  const deltaSec = targetSec - current;
+  if (deltaSec === 0) return cuts;
 
   const next = cuts.map((c) => ({ ...c }));
 

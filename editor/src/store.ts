@@ -2,7 +2,11 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 
 import { buildProps } from '@src/lib/build-props';
-import { snapSourceSecToKeep } from '@src/lib/source-timeline';
+import {
+  cutsToGaps,
+  cutsToKeepRegions,
+  snapSourceSecToKeep,
+} from '@src/lib/source-timeline';
 
 import { removeBRoll, upsertBRoll } from './lib/broll';
 import { captionIndexAt, flattenCaptions, updateCaption } from './lib/captions';
@@ -10,10 +14,8 @@ import { cutForCaption } from './lib/cuts';
 import { sourceSecToOutputFrame } from './lib/frames';
 import { punchInForCaption } from './lib/punchin';
 import { MIN_LISTICLE_SEC, MIN_RANGE_SEC } from './lib/range';
-import { adjustSectionEdge, restoreGap } from './lib/sections';
+import { cutKeepRegion, restoreGap, setSectionEdge } from './lib/sections';
 import { loadWaveformFromVideo, peakMax } from './lib/waveform';
-
-import { cutsToGaps } from '@src/lib/source-timeline';
 
 import type { WaveformData } from "./lib/waveform";
 
@@ -61,6 +63,7 @@ type EditorState = {
   selectedPunchInIndex: number | null;
   selectedListicleItemIndex: number | null;
   selectedGap: number | null;
+  selectedKeepRegionIndex: number | null;
   selectedCaptionIndex: number | null;
   waveform: WaveformData | null;
   waveformMax: number;
@@ -76,6 +79,7 @@ type EditorActions = {
   selectPunchIn: (index: number | null) => void;
   selectListicleItem: (index: number | null) => void;
   selectGap: (gapId: number | null) => void;
+  selectKeepRegion: (index: number | null) => void;
   selectCaption: (index: number | null) => void;
   seekBySeconds: (delta: number) => void;
   seekAdjacentCaption: (direction: -1 | 1) => boolean;
@@ -99,10 +103,10 @@ type EditorActions = {
     end: number,
     live?: boolean,
   ) => void;
-  adjustSection: (
+  setSectionEdge: (
     sectionIndex: number,
     edge: "start" | "end",
-    deltaSec: number,
+    targetSec: number,
     live?: boolean,
   ) => void;
   updatePunchInRange: (
@@ -257,6 +261,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     selectedPunchInIndex: null,
     selectedListicleItemIndex: null,
     selectedGap: null,
+    selectedKeepRegionIndex: null,
     selectedCaptionIndex: null,
     waveform: null,
     waveformMax: 0,
@@ -419,6 +424,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         ...(id != null
           ? {
               selectedGap: null,
+              selectedKeepRegionIndex: null,
               selectedPunchInIndex: null,
               selectedListicleItemIndex: null,
             }
@@ -431,6 +437,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           ? {
               selectedBRollId: null,
               selectedGap: null,
+              selectedKeepRegionIndex: null,
               selectedListicleItemIndex: null,
             }
           : {}),
@@ -443,6 +450,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
               selectedBRollId: null,
               selectedPunchInIndex: null,
               selectedGap: null,
+              selectedKeepRegionIndex: null,
             }
           : {}),
       }),
@@ -454,6 +462,20 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
               selectedBRollId: null,
               selectedPunchInIndex: null,
               selectedListicleItemIndex: null,
+              selectedKeepRegionIndex: null,
+              selectedCaptionIndex: null,
+            }
+          : {}),
+      }),
+    selectKeepRegion: (index) =>
+      set({
+        selectedKeepRegionIndex: index,
+        ...(index != null
+          ? {
+              selectedBRollId: null,
+              selectedPunchInIndex: null,
+              selectedListicleItemIndex: null,
+              selectedGap: null,
               selectedCaptionIndex: null,
             }
           : {}),
@@ -467,6 +489,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
               selectedPunchInIndex: null,
               selectedListicleItemIndex: null,
               selectedGap: null,
+              selectedKeepRegionIndex: null,
             }
           : {}),
       }),
@@ -476,6 +499,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         selectedPunchInIndex: null,
         selectedListicleItemIndex: null,
         selectedGap: null,
+        selectedKeepRegionIndex: null,
         selectedCaptionIndex: null,
       }),
 
@@ -505,6 +529,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         config,
         transcript,
         selectedGap,
+        selectedKeepRegionIndex,
         selectedBRollId,
         selectedPunchInIndex,
       } = get();
@@ -515,6 +540,22 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           transcript,
         });
         set({ selectedGap: null });
+        return true;
+      }
+      if (selectedKeepRegionIndex != null) {
+        const keeps = cutsToKeepRegions(config.cuts, transcript.duration);
+        const keep = keeps[selectedKeepRegionIndex];
+        if (!keep) return false;
+        const nextConfig = cutKeepRegion(
+          config,
+          selectedKeepRegionIndex,
+          transcript.duration,
+        );
+        const gap = cutsToGaps(nextConfig.cuts).find(
+          (g) => keep.start >= g.start - 0.001 && keep.start < g.end,
+        );
+        commit({ config: nextConfig, transcript });
+        set({ selectedKeepRegionIndex: null, selectedGap: gap?.id ?? null });
         return true;
       }
       if (selectedPunchInIndex != null) {
@@ -582,6 +623,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       set({
         selectedBRollId: clip.id,
         selectedGap: null,
+        selectedKeepRegionIndex: null,
         selectedPunchInIndex: null,
         selectedListicleItemIndex: null,
       });
@@ -600,6 +642,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         selectedPunchInIndex: newIndex,
         selectedBRollId: null,
         selectedGap: null,
+        selectedKeepRegionIndex: null,
         selectedListicleItemIndex: null,
         selectedCaptionIndex: caption.index,
       });
@@ -615,6 +658,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       commit({ config: { ...config, cuts }, transcript });
       set({
         selectedGap: gap?.id ?? null,
+        selectedKeepRegionIndex: null,
         selectedBRollId: null,
         selectedPunchInIndex: null,
         selectedListicleItemIndex: null,
@@ -637,16 +681,16 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       commit({ config: { ...config, bRolls: result }, transcript }, live);
     },
 
-    adjustSection: (sectionIndex, edge, deltaSec, live = false) => {
+    setSectionEdge: (sectionIndex, edge, targetSec, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
       commit(
         {
-          config: adjustSectionEdge(
+          config: setSectionEdge(
             config,
             sectionIndex,
             edge,
-            deltaSec,
+            targetSec,
             transcript.duration,
           ),
           transcript,

@@ -5,20 +5,26 @@ cuts:
   - start: 40.734994562262095
     end: 40.8667
 listicleOverlay:
-  start: 4.04
+  start: 4.36
   end: 36.134806960304516
   items:
     - label: Get a perm
-      reveal: 4.04
+      reveal: 4.36
     - label: Go to the gym
-      reveal: 13.4
+      reveal: 13.9
     - label: Drop the glasses
-      reveal: 22.5
+      reveal: 23.423
     - label: Improve your style
-      reveal: 26.74
+      reveal: 27.62
 punchInSegments:
+  - start: 29.625
+    end: 32.601
+    scale: 1.12
   - start: 35.7
-    end: 35.922
+    end: 36.183
+    scale: 1.12
+  - start: 38.458
+    end: 38.76
     scale: 1.12
 bRolls: []
 

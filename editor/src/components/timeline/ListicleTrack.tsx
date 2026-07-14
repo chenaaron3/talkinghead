@@ -77,7 +77,7 @@ export function ListicleTrack({ width, sourceX }: Props) {
         <div
           key={`li-${i}`}
           className="absolute top-1 bottom-1 z-[1] flex w-6 cursor-ew-resize items-center justify-center rounded bg-green-500/70 text-[9px] text-white select-none hover:bg-green-400/80"
-          style={{ left: sourceX(item.reveal) - 12 }}
+          style={{ left: sourceX(item.reveal) }}
           title={`${item.label} @ ${item.reveal.toFixed(2)}s`}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => {

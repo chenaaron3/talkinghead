@@ -6,16 +6,15 @@ import { Handle, TrackLabel, useTrackDrag } from "./shared";
 type Props = {
   width: number;
   sourceX: (sourceSec: number) => number;
-  onNeedleX: (x: number | null) => void;
 };
 
-export function BRollTrack({ width, sourceX, onNeedleX }: Props) {
+export function BRollTrack({ width, sourceX }: Props) {
   const bRolls = useEditor((s) => s.config?.bRolls ?? []);
   const captions = useEditor((s) => s.transcript?.captions ?? []);
   const selectedBRollId = useEditor((s) => s.selectedBRollId);
   const selectBRoll = useEditor((s) => s.selectBRoll);
   const updateBRollRange = useEditor((s) => s.updateBRollRange);
-  const { startDrag, scrubTo } = useTrackDrag(onNeedleX);
+  const { startDrag } = useTrackDrag();
 
   return (
     <TrackLabel label="B-roll" width={width}>
@@ -41,8 +40,7 @@ export function BRollTrack({ width, sourceX, onNeedleX }: Props) {
               onMouseDown={(e) => {
                 const origin = clip.start;
                 const fixedEnd = clip.end;
-                const originX = left;
-                startDrag(e, (dxSec, dxPx, shiftKey) => {
+                startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = Math.max(0, origin + dxSec);
                   const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
                   const { start, end } = clampRangeEdge("start", snapped, {
@@ -50,7 +48,6 @@ export function BRollTrack({ width, sourceX, onNeedleX }: Props) {
                     end: fixedEnd,
                   });
                   updateBRollRange(clip.id, start, end, true);
-                  scrubTo(start, originX + dxPx);
                 });
               }}
             />
@@ -60,8 +57,7 @@ export function BRollTrack({ width, sourceX, onNeedleX }: Props) {
               onMouseDown={(e) => {
                 const origin = clip.end;
                 const fixedStart = clip.start;
-                const originX = right;
-                startDrag(e, (dxSec, dxPx, shiftKey) => {
+                startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = origin + dxSec;
                   const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
                   const { start, end } = clampRangeEdge("end", snapped, {
@@ -69,7 +65,6 @@ export function BRollTrack({ width, sourceX, onNeedleX }: Props) {
                     end: origin,
                   });
                   updateBRollRange(clip.id, start, end, true);
-                  scrubTo(end, originX + dxPx);
                 });
               }}
             />

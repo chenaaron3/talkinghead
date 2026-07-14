@@ -1,9 +1,5 @@
-import {
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type ReactNode,
-} from "react";
-import { setTimelineScrubbing, useEditor } from "../../store";
+import { type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useEditor } from "../../store";
 
 export function TrackLabel({
   label,
@@ -48,18 +44,10 @@ export function Handle({
   );
 }
 
-/** Edge-drag helper: local scrub lock + needle pixel callback. */
-export function useTrackDrag(onNeedleX: (x: number | null) => void) {
+/** Edge-drag helper for timeline range handles (does not move playhead). */
+export function useTrackDrag() {
   const pxPerSec = useEditor((s) => s.pxPerSec);
-  const duration = useEditor((s) => s.transcript?.duration ?? 0);
-  const seekSource = useEditor((s) => s.seekSource);
   const beginGesture = useEditor((s) => s.beginGesture);
-
-  const scrubTo = (sourceSec: number, needleX: number) => {
-    const clamped = Math.max(0, Math.min(duration, sourceSec));
-    onNeedleX(needleX);
-    seekSource(clamped);
-  };
 
   const startDrag = (
     e: ReactMouseEvent,
@@ -68,15 +56,12 @@ export function useTrackDrag(onNeedleX: (x: number | null) => void) {
     e.preventDefault();
     e.stopPropagation();
     beginGesture();
-    setTimelineScrubbing(true);
     const startX = e.clientX;
     const onPointerMove = (ev: MouseEvent) => {
       const dxPx = ev.clientX - startX;
       onMove(dxPx / pxPerSec, dxPx, ev.shiftKey);
     };
     const onUp = () => {
-      setTimelineScrubbing(false);
-      onNeedleX(null);
       window.removeEventListener("mousemove", onPointerMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -84,11 +69,5 @@ export function useTrackDrag(onNeedleX: (x: number | null) => void) {
     window.addEventListener("mouseup", onUp);
   };
 
-  return { startDrag, scrubTo, pxPerSec };
-}
-
-/** Parent owns the needle pixel override while any track is dragging. */
-export function useTimelineNeedle() {
-  const [dragNeedleX, setDragNeedleX] = useState<number | null>(null);
-  return { dragNeedleX, setDragNeedleX };
+  return { startDrag, pxPerSec };
 }

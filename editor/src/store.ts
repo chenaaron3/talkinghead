@@ -11,13 +11,12 @@ import {
 import { removeBRoll, upsertBRoll } from './lib/broll';
 import { captionIndexAt, flattenCaptions, updateCaption } from './lib/captions';
 import { cutForCaption } from './lib/cuts';
-import { sourceSecToOutputFrame } from './lib/frames';
+import { sourceSecToOutputFrame, outputFrameToSourceSec } from './lib/frames';
 import { punchInForCaption } from './lib/punchin';
 import { MIN_LISTICLE_SEC, MIN_RANGE_SEC } from './lib/range';
 import { cutKeepRegion, restoreGap, setSectionEdge } from './lib/sections';
-import { loadWaveformFromVideo, peakMax } from './lib/waveform';
-
-import type { WaveformData } from "./lib/waveform";
+import { deserializeWaveform, peakMax } from '@src/lib/waveform';
+import type { SerializedWaveform, WaveformData } from "@src/lib/waveform";
 
 import type { FlatCaption } from "./lib/captions";
 import type {
@@ -277,6 +276,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           config?: EpisodeConfig;
           transcript?: Transcript;
           props?: EpisodeProps;
+          waveform?: SerializedWaveform | null;
           error?: string;
         };
         const as = (await assetsRes.json()) as {
@@ -306,19 +306,13 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           waveformMax: 0,
         });
 
-        const videoSrc = ep.props.videoSrc;
-        void loadWaveformFromVideo(`/${videoSrc}`)
-          .then((waveform) => {
-            if (get().videoSrc !== videoSrc) return;
-            set({
-              waveform,
-              waveformMax: peakMax(waveform.peaks),
-            });
-          })
-          .catch(() => {
-            if (get().videoSrc !== videoSrc) return;
-            set({ waveform: null, waveformMax: 0 });
+        if (ep.waveform?.peaks?.length) {
+          const waveform = deserializeWaveform(ep.waveform);
+          set({
+            waveform,
+            waveformMax: peakMax(waveform.peaks),
           });
+        }
       } catch (err) {
         set({
           error: err instanceof Error ? err.message : String(err),
@@ -399,20 +393,10 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     },
 
     seekOutput: (frame) => {
-      const { props } = get();
+      const { props, frame: prevFrame } = get();
       if (!props) return;
-      const fps = props.fps;
-      const outputSec = frame / fps;
-      let cursor = 0;
-      let sourceSec = 0;
-      for (const s of props.sections) {
-        const segEnd = cursor + s.durationInFrames / fps;
-        if (outputSec >= cursor && outputSec <= segEnd + 0.001) {
-          sourceSec = s.trimBefore / fps + (outputSec - cursor);
-          break;
-        }
-        cursor = segEnd;
-      }
+      const sourceSec = outputFrameToSourceSec(frame, props);
+      if (frame === prevFrame) return;
       set({ frame, sourceSec });
     },
 

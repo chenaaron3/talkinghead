@@ -20,9 +20,6 @@ importers:
       '@remotion/cli':
         specifier: 4.0.487
         version: 4.0.487(postcss@8.5.16)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@remotion/install-whisper-cpp':
-        specifier: 4.0.487
-        version: 4.0.487
       '@remotion/media':
         specifier: 4.0.487
         version: 4.0.487(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -509,9 +506,6 @@ packages:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
 
-  '@remotion/captions@4.0.487':
-    resolution: {integrity: sha512-3PBicPBRJp46ED+OPPXUhKVkX00MWYDjPBQmCDCK8HOqrarnfWSYfvfd3+bZsd4Sfo53e4D7FFmb56FWJq0m4w==}
-
   '@remotion/cli@4.0.487':
     resolution: {integrity: sha512-N9/gWsrvrHrkkpFTMjy39dRIhZm3mUtQRH5en0mqo5W0xCDHRbp+z21b5StV6bJBECyLFUpQjqkzwgsQlvE9sQ==}
     hasBin: true
@@ -558,9 +552,6 @@ packages:
     resolution: {integrity: sha512-R11pTdry20k7MfUzkvYfpJOn9y/NZfMj+UPk0TpVV8OmzPEQ178wz6aIEC/pvYHFhEMZSSwjm51lCvidyE/BAw==}
     peerDependencies:
       eslint: '>=9'
-
-  '@remotion/install-whisper-cpp@4.0.487':
-    resolution: {integrity: sha512-PqdkRJkU5CZpcNc/9t4Pi2d/nWAeU0IwWnOfVwUVrUtv8+OOfAsHZCwIAMbK4ki5ZTGrnSVpBEhoxSYFk9yHag==}
 
   '@remotion/licensing@4.0.487':
     resolution: {integrity: sha512-X2yUOZ76YdMVLzCet7H4C9haeAHCceCS6rHZHpuTNb011aZEwJ552AUzc0MZQ0BkWffiJMOxbAT7ImSmcICdJQ==}
@@ -2714,8 +2705,6 @@ snapshots:
       react-dom: 19.2.3(react@19.2.3)
       remotion: 4.0.487(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
 
-  '@remotion/captions@4.0.487': {}
-
   '@remotion/cli@4.0.487(postcss@8.5.16)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@remotion/bundler': 4.0.487(postcss@8.5.16)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -2777,10 +2766,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
       - typescript
-
-  '@remotion/install-whisper-cpp@4.0.487':
-    dependencies:
-      '@remotion/captions': 4.0.487
 
   '@remotion/licensing@4.0.487': {}
 

@@ -1,11 +1,9 @@
 /** Hardcoded editing / transcription defaults (not configurable). */
 
-/** whisper.cpp model size */
+/** whispermlx ASR model (MLX on Apple Silicon) */
 export const WHISPER_MODEL = "large-v3-turbo" as const;
 /** Whisper language code */
 export const WHISPER_LANGUAGE = "en" as const;
-/** Remotion-supported whisper.cpp release */
-export const WHISPER_CPP_VERSION = "1.7.6";
 
 /** Silence longer than this (seconds) is cut */
 export const GAP_THRESHOLD_SEC = 0.5;
@@ -26,9 +24,6 @@ export const FILLER_WORDS = [
   "mm",
   "mhm",
 ] as const;
-
-/** Whisper silence markers — never shown as captions */
-export const TRANSCRIPTION_ARTIFACTS = ["blank_audio"] as const;
 
 /** Fallback when titleDurationSec is omitted from config */
 export const DEFAULT_TITLE_DURATION_SEC = 5;

@@ -6,6 +6,10 @@ export function setPlayer(playerRef: PlayerRef | null) {
   player = playerRef;
 }
 
+export function getPlayer() {
+  return player;
+}
+
 export function togglePlayback() {
   if (!player) return;
   if (player.isPlaying()) player.pause();

@@ -7,8 +7,8 @@ import {
   loadEpisodeConfig,
   writeEpisodeConfig,
 } from "../../cli/helpers/config";
-import { probeVideoFps } from "../../cli/helpers/whisper";
 import { rebuildAllPropsIndex } from "../../cli/helpers/props-index";
+import { probeVideoFps } from "../../cli/helpers/whisper";
 import {
   IMAGE_EXTENSIONS,
   ROOT,
@@ -16,6 +16,7 @@ import {
 } from "../../cli/helpers/types";
 import { renderEpisode } from "../../cli/render-episode";
 import type { EpisodeConfig, Transcript } from "../../cli/helpers/types";
+import type { SerializedWaveform } from "../../src/lib/waveform";
 import YAML from "yaml";
 
 function ensureDir(dir: string) {
@@ -115,7 +116,12 @@ function loadEpisodeData(episodeId: string) {
     transcript,
   });
 
-  return { episodeDir, config, transcript, props, probe };
+  const waveformPath = path.join(episodeDir, "generated", "waveform.json");
+  const waveform = fs.existsSync(waveformPath)
+    ? (JSON.parse(fs.readFileSync(waveformPath, "utf8")) as SerializedWaveform)
+    : null;
+
+  return { episodeDir, config, transcript, props, probe, waveform };
 }
 
 function ensureBRollAssets(bRolls: EpisodeConfig["bRolls"]) {
@@ -140,8 +146,15 @@ export function editorApiPlugin(episodeId: string): Plugin {
 
         try {
           if (req.method === "GET" && pathname === "/api/episode") {
-            const { config, transcript, props } = loadEpisodeData(episodeId);
-            return sendJson(res, 200, { episodeId, config, transcript, props });
+            const { config, transcript, props, waveform } =
+              loadEpisodeData(episodeId);
+            return sendJson(res, 200, {
+              episodeId,
+              config,
+              transcript,
+              props,
+              waveform,
+            });
           }
 
           if (req.method === "GET" && pathname === "/api/assets") {

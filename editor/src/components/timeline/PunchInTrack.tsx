@@ -6,16 +6,15 @@ import { Handle, TrackLabel, useTrackDrag } from "./shared";
 type Props = {
   width: number;
   sourceX: (sourceSec: number) => number;
-  onNeedleX: (x: number | null) => void;
 };
 
-export function PunchInTrack({ width, sourceX, onNeedleX }: Props) {
+export function PunchInTrack({ width, sourceX }: Props) {
   const punchIns = useEditor((s) => s.config?.punchInSegments ?? []);
   const selectedPunchInIndex = useEditor((s) => s.selectedPunchInIndex);
   const selectPunchIn = useEditor((s) => s.selectPunchIn);
   const captions = useEditor((s) => s.transcript?.captions ?? []);
   const updatePunchInRange = useEditor((s) => s.updatePunchInRange);
-  const { startDrag, scrubTo } = useTrackDrag(onNeedleX);
+  const { startDrag } = useTrackDrag();
 
   return (
     <TrackLabel label="Zoom" width={width}>
@@ -41,8 +40,7 @@ export function PunchInTrack({ width, sourceX, onNeedleX }: Props) {
               onMouseDown={(e) => {
                 const origin = p.start;
                 const fixedEnd = p.end;
-                const originX = left;
-                startDrag(e, (dxSec, dxPx, shiftKey) => {
+                startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = Math.max(0, origin + dxSec);
                   const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
                   const { start, end } = clampRangeEdge("start", snapped, {
@@ -50,7 +48,6 @@ export function PunchInTrack({ width, sourceX, onNeedleX }: Props) {
                     end: fixedEnd,
                   });
                   updatePunchInRange(i, start, end, true);
-                  scrubTo(start, originX + dxPx);
                 });
               }}
             />
@@ -60,8 +57,7 @@ export function PunchInTrack({ width, sourceX, onNeedleX }: Props) {
               onMouseDown={(e) => {
                 const origin = p.end;
                 const fixedStart = p.start;
-                const originX = right;
-                startDrag(e, (dxSec, dxPx, shiftKey) => {
+                startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = origin + dxSec;
                   const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
                   const { start, end } = clampRangeEdge("end", snapped, {
@@ -69,7 +65,6 @@ export function PunchInTrack({ width, sourceX, onNeedleX }: Props) {
                     end: origin,
                   });
                   updatePunchInRange(i, start, end, true);
-                  scrubTo(end, originX + dxPx);
                 });
               }}
             />

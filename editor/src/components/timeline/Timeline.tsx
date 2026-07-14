@@ -1,15 +1,17 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from "react";
 
-import { isTimelineScrubbing, useEditor } from '../../store';
-import { BRollTrack } from './BRollTrack';
-import { CaptionTrack } from './CaptionTrack';
-import { ListicleTrack } from './ListicleTrack';
-import { PunchInTrack } from './PunchInTrack';
-import { useTimelineNeedle } from './shared';
-import { useTimelineLayout } from './useTimelineLayout';
-import { VideoTrack } from './VideoTrack';
-
-const LABEL_OFFSET = 72;
+import { getPlayer } from "../../lib/player-bridge";
+import { isTimelineScrubbing, useEditor } from "../../store";
+import { BRollTrack } from "./BRollTrack";
+import { CaptionTrack } from "./CaptionTrack";
+import { LABEL_OFFSET } from "./constants";
+import { ListicleTrack } from "./ListicleTrack";
+import { Playhead } from "./Playhead";
+import { PunchInTrack } from "./PunchInTrack";
+import { TimelineRuler } from "./TimelineRuler";
+import { usePlayheadInteraction } from "./usePlayheadInteraction";
+import { useTimelineLayout } from "./useTimelineLayout";
+import { VideoTrack } from "./VideoTrack";
 
 function playheadContentX(sourceSec: number, pxPerSec: number): number {
   return LABEL_OFFSET + sourceSec * pxPerSec;
@@ -32,7 +34,6 @@ function scrollPlayheadIntoView(
 
 export function Timeline() {
   const duration = useEditor((s) => s.transcript?.duration ?? 0);
-  const sourceSec = useEditor((s) => s.sourceSec);
   const pxPerSec = useEditor((s) => s.pxPerSec);
   const setPxPerSec = useEditor((s) => s.setPxPerSec);
   const selectGap = useEditor((s) => s.selectGap);
@@ -40,11 +41,26 @@ export function Timeline() {
   const seekSource = useEditor((s) => s.seekSource);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const zoomAnchorSec = useRef<number | null>(null);
   const zoomAnchorViewportX = useRef<number | null>(null);
-  const { dragNeedleX, setDragNeedleX } = useTimelineNeedle();
   const { items, totalWidth, sourceX } = useTimelineLayout();
 
   const trackWidth = totalWidth - 40;
+
+  const {
+    hoverSec,
+    scrubbing,
+    onMouseMove,
+    onMouseLeave,
+    onClick,
+    startScrub,
+  } = usePlayheadInteraction({
+    contentRef,
+    duration,
+    pxPerSec,
+    seekSource,
+  });
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -58,9 +74,23 @@ export function Timeline() {
       const next = Math.min(200, Math.max(8, current * factor));
       if (next === current) return;
 
-      const sec = useEditor.getState().sourceSec;
-      const playheadX = playheadContentX(sec, current);
-      zoomAnchorViewportX.current = playheadX - el.scrollLeft;
+      const { sourceSec, transcript } = useEditor.getState();
+      const duration = transcript?.duration ?? 0;
+      let anchorSec = sourceSec;
+
+      const content = contentRef.current;
+      if (content && duration > 0) {
+        const rect = content.getBoundingClientRect();
+        const x = e.clientX - rect.left - LABEL_OFFSET;
+        const hoverSec = x / current;
+        if (hoverSec >= 0 && hoverSec <= duration) {
+          anchorSec = hoverSec;
+        }
+      }
+
+      const anchorX = playheadContentX(anchorSec, current);
+      zoomAnchorSec.current = anchorSec;
+      zoomAnchorViewportX.current = anchorX - el.scrollLeft;
       setPxPerSec(next);
     };
 
@@ -71,18 +101,29 @@ export function Timeline() {
   useLayoutEffect(() => {
     const el = scrollRef.current;
     const anchor = zoomAnchorViewportX.current;
-    if (!el || anchor == null) return;
+    const sec = zoomAnchorSec.current;
+    if (!el || anchor == null || sec == null) return;
     zoomAnchorViewportX.current = null;
+    zoomAnchorSec.current = null;
 
-    const { sourceSec: sec, pxPerSec: scale } = useEditor.getState();
+    const { pxPerSec: scale } = useEditor.getState();
     el.scrollLeft = playheadContentX(sec, scale) - anchor;
   }, [pxPerSec]);
 
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el || isTimelineScrubbing()) return;
-    scrollPlayheadIntoView(el, playheadContentX(sourceSec, pxPerSec));
-  }, [sourceSec, pxPerSec]);
+  useEffect(() => {
+    return useEditor.subscribe((state, prev) => {
+      if (state.sourceSec === prev.sourceSec) return;
+      if (isTimelineScrubbing()) return;
+      if (getPlayer()?.isPlaying()) return;
+
+      const el = scrollRef.current;
+      if (!el) return;
+      scrollPlayheadIntoView(
+        el,
+        playheadContentX(state.sourceSec, state.pxPerSec),
+      );
+    });
+  }, []);
 
   return (
     <div className="flex min-h-0 min-w-0 w-full max-w-[100vw] flex-col overflow-hidden bg-panel">
@@ -91,48 +132,38 @@ export function Timeline() {
         ref={scrollRef}
       >
         <div
-          className="relative min-h-full py-2 pl-[72px]"
+          className="relative min-h-full"
+          ref={contentRef}
           style={{ width: totalWidth }}
+          onMouseMove={(e) => onMouseMove(e.clientX)}
+          onMouseLeave={onMouseLeave}
           onClick={(e) => {
-            const rect = (
-              e.currentTarget as HTMLDivElement
-            ).getBoundingClientRect();
-            const x =
-              e.clientX - rect.left - 72 + (scrollRef.current?.scrollLeft ?? 0);
             selectGap(null);
             selectKeepRegion(null);
-            const sec = x / pxPerSec;
-            if (sec >= 0 && sec <= duration) {
-              seekSource(sec);
-            }
+            onClick(e.clientX);
           }}
         >
-          <div
-            className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-red-400"
-            style={{ left: LABEL_OFFSET + (dragNeedleX ?? sourceX(sourceSec)) }}
+          <Playhead
+            hoverSec={hoverSec}
+            pxPerSec={pxPerSec}
+            scrubbing={scrubbing}
+            onScrubStart={startScrub}
           />
 
-          <VideoTrack
-            width={trackWidth}
-            items={items}
-            onNeedleX={setDragNeedleX}
+          <TimelineRuler
+            duration={duration}
+            pxPerSec={pxPerSec}
+            trackWidth={trackWidth}
+            onScrubStart={startScrub}
           />
-          <CaptionTrack width={trackWidth} sourceX={sourceX} />
-          <BRollTrack
-            width={trackWidth}
-            sourceX={sourceX}
-            onNeedleX={setDragNeedleX}
-          />
-          <PunchInTrack
-            width={trackWidth}
-            sourceX={sourceX}
-            onNeedleX={setDragNeedleX}
-          />
-          <ListicleTrack
-            width={trackWidth}
-            sourceX={sourceX}
-            onNeedleX={setDragNeedleX}
-          />
+
+          <div className="py-2 pl-[72px]">
+            <VideoTrack width={trackWidth} items={items} />
+            <CaptionTrack width={trackWidth} sourceX={sourceX} />
+            <BRollTrack width={trackWidth} sourceX={sourceX} />
+            <PunchInTrack width={trackWidth} sourceX={sourceX} />
+            <ListicleTrack width={trackWidth} sourceX={sourceX} />
+          </div>
         </div>
       </div>
     </div>

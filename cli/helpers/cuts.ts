@@ -1,59 +1,13 @@
+import { isFiller } from "../../src/lib/caption-words";
 import { normalizeCuts } from "../../src/lib/source-timeline";
-import {
-  FILLER_PADDING_SEC,
-  FILLER_WORDS,
-  GAP_THRESHOLD_SEC,
-  TRANSCRIPTION_ARTIFACTS,
-} from "./constants";
+import { FILLER_PADDING_SEC, GAP_THRESHOLD_SEC } from "./constants";
 import type { SourceCut, TranscriptCaption } from "./types";
+
+export { isFiller } from "../../src/lib/caption-words";
 
 /** Numbered caption list for OpenAI prompts that return word indices. */
 export function buildNumberedTranscript(captions: TranscriptCaption[]): string {
   return captions.map((c, i) => `${i}: ${c.text}`).join("\n");
-}
-
-function normalizeToken(word: string): string {
-  return word
-    .toLowerCase()
-    .replace(/^[^a-z0-9']+|[^a-z0-9']+$/gi, "")
-    .trim();
-}
-
-function isFiller(word: string): boolean {
-  const token = normalizeToken(word);
-  if (!token) return false;
-  return (FILLER_WORDS as readonly string[]).includes(token);
-}
-
-function isTranscriptionArtifact(word: string): boolean {
-  const token = normalizeToken(word);
-  if (!token) return /BLANK_AUDIO/i.test(word);
-  return (TRANSCRIPTION_ARTIFACTS as readonly string[]).includes(token);
-}
-
-export function isSkippedWord(word: string): boolean {
-  return isFiller(word) || isTranscriptionArtifact(word);
-}
-
-/** Strip punctuation for on-screen captions (keep letters/numbers/apostrophes). */
-export function captionText(word: string): string {
-  return word.replace(/[^\p{L}\p{N}']+/gu, "").trim();
-}
-
-/** Drop fillers/artifacts and normalize on-screen text from whisper output. */
-export function filterCaptions(captions: TranscriptCaption[]): TranscriptCaption[] {
-  const filtered: TranscriptCaption[] = [];
-  for (const caption of captions) {
-    if (isSkippedWord(caption.text)) continue;
-    const text = captionText(caption.text);
-    if (!text) continue;
-    filtered.push({
-      text,
-      start: caption.start,
-      end: Math.max(caption.end, caption.start + 0.04),
-    });
-  }
-  return filtered;
 }
 
 /**
@@ -105,7 +59,7 @@ export function buildCutsFromWords(options: {
     keepRaw.push({ start: 0, end: durationSec });
   }
 
-  const keepWords = captions.filter((c) => !isSkippedWord(c.text));
+  const keepWords = captions.filter((c) => !isFiller(c.text));
   const speechKeep: Interval[] = [];
 
   for (const region of keepRaw) {

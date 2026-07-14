@@ -10,7 +10,9 @@ schedule-manifest.json
 secrets/*
 !secrets/.gitkeep
 
-# Local whisper.cpp install + models
+# Local whispermlx Python env + legacy whisper.cpp
+whispermlx-env/
+whisperx-env/
 whisper.cpp/
 tmp.json
 tmp/

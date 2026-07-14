@@ -2,6 +2,7 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import { buildProps } from "../src/lib/build-props";
+import type { SerializedWaveform } from "../src/lib/waveform";
 import {
   findSourceVideo,
   loadEpisodeConfig,
@@ -13,6 +14,7 @@ import { buildCutsFromWords } from "./helpers/cuts";
 import { rebuildAllPropsIndex } from "./helpers/props-index";
 import type { EpisodeProps, Transcript } from "./helpers/types";
 import { PUBLIC_EPISODES_DIR, ROOT } from "./helpers/types";
+import { buildWaveform, waveformCacheValid } from "./helpers/waveform";
 import { probeVideoFps, runWhisper } from "./helpers/whisper";
 import { buildEmphasisCaptions } from "./modules/emphasis";
 import { buildListicleOverlay } from "./modules/listicles";
@@ -80,6 +82,7 @@ export async function runProcess(argv: string[]): Promise<{ episodeId: string }>
   ensureDir(generatedDir);
 
   const transcriptPath = path.join(generatedDir, "transcript.json");
+  const waveformPath = path.join(generatedDir, "waveform.json");
   const probe = probeVideoFps(videoPath);
   const fps = probe.fps;
 
@@ -129,6 +132,22 @@ export async function runProcess(argv: string[]): Promise<{ episodeId: string }>
     ...transcript.captions.map((c) => c.end),
   );
   transcript = { ...transcript, duration: durationSec };
+
+  let waveform: SerializedWaveform | null = null;
+  if (!force && fs.existsSync(waveformPath)) {
+    const cached = JSON.parse(
+      fs.readFileSync(waveformPath, "utf8"),
+    ) as SerializedWaveform;
+    if (waveformCacheValid(cached, videoStat)) {
+      waveform = cached;
+      console.log(`[cache] reusing ${waveformPath}`);
+    }
+  }
+  if (!waveform) {
+    waveform = buildWaveform({ videoPath });
+    writeJson(waveformPath, waveform);
+    console.log(`[cache] wrote ${waveformPath}`);
+  }
 
   let title = config.title;
   if (!title) {

@@ -1,9 +1,11 @@
 import {
-    clipRangeToCaptions, cutsToKeepSegments, intersectWithKeepRegions, mapSourceSecToOutputFrame,
-    mapSourceSecToOutputSec,
-    validateCuts
-} from './source-timeline';
+    groupCaptionWords, padLastWordInGroups, prepareRenderCaptions, stripPunctuationForDisplay
+} from './caption-words';
 import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from './constants';
+import {
+    clipRangeToCaptions, cutsToKeepSegments, intersectWithKeepRegions, mapSourceSecToOutputFrame,
+    mapSourceSecToOutputSec, validateCuts
+} from './source-timeline';
 
 import type {
   BRollClip,
@@ -31,10 +33,10 @@ function buildCaptionGroups(options: {
   captionsAtATime: number;
 }): CaptionGroup[] {
   const { captions, segments, fps, captionsAtATime } = options;
-  const atATime = Math.max(1, captionsAtATime);
+  const renderCaptions = prepareRenderCaptions(captions);
 
   const captionWords: CaptionWord[] = [];
-  for (const cap of captions) {
+  for (const cap of renderCaptions) {
     const outStart = mapSourceSecToOutputFrame(cap.start, segments, fps);
     const outEnd = mapSourceSecToOutputFrame(cap.end, segments, fps);
     if (outStart == null || outEnd == null) continue;
@@ -51,17 +53,25 @@ function buildCaptionGroups(options: {
     });
   }
 
-  const groups: CaptionGroup[] = [];
-  for (let i = 0; i < captionWords.length; i += atATime) {
-    const slice = captionWords.slice(i, i + atATime);
-    if (slice.length === 0) continue;
-    groups.push({
-      words: slice,
-      startFrame: slice[0]!.startFrame,
-      endFrame: slice[slice.length - 1]!.endFrame,
-    });
-  }
-  return groups;
+  return padLastWordInGroups(
+    groupCaptionWords(captionWords, captionsAtATime)
+      .map((group) => {
+        const words = group.words
+          .map((word) => ({
+            ...word,
+            text: stripPunctuationForDisplay(word.text),
+          }))
+          .filter((word) => word.text.length > 0);
+        if (words.length === 0) return null;
+        return {
+          words,
+          startFrame: words[0]!.startFrame,
+          endFrame: words[words.length - 1]!.endFrame,
+        };
+      })
+      .filter((group): group is CaptionGroup => group != null),
+    fps,
+  );
 }
 
 function mapSourceRangeToOutputFrames(
@@ -196,14 +206,7 @@ function buildBRolls(
 
 /** Deterministically derive frame-only props from config + transcript. */
 export function buildProps(input: BuildPropsInput): EpisodeProps {
-  const {
-    episodeId,
-    title,
-    videoSrc,
-    fps,
-    config,
-    transcript,
-  } = input;
+  const { episodeId, title, videoSrc, fps, config, transcript } = input;
 
   validateCuts(config.cuts, transcript.duration);
   const keepSegments = cutsToKeepSegments(

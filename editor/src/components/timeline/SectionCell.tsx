@@ -7,15 +7,14 @@ import { VoiceBand } from "./VoiceBand";
 
 type Props = {
   item: SectionLayoutItem;
-  onNeedleX: (x: number | null) => void;
 };
 
-export function SectionCell({ item, onNeedleX }: Props) {
+export function SectionCell({ item }: Props) {
   const setSectionEdge = useEditor((s) => s.setSectionEdge);
   const selectedKeepRegionIndex = useEditor((s) => s.selectedKeepRegionIndex);
   const selectKeepRegion = useEditor((s) => s.selectKeepRegion);
   const captions = useFlatCaptions();
-  const { startDrag, scrubTo } = useTrackDrag(onNeedleX);
+  const { startDrag } = useTrackDrag();
 
   const selected = selectedKeepRegionIndex === item.keepRegionIndex;
   const duration = item.end - item.start;
@@ -34,20 +33,14 @@ export function SectionCell({ item, onNeedleX }: Props) {
         selectKeepRegion(selected ? null : item.keepRegionIndex);
       }}
     >
-      <VoiceBand
-        start={item.start}
-        end={item.end}
-        captions={captions}
-        pixelWidth={item.width}
-      />
+      <VoiceBand start={item.start} end={item.end} captions={captions} />
       <Handle
         side="left"
         className="z-20"
         onMouseDown={(e) => {
           const origin = item.start;
           const fixedEnd = item.end;
-          const originX = item.x;
-          startDrag(e, (dxSec, dxPx, shiftKey) => {
+          startDrag(e, (dxSec, _dxPx, shiftKey) => {
             const raw = Math.max(0, origin + dxSec);
             const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
             const { start } = clampRangeEdge("start", snapped, {
@@ -55,7 +48,6 @@ export function SectionCell({ item, onNeedleX }: Props) {
               end: fixedEnd,
             });
             setSectionEdge(item.keepRegionIndex, "start", start, true);
-            scrubTo(start, originX + dxPx);
           });
         }}
       />
@@ -65,8 +57,7 @@ export function SectionCell({ item, onNeedleX }: Props) {
         onMouseDown={(e) => {
           const origin = item.end;
           const fixedStart = item.start;
-          const originX = item.x + item.width;
-          startDrag(e, (dxSec, dxPx, shiftKey) => {
+          startDrag(e, (dxSec, _dxPx, shiftKey) => {
             const raw = origin + dxSec;
             const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
             const { end } = clampRangeEdge("end", snapped, {
@@ -74,7 +65,6 @@ export function SectionCell({ item, onNeedleX }: Props) {
               end: origin,
             });
             setSectionEdge(item.keepRegionIndex, "end", end, true);
-            scrubTo(end, originX + dxPx);
           });
         }}
       />

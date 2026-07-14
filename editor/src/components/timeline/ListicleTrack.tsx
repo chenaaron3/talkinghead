@@ -1,25 +1,28 @@
-import { clampRangeEdge, MIN_LISTICLE_SEC } from '../../lib/range';
-import { maybeSnapTimelineSec } from '../../lib/snap';
-import { useEditor } from '../../store';
-import { Handle, TrackLabel, useTrackDrag } from './shared';
+import { clampRangeEdge, MIN_LISTICLE_SEC } from "../../lib/range";
+import { maybeSnapTimelineSec } from "../../lib/snap";
+import { useEditor } from "../../store";
+import { Handle, TrackLabel, useTrackDrag } from "./shared";
 
 type Props = {
   width: number;
   sourceX: (sourceSec: number) => number;
-  onNeedleX: (x: number | null) => void;
 };
 
-export function ListicleTrack({ width, sourceX, onNeedleX }: Props) {
+export function ListicleTrack({ width, sourceX }: Props) {
   const listicle = useEditor((s) => s.config?.listicleOverlay);
   const captions = useEditor((s) => s.transcript?.captions ?? []);
   const updateListicleOverlay = useEditor((s) => s.updateListicleOverlay);
   const updateListicleItemReveal = useEditor(
     (s) => s.updateListicleItemReveal,
   );
-  const { startDrag, scrubTo } = useTrackDrag(onNeedleX);
+  const { startDrag } = useTrackDrag();
 
   if (!listicle) {
-    return <TrackLabel label="List" width={width}>{null}</TrackLabel>;
+    return (
+      <TrackLabel label="List" width={width}>
+        {null}
+      </TrackLabel>
+    );
   }
 
   const left = sourceX(listicle.start);
@@ -38,8 +41,7 @@ export function ListicleTrack({ width, sourceX, onNeedleX }: Props) {
           onMouseDown={(e) => {
             const origin = listicle.start;
             const fixedEnd = listicle.end;
-            const originX = left;
-            startDrag(e, (dxSec, dxPx, shiftKey) => {
+            startDrag(e, (dxSec, _dxPx, shiftKey) => {
               const raw = Math.max(0, origin + dxSec);
               const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
               const { start, end } = clampRangeEdge(
@@ -49,7 +51,6 @@ export function ListicleTrack({ width, sourceX, onNeedleX }: Props) {
                 MIN_LISTICLE_SEC,
               );
               updateListicleOverlay(start, end, true);
-              scrubTo(start, originX + dxPx);
             });
           }}
         />
@@ -58,8 +59,7 @@ export function ListicleTrack({ width, sourceX, onNeedleX }: Props) {
           onMouseDown={(e) => {
             const origin = listicle.end;
             const fixedStart = listicle.start;
-            const originX = right;
-            startDrag(e, (dxSec, dxPx, shiftKey) => {
+            startDrag(e, (dxSec, _dxPx, shiftKey) => {
               const raw = origin + dxSec;
               const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
               const { start, end } = clampRangeEdge(
@@ -69,7 +69,6 @@ export function ListicleTrack({ width, sourceX, onNeedleX }: Props) {
                 MIN_LISTICLE_SEC,
               );
               updateListicleOverlay(start, end, true);
-              scrubTo(end, originX + dxPx);
             });
           }}
         />
@@ -84,15 +83,13 @@ export function ListicleTrack({ width, sourceX, onNeedleX }: Props) {
           onMouseDown={(e) => {
             if (e.button !== 0) return;
             const origin = item.reveal;
-            const originX = sourceX(item.reveal);
-            startDrag(e, (dxSec, dxPx, shiftKey) => {
+            startDrag(e, (dxSec, _dxPx, shiftKey) => {
               const reveal = maybeSnapTimelineSec(
                 origin + dxSec,
                 captions,
                 shiftKey,
               );
               updateListicleItemReveal(i, reveal, true);
-              scrubTo(reveal, originX + dxPx);
             });
           }}
         >

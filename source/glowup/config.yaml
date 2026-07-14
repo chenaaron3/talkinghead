@@ -1,11 +1,7 @@
 title: Asian Guy Glow Up Guide
 cuts:
   - start: 0
-    end: 1.89
-  - start: 32.067974442631865
-    end: 32.16797852093529
-  - start: 33.24
-    end: 33.684999999999995
+    end: 1.809
   - start: 40.734994562262095
     end: 40.8667
 listicleOverlay:
@@ -21,22 +17,8 @@ listicleOverlay:
     - label: Improve your style
       reveal: 26.74
 punchInSegments:
-  - start: 23.94
-    end: 25.24
-    scale: 1.06
-  - start: 30.70125203915171
-    end: 31.501284665579117
+  - start: 35.7
+    end: 35.922
     scale: 1.12
-  - start: 34.9014233278956
-    end: 35.70145595432301
-    scale: 1.12
-bRolls:
-  - id: broll-mrkqan6o-j7agy
-    src: b-roll/glowup/Perm_After_Joke.jpg
-    start: 4.8
-    end: 5.3
-  - id: broll-mriftfgx-aly38
-    src: b-roll/glowup/Fashion_After.jpg
-    start: 32.66799891245242
-    end: 35.00142740619903
+bRolls: []
 

@@ -1,13 +1,12 @@
 import { useMemo } from "react";
 import type { FlatCaption } from "../../lib/captions";
-import { sampleWaveformRange } from "../../lib/waveform";
+import { sampleWaveformRange } from "@src/lib/waveform";
 import { useEditor } from "../../store";
 
 type Props = {
   start: number;
   end: number;
   captions: FlatCaption[];
-  pixelWidth?: number;
 };
 
 const CENTER = 50;
@@ -16,9 +15,13 @@ const MIN_HALF = 3;
 const CENTER_GAP = 1.2;
 const BAR_PX = 2.2;
 
-function barCountForWidth(pixelWidth?: number): number {
-  if (!pixelWidth) return 80;
-  return Math.min(400, Math.max(40, Math.floor(pixelWidth / BAR_PX)));
+/** One bar every BAR_PX pixels — density stays even across section cells. */
+function barCountForDuration(
+  durationSec: number,
+  pxPerSec: number,
+): number {
+  if (durationSec <= 0 || pxPerSec <= 0) return 0;
+  return Math.max(2, Math.ceil((durationSec * pxPerSec) / BAR_PX));
 }
 
 /** Fallback envelope from caption timing when audio peaks are not loaded yet. */
@@ -39,12 +42,13 @@ function buildCaptionEnvelope(
   });
 }
 
-export function VoiceBand({ start, end, captions, pixelWidth }: Props) {
+export function VoiceBand({ start, end, captions }: Props) {
   const waveform = useEditor((s) => s.waveform);
   const waveformMax = useEditor((s) => s.waveformMax);
+  const pxPerSec = useEditor((s) => s.pxPerSec);
 
   const { envelope, slot } = useMemo(() => {
-    const samples = barCountForWidth(pixelWidth);
+    const samples = barCountForDuration(end - start, pxPerSec);
 
     const env =
       waveform && waveformMax > 0
@@ -61,7 +65,7 @@ export function VoiceBand({ start, end, captions, pixelWidth }: Props) {
       envelope: env,
       slot: 100 / samples,
     };
-  }, [start, end, captions, pixelWidth, waveform, waveformMax]);
+  }, [start, end, captions, pxPerSec, waveform, waveformMax]);
 
   if (envelope.length < 2) return null;
 

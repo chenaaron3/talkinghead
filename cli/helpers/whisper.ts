@@ -1,22 +1,27 @@
-import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
-import {
-    downloadWhisperModel, installWhisperCpp, toCaptions, transcribe
-} from '@remotion/install-whisper-cpp';
+import { WHISPER_LANGUAGE, WHISPER_MODEL } from "./constants";
+import { ROOT } from "./types";
 
-import { WHISPER_CPP_VERSION, WHISPER_LANGUAGE, WHISPER_MODEL } from './constants';
-import { ROOT } from './types';
-
-import { filterCaptions } from "./cuts";
 import type { Transcript, TranscriptCaption } from "./types";
-const WHISPER_DIR = path.join(ROOT, "whisper.cpp");
 
-function msToSec(ms: number): number {
-  return ms / 1000;
-}
+const WHISPERMLX_VENV = path.join(ROOT, "whispermlx-env");
+const WHISPERMLX_PYTHON = path.join(WHISPERMLX_VENV, "bin", "python3");
+const TRANSCRIBE_SCRIPT = path.join(
+  ROOT,
+  "scripts",
+  "whispermlx",
+  "transcribe.py",
+);
+
+type WhisperMLXPayload = {
+  language: string;
+  duration: number;
+  captions: TranscriptCaption[];
+};
 
 function extractWav(videoPath: string, wavPath: string): void {
   const result = spawnSync(
@@ -42,97 +47,78 @@ function extractWav(videoPath: string, wavPath: string): void {
   }
 }
 
-async function ensureWhisperCpp(): Promise<void> {
-  console.log(`[whisper] ensuring whisper.cpp ${WHISPER_CPP_VERSION}…`);
-  await installWhisperCpp({
-    to: WHISPER_DIR,
-    version: WHISPER_CPP_VERSION,
-    printOutput: true,
-  });
-  await downloadWhisperModel({
-    model: WHISPER_MODEL,
-    folder: WHISPER_DIR,
-    printOutput: true,
-  });
+function ensureWhisperMLX(): void {
+  if (!fs.existsSync(WHISPERMLX_PYTHON)) {
+    throw new Error(
+      `whispermlx venv not found at whispermlx-env/. Run: pnpm setup:whispermlx`,
+    );
+  }
+  if (!fs.existsSync(TRANSCRIBE_SCRIPT)) {
+    throw new Error(`Missing whispermlx script: ${TRANSCRIBE_SCRIPT}`);
+  }
+}
+
+function runWhisperMLXTranscribe(wavPath: string): WhisperMLXPayload {
+  const result = spawnSync(
+    WHISPERMLX_PYTHON,
+    [
+      TRANSCRIBE_SCRIPT,
+      wavPath,
+      "--language",
+      WHISPER_LANGUAGE,
+      "--model",
+      WHISPER_MODEL,
+    ],
+    {
+      encoding: "utf8",
+      maxBuffer: 50 * 1024 * 1024,
+      // Stream Python progress (model load, align) to the terminal.
+      stdio: ["ignore", "pipe", "inherit"],
+    },
+  );
+
+  if (result.status !== 0) {
+    throw new Error(
+      `whispermlx failed for ${wavPath}\n${result.stderr || result.stdout}`,
+    );
+  }
+
+  try {
+    return JSON.parse(result.stdout) as WhisperMLXPayload;
+  } catch {
+    throw new Error(
+      `whispermlx returned invalid JSON\n${result.stdout.slice(0, 500)}`,
+    );
+  }
 }
 
 export async function runWhisper(options: {
   videoPath: string;
 }): Promise<Omit<Transcript, "source">> {
-  await ensureWhisperCpp();
+  ensureWhisperMLX();
 
   const tmpDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), "talking-head-whisper-"),
+    path.join(os.tmpdir(), "talking-head-whispermlx-"),
   );
   const wavPath = path.join(tmpDir, "audio.wav");
 
   try {
-    console.log(`[whisper] extracting 16kHz wav…`);
+    console.log(`[whispermlx] extracting 16kHz wav…`);
     extractWav(options.videoPath, wavPath);
 
     console.log(
-      `[whisper] transcribing model=${WHISPER_MODEL} language=${WHISPER_LANGUAGE}`,
+      `[whispermlx] transcribing model=${WHISPER_MODEL} language=${WHISPER_LANGUAGE}`,
     );
-    const whisperCppOutput = await transcribe({
-      inputPath: wavPath,
-      whisperPath: WHISPER_DIR,
-      whisperCppVersion: WHISPER_CPP_VERSION,
-      model: WHISPER_MODEL,
-      language: WHISPER_LANGUAGE,
-      tokenLevelTimestamps: true,
-      // Remotion's splitOnWord passes `--split-on-word true`; whisper-cli
-      // treats that boolean as a positional input path. Pass the flag alone.
-      additionalArgs: ["--split-on-word"],
-      printOutput: true,
-    });
+    const payload = runWhisperMLXTranscribe(wavPath);
+    const captions = payload.captions;
+    const duration = Math.max(payload.duration, ...captions.map((c) => c.end));
 
-    // With splitOnWord + tokenLevelTimestamps, each transcription item is a word
-    // (e.g. "it's"). toCaptions() maps those items — don't walk BPE tokens.
-    const { captions } = toCaptions({ whisperCppOutput });
-
-    const rawCaptions: TranscriptCaption[] = captions
-      .map((caption) => {
-        const text = caption.text.trim();
-        const startMs =
-          caption.timestampMs != null && caption.timestampMs >= 0
-            ? caption.timestampMs
-            : caption.startMs;
-        const endMs = Math.max(startMs + 40, caption.endMs);
-        return {
-          text,
-          start: msToSec(startMs),
-          end: msToSec(endMs),
-        };
-      })
-      .filter((c) => c.text.length > 0 && !/\[BLANK_AUDIO\]/i.test(c.text));
-
-    // Snap ends so words don't overlap
-    for (let i = 0; i < rawCaptions.length - 1; i++) {
-      const current = rawCaptions[i]!;
-      const next = rawCaptions[i + 1]!;
-      if (next.start > current.start) {
-        current.end = Math.max(
-          current.start + 0.04,
-          Math.min(current.end, next.start),
-        );
-      }
-    }
-
-    const filtered = filterCaptions(rawCaptions);
-    const duration = Math.max(0, ...filtered.map((c) => c.end));
-
-    console.log(`[whisper] wrote ${filtered.length} captions`);
-
-    // Remotion's whisper.cpp wrapper leaves tmp.json in the project root
-    const leftover = path.join(ROOT, "tmp.json");
-    if (fs.existsSync(leftover)) {
-      fs.unlinkSync(leftover);
-    }
+    console.log(`[whispermlx] wrote ${captions.length} captions`);
 
     return {
-      language: whisperCppOutput.result.language || WHISPER_LANGUAGE,
+      language: payload.language || WHISPER_LANGUAGE,
       duration,
-      captions: filtered,
+      captions,
     };
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });

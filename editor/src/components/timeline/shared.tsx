@@ -31,16 +31,18 @@ export function TrackLabel({
 
 export function Handle({
   side,
+  className,
   onMouseDown,
 }: {
   side: "left" | "right";
+  className?: string;
   onMouseDown: (e: ReactMouseEvent) => void;
 }) {
   return (
     <span
-      className={`absolute top-0 bottom-0 w-1.5 cursor-ew-resize bg-white/35 ${
+      className={`absolute top-0 bottom-0 z-10 w-2.5 cursor-ew-resize touch-none bg-white/35 hover:bg-white/60 ${
         side === "left" ? "left-0" : "right-0"
-      }`}
+      } ${className ?? ""}`}
       onMouseDown={onMouseDown}
     />
   );
@@ -61,7 +63,7 @@ export function useTrackDrag(onNeedleX: (x: number | null) => void) {
 
   const startDrag = (
     e: ReactMouseEvent,
-    onMove: (dxSec: number, dxPx: number) => void,
+    onMove: (dxSec: number, dxPx: number, shiftKey: boolean) => void,
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -70,7 +72,7 @@ export function useTrackDrag(onNeedleX: (x: number | null) => void) {
     const startX = e.clientX;
     const onPointerMove = (ev: MouseEvent) => {
       const dxPx = ev.clientX - startX;
-      onMove(dxPx / pxPerSec, dxPx);
+      onMove(dxPx / pxPerSec, dxPx, ev.shiftKey);
     };
     const onUp = () => {
       setTimelineScrubbing(false);

@@ -6,6 +6,17 @@ export function flattenCaptions(captions: TranscriptCaption[]): FlatCaption[] {
   return captions.map((cap, index) => ({ ...cap, index }));
 }
 
+export function captionIndexAt(
+  sourceSec: number,
+  captions: TranscriptCaption[],
+): number | null {
+  for (let i = 0; i < captions.length; i++) {
+    const caption = captions[i]!;
+    if (sourceSec >= caption.start && sourceSec < caption.end) return i;
+  }
+  return null;
+}
+
 export function updateCaption(
   transcript: Transcript,
   index: number,

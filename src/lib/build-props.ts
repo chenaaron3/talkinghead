@@ -1,7 +1,9 @@
 import {
     clipRangeToCaptions, cutsToKeepSegments, intersectWithKeepRegions, mapSourceSecToOutputFrame,
+    mapSourceSecToOutputSec,
     validateCuts
 } from './source-timeline';
+import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from './constants';
 
 import type {
   BRollClip,
@@ -101,17 +103,12 @@ function buildListicle(
 
   const items = overlay.items
     .map((item) => {
-      const frames = mapSourceRangeToOutputFrames(
-        item.reveal,
-        item.reveal,
-        segments,
-        fps,
-        captions,
-        cuts,
-        durationSec,
-      );
-      if (!frames) return null;
-      return { label: item.label, revealFrame: frames.startFrame };
+      const outSec = mapSourceSecToOutputSec(item.reveal, segments);
+      if (outSec == null) return null;
+      return {
+        label: item.label,
+        revealFrame: Math.max(0, Math.round(outSec * fps)),
+      };
     })
     .filter((x): x is NonNullable<typeof x> => x != null);
 
@@ -204,8 +201,6 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     title,
     videoSrc,
     fps,
-    width = 1080,
-    height = 1920,
     config,
     transcript,
   } = input;
@@ -260,8 +255,8 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     title,
     videoSrc,
     fps,
-    width,
-    height,
+    width: COMPOSITION_WIDTH,
+    height: COMPOSITION_HEIGHT,
     durationInFrames: Math.max(1, durationInFrames),
     titleDurationSec: config.titleDurationSec,
     captionsAtATime: config.captionsAtATime,

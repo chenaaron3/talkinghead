@@ -111,8 +111,6 @@ function loadEpisodeData(episodeId: string) {
     title,
     videoSrc,
     fps: probe.fps,
-    width: probe.width,
-    height: probe.height,
     config,
     transcript,
   });

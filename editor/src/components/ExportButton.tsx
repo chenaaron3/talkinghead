@@ -105,7 +105,7 @@ export function ExportButton() {
   const pct = Math.round(progress * 100);
 
   return (
-    <div className="flex w-full max-w-[240px] flex-col gap-1.5">
+    <div className="flex w-full flex-col gap-1.5">
       <Button
         type="button"
         variant="outline"

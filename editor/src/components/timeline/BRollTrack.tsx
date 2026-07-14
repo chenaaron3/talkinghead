@@ -1,3 +1,5 @@
+import { clampRangeEdge } from "../../lib/range";
+import { maybeSnapTimelineSec } from "../../lib/snap";
 import { useEditor } from "../../store";
 import { Handle, TrackLabel, useTrackDrag } from "./shared";
 
@@ -9,11 +11,10 @@ type Props = {
 
 export function BRollTrack({ width, sourceX, onNeedleX }: Props) {
   const bRolls = useEditor((s) => s.config?.bRolls ?? []);
-  const pxPerSec = useEditor((s) => s.pxPerSec);
+  const captions = useEditor((s) => s.transcript?.captions ?? []);
   const selectedBRollId = useEditor((s) => s.selectedBRollId);
   const selectBRoll = useEditor((s) => s.selectBRoll);
   const updateBRollRange = useEditor((s) => s.updateBRollRange);
-  const seekSource = useEditor((s) => s.seekSource);
   const { startDrag, scrubTo } = useTrackDrag(onNeedleX);
 
   return (
@@ -39,13 +40,17 @@ export function BRollTrack({ width, sourceX, onNeedleX }: Props) {
               side="left"
               onMouseDown={(e) => {
                 const origin = clip.start;
-                const end = clip.end;
+                const fixedEnd = clip.end;
                 const originX = left;
-                startDrag(e, (dx) => {
-                  const start = Math.max(0, Math.min(origin + dx / pxPerSec, end - 0.04));
+                startDrag(e, (dxSec, dxPx, shiftKey) => {
+                  const raw = Math.max(0, origin + dxSec);
+                  const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+                  const { start, end } = clampRangeEdge("start", snapped, {
+                    start: origin,
+                    end: fixedEnd,
+                  });
                   updateBRollRange(clip.id, start, end, true);
-                  seekSource(start);
-                  scrubTo(start, originX + dx);
+                  scrubTo(start, originX + dxPx);
                 });
               }}
             />
@@ -54,13 +59,17 @@ export function BRollTrack({ width, sourceX, onNeedleX }: Props) {
               side="right"
               onMouseDown={(e) => {
                 const origin = clip.end;
-                const start = clip.start;
+                const fixedStart = clip.start;
                 const originX = right;
-                startDrag(e, (dx) => {
-                  const end = Math.max(start + 0.04, origin + dx / pxPerSec);
+                startDrag(e, (dxSec, dxPx, shiftKey) => {
+                  const raw = origin + dxSec;
+                  const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+                  const { start, end } = clampRangeEdge("end", snapped, {
+                    start: fixedStart,
+                    end: origin,
+                  });
                   updateBRollRange(clip.id, start, end, true);
-                  seekSource(end);
-                  scrubTo(end, originX + dx);
+                  scrubTo(end, originX + dxPx);
                 });
               }}
             />

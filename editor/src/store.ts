@@ -1,7 +1,23 @@
-import { useMemo } from "react";
-import { create } from "zustand";
-import { buildProps } from "@src/lib/build-props";
-import { snapSourceSecToKeep } from "@src/lib/source-timeline";
+import { useMemo } from 'react';
+import { create } from 'zustand';
+
+import { buildProps } from '@src/lib/build-props';
+import { snapSourceSecToKeep } from '@src/lib/source-timeline';
+
+import { removeBRoll, upsertBRoll } from './lib/broll';
+import { captionIndexAt, flattenCaptions, updateCaption } from './lib/captions';
+import { cutForCaption } from './lib/cuts';
+import { sourceSecToOutputFrame } from './lib/frames';
+import { punchInForCaption } from './lib/punchin';
+import { MIN_LISTICLE_SEC, MIN_RANGE_SEC } from './lib/range';
+import { adjustSectionEdge, restoreGap } from './lib/sections';
+import { loadWaveformFromVideo, peakMax } from './lib/waveform';
+
+import { cutsToGaps } from '@src/lib/source-timeline';
+
+import type { WaveformData } from "./lib/waveform";
+
+import type { FlatCaption } from "./lib/captions";
 import type {
   CaptionEmphasis,
   EpisodeConfig,
@@ -9,15 +25,6 @@ import type {
   SourceBRoll,
   Transcript,
 } from "@src/lib/types";
-import { removeBRoll, snapToCaptionBoundary, upsertBRoll } from "./lib/broll";
-import {
-  flattenCaptions,
-  updateCaption,
-  type FlatCaption,
-} from "./lib/captions";
-import { sourceSecToOutputFrame } from "./lib/frames";
-import { adjustSectionEdge, restoreGap } from "./lib/sections";
-
 export type Asset = {
   key: string;
   label: string;
@@ -51,7 +58,12 @@ type EditorState = {
   sourceSec: number;
   pxPerSec: number;
   selectedBRollId: string | null;
+  selectedPunchInIndex: number | null;
+  selectedListicleItemIndex: number | null;
   selectedGap: number | null;
+  selectedCaptionIndex: number | null;
+  waveform: WaveformData | null;
+  waveformMax: number;
 };
 
 type EditorActions = {
@@ -61,7 +73,13 @@ type EditorActions = {
   seekOutput: (frame: number) => void;
   setPxPerSec: (v: number) => void;
   selectBRoll: (id: string | null) => void;
+  selectPunchIn: (index: number | null) => void;
+  selectListicleItem: (index: number | null) => void;
   selectGap: (gapId: number | null) => void;
+  selectCaption: (index: number | null) => void;
+  seekBySeconds: (delta: number) => void;
+  seekAdjacentCaption: (direction: -1 | 1) => boolean;
+  syncActiveCaption: () => void;
   clearSelection: () => void;
   beginGesture: () => void;
   undo: () => void;
@@ -73,6 +91,8 @@ type EditorActions = {
     emphasis: CaptionEmphasis | undefined,
   ) => void;
   placeBRollOnCaption: (asset: Asset, caption: FlatCaption) => void;
+  addPunchInOnCaption: (caption: FlatCaption) => void;
+  cutCaption: (caption: FlatCaption) => void;
   updateBRollRange: (
     id: string,
     start: number,
@@ -83,6 +103,18 @@ type EditorActions = {
     sectionIndex: number,
     edge: "start" | "end",
     deltaSec: number,
+    live?: boolean,
+  ) => void;
+  updatePunchInRange: (
+    index: number,
+    start: number,
+    end: number,
+    live?: boolean,
+  ) => void;
+  updateListicleOverlay: (start: number, end: number, live?: boolean) => void;
+  updateListicleItemReveal: (
+    index: number,
+    reveal: number,
     live?: boolean,
   ) => void;
 };
@@ -222,7 +254,12 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     sourceSec: 0,
     pxPerSec: 40,
     selectedBRollId: null,
+    selectedPunchInIndex: null,
+    selectedListicleItemIndex: null,
     selectedGap: null,
+    selectedCaptionIndex: null,
+    waveform: null,
+    waveformMax: 0,
 
     load: async () => {
       try {
@@ -260,7 +297,23 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           loadState: "ready",
           frame: 0,
           sourceSec: 0,
+          waveform: null,
+          waveformMax: 0,
         });
+
+        const videoSrc = ep.props.videoSrc;
+        void loadWaveformFromVideo(`/${videoSrc}`)
+          .then((waveform) => {
+            if (get().videoSrc !== videoSrc) return;
+            set({
+              waveform,
+              waveformMax: peakMax(waveform.peaks),
+            });
+          })
+          .catch(() => {
+            if (get().videoSrc !== videoSrc) return;
+            set({ waveform: null, waveformMax: 0 });
+          });
       } catch (err) {
         set({
           error: err instanceof Error ? err.message : String(err),
@@ -311,6 +364,35 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       set({ sourceSec: snapped, frame });
     },
 
+    seekBySeconds: (delta) => {
+      const { sourceSec, transcript } = get();
+      if (!transcript) return;
+      const next = Math.max(
+        0,
+        Math.min(transcript.duration, sourceSec + delta),
+      );
+      get().seekSource(next);
+    },
+
+    seekAdjacentCaption: (direction) => {
+      const { selectedCaptionIndex, transcript } = get();
+      if (!transcript || selectedCaptionIndex == null) return false;
+      const next = selectedCaptionIndex + direction;
+      if (next < 0 || next >= transcript.captions.length) return false;
+      const caption = transcript.captions[next]!;
+      set({ selectedCaptionIndex: next });
+      get().seekSource(caption.start);
+      return true;
+    },
+
+    syncActiveCaption: () => {
+      const { sourceSec, transcript, selectedCaptionIndex } = get();
+      if (!transcript) return;
+      const index = captionIndexAt(sourceSec, transcript.captions);
+      if (index == null || index === selectedCaptionIndex) return;
+      set({ selectedCaptionIndex: index });
+    },
+
     seekOutput: (frame) => {
       const { props } = get();
       if (!props) return;
@@ -332,13 +414,70 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     setPxPerSec: (pxPerSec) => set({ pxPerSec }),
 
     selectBRoll: (id) =>
-      set({ selectedBRollId: id, ...(id != null ? { selectedGap: null } : {}) }),
+      set({
+        selectedBRollId: id,
+        ...(id != null
+          ? {
+              selectedGap: null,
+              selectedPunchInIndex: null,
+              selectedListicleItemIndex: null,
+            }
+          : {}),
+      }),
+    selectPunchIn: (index) =>
+      set({
+        selectedPunchInIndex: index,
+        ...(index != null
+          ? {
+              selectedBRollId: null,
+              selectedGap: null,
+              selectedListicleItemIndex: null,
+            }
+          : {}),
+      }),
+    selectListicleItem: (index) =>
+      set({
+        selectedListicleItemIndex: index,
+        ...(index != null
+          ? {
+              selectedBRollId: null,
+              selectedPunchInIndex: null,
+              selectedGap: null,
+            }
+          : {}),
+      }),
     selectGap: (gapId) =>
       set({
         selectedGap: gapId,
-        ...(gapId != null ? { selectedBRollId: null } : {}),
+        ...(gapId != null
+          ? {
+              selectedBRollId: null,
+              selectedPunchInIndex: null,
+              selectedListicleItemIndex: null,
+              selectedCaptionIndex: null,
+            }
+          : {}),
       }),
-    clearSelection: () => set({ selectedBRollId: null, selectedGap: null }),
+    selectCaption: (index) =>
+      set({
+        selectedCaptionIndex: index,
+        ...(index != null
+          ? {
+              selectedBRollId: null,
+              selectedPunchInIndex: null,
+              selectedListicleItemIndex: null,
+              selectedGap: null,
+            }
+          : {}),
+      }),
+    clearSelection: () =>
+      set({
+        selectedBRollId: null,
+        selectedPunchInIndex: null,
+        selectedListicleItemIndex: null,
+        selectedGap: null,
+        selectedCaptionIndex: null,
+      }),
 
     beginGesture: () => {
       const snap = snapshot();
@@ -362,7 +501,13 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     },
 
     deleteSelection: () => {
-      const { config, transcript, selectedGap, selectedBRollId } = get();
+      const {
+        config,
+        transcript,
+        selectedGap,
+        selectedBRollId,
+        selectedPunchInIndex,
+      } = get();
       if (!config || !transcript) return false;
       if (selectedGap != null) {
         commit({
@@ -370,6 +515,20 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           transcript,
         });
         set({ selectedGap: null });
+        return true;
+      }
+      if (selectedPunchInIndex != null) {
+        if (!config.punchInSegments[selectedPunchInIndex]) return false;
+        commit({
+          config: {
+            ...config,
+            punchInSegments: config.punchInSegments.filter(
+              (_, i) => i !== selectedPunchInIndex,
+            ),
+          },
+          transcript,
+        });
+        set({ selectedPunchInIndex: null });
         return true;
       }
       if (selectedBRollId) {
@@ -420,7 +579,47 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const result = upsertBRoll(config.bRolls, clip);
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript });
-      set({ selectedBRollId: clip.id, selectedGap: null });
+      set({
+        selectedBRollId: clip.id,
+        selectedGap: null,
+        selectedPunchInIndex: null,
+        selectedListicleItemIndex: null,
+      });
+    },
+
+    addPunchInOnCaption: (caption) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const segment = punchInForCaption(caption);
+      const punchInSegments = [...config.punchInSegments, segment].sort(
+        (a, b) => a.start - b.start,
+      );
+      const newIndex = punchInSegments.indexOf(segment);
+      commit({ config: { ...config, punchInSegments }, transcript });
+      set({
+        selectedPunchInIndex: newIndex,
+        selectedBRollId: null,
+        selectedGap: null,
+        selectedListicleItemIndex: null,
+        selectedCaptionIndex: caption.index,
+      });
+    },
+
+    cutCaption: (caption) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const cuts = cutForCaption(config.cuts, caption);
+      const gap = cutsToGaps(cuts).find(
+        (g) => caption.start >= g.start && caption.start < g.end,
+      );
+      commit({ config: { ...config, cuts }, transcript });
+      set({
+        selectedGap: gap?.id ?? null,
+        selectedBRollId: null,
+        selectedPunchInIndex: null,
+        selectedListicleItemIndex: null,
+        selectedCaptionIndex: caption.index,
+      });
     },
 
     updateBRollRange: (id, start, end, live = false) => {
@@ -428,20 +627,11 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       if (!config || !transcript) return;
       const clip = config.bRolls.find((c) => c.id === id);
       if (!clip) return;
-      const snappedStart = snapToCaptionBoundary(
-        start,
-        transcript.captions,
-        "start",
-      );
-      const snappedEnd = snapToCaptionBoundary(
-        Math.max(start + 0.04, end),
-        transcript.captions,
-        "end",
-      );
+      if (end <= start + MIN_RANGE_SEC) return;
       const result = upsertBRoll(config.bRolls, {
         ...clip,
-        start: snappedStart,
-        end: Math.max(snappedStart + 0.04, snappedEnd),
+        start,
+        end,
       });
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript }, live);
@@ -464,13 +654,75 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         live,
       );
     },
+
+    updatePunchInRange: (index, start, end, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const seg = config.punchInSegments[index];
+      if (!seg) return;
+      const duration = transcript.duration;
+      if (end <= start + MIN_RANGE_SEC) return;
+      const nextStart = Math.max(0, Math.min(start, duration - MIN_RANGE_SEC));
+      const nextEnd = Math.min(end, duration);
+      if (nextEnd <= nextStart + MIN_RANGE_SEC) return;
+      const punchInSegments = config.punchInSegments.map((p, i) =>
+        i === index ? { ...p, start: nextStart, end: nextEnd } : p,
+      );
+      commit({ config: { ...config, punchInSegments }, transcript }, live);
+    },
+
+    updateListicleOverlay: (start, end, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript || !config.listicleOverlay) return;
+      const duration = transcript.duration;
+      if (end <= start + MIN_LISTICLE_SEC) return;
+      const nextStart = Math.max(0, start);
+      const nextEnd = Math.min(end, duration);
+      if (nextEnd <= nextStart + MIN_LISTICLE_SEC) return;
+      const items = config.listicleOverlay.items.map((item) => ({
+        ...item,
+        reveal: Math.max(nextStart, Math.min(nextEnd, item.reveal)),
+      }));
+      commit(
+        {
+          config: {
+            ...config,
+            listicleOverlay: {
+              ...config.listicleOverlay,
+              start: nextStart,
+              end: nextEnd,
+              items,
+            },
+          },
+          transcript,
+        },
+        live,
+      );
+    },
+
+    updateListicleItemReveal: (index, reveal, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript || !config.listicleOverlay) return;
+      const { start, end } = config.listicleOverlay;
+      const nextReveal = Math.max(start, Math.min(end, reveal));
+      const items = config.listicleOverlay.items.map((item, i) =>
+        i === index ? { ...item, reveal: nextReveal } : item,
+      );
+      commit(
+        {
+          config: {
+            ...config,
+            listicleOverlay: { ...config.listicleOverlay, items },
+          },
+          transcript,
+        },
+        live,
+      );
+    },
   };
 });
 
 export function useFlatCaptions(): FlatCaption[] {
   const captions = useEditor((s) => s.transcript?.captions);
-  return useMemo(
-    () => (captions ? flattenCaptions(captions) : []),
-    [captions],
-  );
+  return useMemo(() => (captions ? flattenCaptions(captions) : []), [captions]);
 }

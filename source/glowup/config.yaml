@@ -4,26 +4,33 @@ cuts:
     end: 1.4667264817835781
   - start: 32.067974442631865
     end: 32.16797852093529
+  - start: 33.24
+    end: 33.28
+  - start: 33.44
+    end: 33.48
   - start: 40.734994562262095
     end: 40.8667
 listicleOverlay:
-  start: 4.50018352365416
+  start: 4.04
   end: 36.134806960304516
   items:
     - label: Get a perm
-      reveal: 4.8001957585644375
+      reveal: 4.04
     - label: Go to the gym
-      reveal: 14.367252582925502
+      reveal: 13.4
     - label: Drop the glasses
-      reveal: 23.93430940728657
+      reveal: 22.5
     - label: Improve your style
-      reveal: 28.13448069603045
+      reveal: 26.74
 punchInSegments:
-  - start: 5.533558999456226
-    end: 6.333591625883632
+  - start: 2.9
+    end: 3.24
     scale: 1.12
-  - start: 13.400546492659053
-    end: 14.20057911908646
+  - start: 5.533558999456226
+    end: 7.02
+    scale: 1.12
+  - start: 12.6
+    end: 14.11
     scale: 1.06
   - start: 25.234362425231105
     end: 27.66779499728113
@@ -35,18 +42,18 @@ punchInSegments:
     end: 35.70145595432301
     scale: 1.12
 bRolls:
-  - id: broll-mriflxm6-6c29r
+  - id: broll-mrknbt28-eg6by
     src: b-roll/glowup/Perm_Before.jpg
-    start: 5.066873300706906
-    end: 7.633644643828167
+    start: 3.66
+    end: 5.3
   - id: broll-mrifljxi-rzq0h
     src: b-roll/glowup/Perm_After.jpg
     start: 7.8336528004350185
     end: 10.267085372485045
   - id: broll-mrifmoar-u7smr
     src: b-roll/glowup/Perm_After_Joke.jpg
-    start: 10.40042414355628
-    end: 11.633807775965199
+    start: 10.4
+    end: 11.65
   - id: broll-mrifn3uz-sfyep
     src: b-roll/glowup/Gym_Before.jpg
     start: 16.53400761283306

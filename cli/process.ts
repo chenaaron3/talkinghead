@@ -207,8 +207,6 @@ export async function runProcess(argv: string[]): Promise<{ episodeId: string }>
     title,
     videoSrc,
     fps,
-    width: probe.width,
-    height: probe.height,
     config,
     transcript,
   });

@@ -196,7 +196,11 @@ export function intersectWithKeepRegions(
   for (const keep of cutsToKeepRegions(cuts, durationSec)) {
     const a = Math.max(start, keep.start);
     const b = Math.min(end, keep.end);
-    if (b > a) out.push({ start: a, end: b });
+    if (b > a) {
+      out.push({ start: a, end: b });
+    } else if (end - start < 0.001 && start >= keep.start && start <= keep.end) {
+      out.push({ start, end: start });
+    }
   }
   return out;
 }

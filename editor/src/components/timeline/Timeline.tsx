@@ -1,11 +1,13 @@
-import { useRef } from "react";
-import { useEditor } from "../../store";
-import { BRollTrack } from "./BRollTrack";
-import { ListicleTrack } from "./ListicleTrack";
-import { PunchInTrack } from "./PunchInTrack";
-import { useTimelineNeedle } from "./shared";
-import { useTimelineLayout } from "./useTimelineLayout";
-import { VideoTrack } from "./VideoTrack";
+import { useEffect, useRef } from 'react';
+
+import { useEditor } from '../../store';
+import { BRollTrack } from './BRollTrack';
+import { CaptionTrack } from './CaptionTrack';
+import { ListicleTrack } from './ListicleTrack';
+import { PunchInTrack } from './PunchInTrack';
+import { useTimelineNeedle } from './shared';
+import { useTimelineLayout } from './useTimelineLayout';
+import { VideoTrack } from './VideoTrack';
 
 export function Timeline() {
   const duration = useEditor((s) => s.transcript?.duration ?? 0);
@@ -21,18 +23,27 @@ export function Timeline() {
 
   const trackWidth = totalWidth - 40;
 
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1 / 1.1 : 1.1;
+      const current = useEditor.getState().pxPerSec;
+      setPxPerSec(Math.min(200, Math.max(8, current * factor)));
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [setPxPerSec]);
+
   return (
     <div className="flex min-h-0 min-w-0 w-full max-w-[100vw] flex-col overflow-hidden bg-panel">
       <div
-        className="relative min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden"
+        className="relative min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden [touch-action:pan-x]"
         ref={scrollRef}
-        onWheel={(e) => {
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            const factor = e.deltaY > 0 ? 1 / 1.1 : 1.1;
-            setPxPerSec(Math.min(200, Math.max(8, pxPerSec * factor)));
-          }
-        }}
       >
         <div
           className="relative min-h-full py-2 pl-[72px]"
@@ -60,13 +71,22 @@ export function Timeline() {
             items={items}
             onNeedleX={setDragNeedleX}
           />
+          <CaptionTrack width={trackWidth} sourceX={sourceX} />
           <BRollTrack
             width={trackWidth}
             sourceX={sourceX}
             onNeedleX={setDragNeedleX}
           />
-          <PunchInTrack width={trackWidth} sourceX={sourceX} />
-          <ListicleTrack width={trackWidth} sourceX={sourceX} />
+          <PunchInTrack
+            width={trackWidth}
+            sourceX={sourceX}
+            onNeedleX={setDragNeedleX}
+          />
+          <ListicleTrack
+            width={trackWidth}
+            sourceX={sourceX}
+            onNeedleX={setDragNeedleX}
+          />
         </div>
       </div>
     </div>

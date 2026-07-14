@@ -41,11 +41,12 @@ const Clip: React.FC<{ clip: BRollClip }> = ({ clip }) => {
         src={staticFile(clip.src)}
         style={{
           position: "relative",
-          width: "92%",
-          height: "70%",
+          maxWidth: "92%",
+          maxHeight: "70%",
+          width: "auto",
+          height: "auto",
           objectFit: "contain",
           borderRadius: 16,
-          boxShadow: "0 12px 48px rgba(0,0,0,0.45)",
           zIndex: 1,
         }}
       />

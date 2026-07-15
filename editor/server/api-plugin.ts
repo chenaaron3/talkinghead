@@ -10,7 +10,9 @@ import {
 import { rebuildAllPropsIndex } from "../../cli/helpers/props-index";
 import { probeVideoFps } from "../../cli/helpers/whisper";
 import {
+  AUDIO_EXTENSIONS,
   IMAGE_EXTENSIONS,
+  PUBLIC_SFX_DIR,
   ROOT,
   SOURCE_DIR,
 } from "../../cli/helpers/types";
@@ -18,6 +20,7 @@ import { renderEpisode } from "../../cli/render-episode";
 import type { EpisodeConfig, Transcript } from "../../cli/helpers/types";
 import type { SerializedWaveform } from "../../src/lib/waveform";
 import YAML from "yaml";
+import { spawnSync } from "node:child_process";
 
 function ensureDir(dir: string) {
   fs.mkdirSync(dir, { recursive: true });
@@ -69,6 +72,56 @@ function listEpisodeImages(episodeId: string) {
     });
   }
   return out;
+}
+
+function probeAudioDurationSec(absPath: string): number {
+  const result = spawnSync(
+    "ffprobe",
+    [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "json",
+      absPath,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) return 0.5;
+  try {
+    const parsed = JSON.parse(result.stdout) as {
+      format?: { duration?: string };
+    };
+    const duration = Number(parsed.format?.duration);
+    return Number.isFinite(duration) && duration > 0 ? duration : 0.5;
+  } catch {
+    return 0.5;
+  }
+}
+
+function listSfxAssets() {
+  if (!fs.existsSync(PUBLIC_SFX_DIR)) return [];
+  const out: Array<{
+    key: string;
+    label: string;
+    src: string;
+    durationSec: number;
+  }> = [];
+  for (const entry of fs.readdirSync(PUBLIC_SFX_DIR, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const ext = path.extname(entry.name);
+    if (!AUDIO_EXTENSIONS.has(ext)) continue;
+    const abs = path.join(PUBLIC_SFX_DIR, entry.name);
+    const src = path.join("sfx", entry.name).split(path.sep).join("/");
+    out.push({
+      key: entry.name,
+      label: entry.name.replace(/\.[^.]+$/, ""),
+      src,
+      durationSec: probeAudioDurationSec(abs),
+    });
+  }
+  return out.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function readBody(req: import("http").IncomingMessage): Promise<string> {
@@ -167,7 +220,8 @@ export function editorApiPlugin(episodeId: string): Plugin {
                 thumbUrl: `/${a.publicSrc}`,
               };
             });
-            return sendJson(res, 200, { assets });
+            const sfx = listSfxAssets();
+            return sendJson(res, 200, { assets, sfx });
           }
 
           if (req.method === "PUT" && pathname === "/api/episode") {
@@ -198,6 +252,7 @@ export function editorApiPlugin(episodeId: string): Plugin {
               listicleOverlay: body.config.listicleOverlay,
               punchInSegments: body.config.punchInSegments,
               bRolls: body.config.bRolls,
+              sfx: body.config.sfx ?? [],
             });
 
             const transcriptPath = path.join(
@@ -243,6 +298,7 @@ export function editorApiPlugin(episodeId: string): Plugin {
                   listicleOverlay: body.config.listicleOverlay,
                   punchInSegments: body.config.punchInSegments,
                   bRolls: body.config.bRolls,
+                  sfx: body.config.sfx ?? [],
                 });
                 writeJson(
                   path.join(episodeDir, "generated", "transcript.json"),

@@ -1,12 +1,20 @@
-import { normalizeCuts } from "@src/lib/source-timeline";
-import type { SourceCut } from "@src/lib/types";
+import {
+  mergeCutsOverRemovedCaptions,
+  normalizeCuts,
+} from "@src/lib/source-timeline";
+import type { SourceCut, TranscriptCaption } from "@src/lib/types";
 
 export function cutForCaption(
   cuts: SourceCut[],
-  caption: { start: number; end: number },
+  range: { start: number; end: number },
+  captions: readonly TranscriptCaption[],
 ): SourceCut[] {
-  if (caption.end <= caption.start) return cuts;
-  return normalizeCuts([...cuts, { start: caption.start, end: caption.end }]);
+  if (range.end <= range.start) return cuts;
+  const next = normalizeCuts([
+    ...cuts,
+    { start: range.start, end: range.end },
+  ]);
+  return mergeCutsOverRemovedCaptions(next, captions);
 }
 
 export function captionInCut(

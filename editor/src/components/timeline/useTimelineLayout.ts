@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { cutsToTimelineRegions } from "@src/lib/source-timeline";
+import { EMPTY_CUTS } from "../../lib/empty";
 import { useEditor } from "../../store";
 
 export type SectionLayoutItem = {
@@ -23,7 +24,7 @@ export type GapLayoutItem = {
 export type LayoutItem = SectionLayoutItem | GapLayoutItem;
 
 export function useTimelineLayout() {
-  const cuts = useEditor((s) => s.config?.cuts ?? []);
+  const cuts = useEditor((s) => s.config?.cuts ?? EMPTY_CUTS);
   const duration = useEditor((s) => s.transcript?.duration ?? 0);
   const pxPerSec = useEditor((s) => s.pxPerSec);
 

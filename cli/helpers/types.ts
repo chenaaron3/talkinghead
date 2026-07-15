@@ -20,6 +20,19 @@ export const IMAGE_EXTENSIONS = new Set([
   ".WEBP",
   ".GIF",
 ]);
+export const AUDIO_EXTENSIONS = new Set([
+  ".wav",
+  ".mp3",
+  ".m4a",
+  ".ogg",
+  ".flac",
+  ".WAV",
+  ".MP3",
+  ".M4A",
+  ".OGG",
+  ".FLAC",
+]);
+export const PUBLIC_SFX_DIR = path.join(ROOT, "public", "sfx");
 export const GENERATED_EPISODES_INDEX = path.join(
   ROOT,
   "src",

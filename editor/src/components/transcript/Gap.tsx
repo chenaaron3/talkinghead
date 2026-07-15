@@ -1,3 +1,5 @@
+import { isSelected } from "../../lib/selection";
+import { useSelection } from "../../selection-store";
 import { useEditor } from "../../store";
 
 type Props = {
@@ -7,11 +9,11 @@ type Props = {
 };
 
 export function Gap({ id, start, end }: Props) {
-  const selectedGap = useEditor((s) => s.selectedGap);
-  const selectGap = useEditor((s) => s.selectGap);
+  const selection = useSelection((s) => s.selection);
+  const selectGap = useSelection((s) => s.selectGap);
   const seekSource = useEditor((s) => s.seekSource);
 
-  const selected = selectedGap === id;
+  const selected = isSelected(selection, "gap", id);
   const duration = end - start;
 
   return (

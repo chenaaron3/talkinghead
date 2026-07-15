@@ -7,7 +7,10 @@ export const TIMEOUTS = {
   /** Navigation / first paint (page loads need more than UI clicks) */
   navigation: 30_000,
 
-  /** Clicking primary CTAs */
+  /** Page-load-dependent elements (composers, dialogs after navigation) */
+  pageLoad: 15_000,
+
+  /** Clicking primary CTAs (frontend updates) */
   action: 5_000,
 
   /** Short UI settle after a click */
@@ -16,11 +19,11 @@ export const TIMEOUTS = {
   /** Medium settle (composer transitions) */
   settleMedium: 1_000,
 
-  /** File chooser appearance */
-  fileChooser: 5_000,
+  /** File chooser appearance (after page/composer load) */
+  fileChooser: 15_000,
 
   /** Video upload + processing */
-  videoUpload: 60_000,
+  videoUpload: 300_000,
 
   /** Cover/thumbnail upload */
   coverUpload: 30_000,

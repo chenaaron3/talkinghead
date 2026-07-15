@@ -44,6 +44,14 @@ export type BRollClip = {
   endFrame: number;
 };
 
+export type SfxClip = {
+  id: string;
+  /** Path under public/, e.g. `sfx/ding_light.wav` */
+  src: string;
+  startFrame: number;
+  endFrame: number;
+};
+
 /** Derived render payload stored in props.json (output timeline, frames). */
 export type EpisodeProps = {
   episodeId: string;
@@ -60,4 +68,5 @@ export type EpisodeProps = {
   listicle: ListicleOverlay | null;
   punchIns?: PunchInSegment[] | null;
   bRolls?: BRollClip[] | null;
+  sfx?: SfxClip[] | null;
 };

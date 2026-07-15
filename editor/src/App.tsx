@@ -4,6 +4,7 @@ import { AssetsPanel } from "./components/AssetsPanel";
 import { PlayerPanel } from "./components/PlayerPanel";
 import { Timeline } from "./components/timeline/Timeline";
 import { TranscriptPanel } from "./components/transcript/TranscriptPanel";
+import { useSelection } from "./selection-store";
 import { useEditor } from "./store";
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -18,6 +19,7 @@ function useGlobalShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const editor = useEditor.getState();
+      const selection = useSelection.getState();
       const meta = e.metaKey || e.ctrlKey;
       if (meta && e.key.toLowerCase() === "s") {
         e.preventDefault();
@@ -27,7 +29,7 @@ function useGlobalShortcuts() {
         if (e.shiftKey) editor.redo();
         else editor.undo();
       } else if (e.key === "Escape") {
-        editor.clearSelection();
+        selection.clearSelection();
       } else if (e.key === "Delete" || e.key === "Backspace") {
         if (isTypingTarget(e.target)) return;
         if (editor.deleteSelection()) e.preventDefault();
@@ -38,20 +40,16 @@ function useGlobalShortcuts() {
         togglePlayback();
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
-        if (
-          editor.selectedCaptionIndex != null &&
-          editor.seekAdjacentCaption(-1)
-        ) {
-          return;
+        if (selection.selection?.kind === "caption") {
+          if (e.shiftKey && editor.extendCaptionArrow(-1)) return;
+          if (editor.seekAdjacentCaption(-1)) return;
         }
         editor.seekBySeconds(-1);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        if (
-          editor.selectedCaptionIndex != null &&
-          editor.seekAdjacentCaption(1)
-        ) {
-          return;
+        if (selection.selection?.kind === "caption") {
+          if (e.shiftKey && editor.extendCaptionArrow(1)) return;
+          if (editor.seekAdjacentCaption(1)) return;
         }
         editor.seekBySeconds(1);
       }

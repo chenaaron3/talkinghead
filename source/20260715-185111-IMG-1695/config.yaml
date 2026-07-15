@@ -1,0 +1,31 @@
+title: My Simple Content Rules
+cuts:
+  - start: 0
+    end: 0.363
+  - start: 6.52
+    end: 6.703
+  - start: 9.88
+    end: 11.422
+  - start: 19.88
+    end: 20.001
+  - start: 26.581
+    end: 26.706
+  - start: 30.9
+    end: 42.661
+punchInSegments:
+  - start: 13.991
+    end: 15.98
+    scale: 1.12
+listicleOverlay: null
+bRolls:
+  - id: broll-mrmlk3tf-cllzu
+    src: b-roll/20260715-185111-IMG-1695/Gym_After.png
+    start: 7.203
+    end: 9.38
+sfx:
+  - id: sfx-mrmkyko1-h48go
+    src: sfx/anime_wow.mp3
+    start: 1.946
+    end: 2.948999999999999
+    srcDurationSec: 3.265306
+

@@ -9,7 +9,11 @@ import {
 } from '@src/lib/source-timeline';
 
 import { removeBRoll, upsertBRoll } from './lib/broll';
+import { removeSfx, upsertSfx, applySfxEdge } from './lib/sfx';
 import { captionIndexAt, flattenCaptions, updateCaption } from './lib/captions';
+import { captionActionRange } from './lib/caption-selection';
+import { applySelection, primaryId } from './lib/selection';
+import { useSelection } from './selection-store';
 import { cutForCaption } from './lib/cuts';
 import { sourceSecToOutputFrame, outputFrameToSourceSec } from './lib/frames';
 import { punchInForCaption } from './lib/punchin';
@@ -24,6 +28,7 @@ import type {
   EpisodeConfig,
   EpisodeProps,
   SourceBRoll,
+  SourceSfx,
   Transcript,
 } from "@src/lib/types";
 export type Asset = {
@@ -31,6 +36,13 @@ export type Asset = {
   label: string;
   src: string;
   thumbUrl: string;
+};
+
+export type SfxAsset = {
+  key: string;
+  label: string;
+  src: string;
+  durationSec: number;
 };
 
 type EpisodeSnapshot = {
@@ -51,6 +63,7 @@ type EditorState = {
   transcript: Transcript | null;
   props: EpisodeProps | null;
   assets: Asset[];
+  sfxAssets: SfxAsset[];
   dirty: boolean;
   saving: boolean;
   /** Playhead on output timeline (for Remotion preview). */
@@ -58,12 +71,6 @@ type EditorState = {
   /** Source playhead position in seconds (for timeline display). */
   sourceSec: number;
   pxPerSec: number;
-  selectedBRollId: string | null;
-  selectedPunchInIndex: number | null;
-  selectedListicleItemIndex: number | null;
-  selectedGap: number | null;
-  selectedKeepRegionIndex: number | null;
-  selectedCaptionIndex: number | null;
   waveform: WaveformData | null;
   waveformMax: number;
 };
@@ -74,16 +81,10 @@ type EditorActions = {
   seekSource: (sourceSec: number) => void;
   seekOutput: (frame: number) => void;
   setPxPerSec: (v: number) => void;
-  selectBRoll: (id: string | null) => void;
-  selectPunchIn: (index: number | null) => void;
-  selectListicleItem: (index: number | null) => void;
-  selectGap: (gapId: number | null) => void;
-  selectKeepRegion: (index: number | null) => void;
-  selectCaption: (index: number | null) => void;
   seekBySeconds: (delta: number) => void;
   seekAdjacentCaption: (direction: -1 | 1) => boolean;
+  extendCaptionArrow: (direction: -1 | 1) => boolean;
   syncActiveCaption: () => void;
-  clearSelection: () => void;
   beginGesture: () => void;
   undo: () => void;
   redo: () => void;
@@ -94,12 +95,19 @@ type EditorActions = {
     emphasis: CaptionEmphasis | undefined,
   ) => void;
   placeBRollOnCaption: (asset: Asset, caption: FlatCaption) => void;
+  placeSfxOnCaption: (asset: SfxAsset, caption: FlatCaption) => void;
   addPunchInOnCaption: (caption: FlatCaption) => void;
   cutCaption: (caption: FlatCaption) => void;
   updateBRollRange: (
     id: string,
     start: number,
     end: number,
+    live?: boolean,
+  ) => void;
+  updateSfxRange: (
+    id: string,
+    edge: "start" | "end",
+    value: number,
     live?: boolean,
   ) => void;
   setSectionEdge: (
@@ -135,8 +143,8 @@ export function isTimelineScrubbing() {
   return scrubbing;
 }
 
-function newId(): string {
-  return `broll-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+function newId(prefix = "id"): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function recomputeProps(state: {
@@ -251,17 +259,12 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     transcript: null,
     props: null,
     assets: [],
+    sfxAssets: [],
     dirty: false,
     saving: false,
     frame: 0,
     sourceSec: 0,
     pxPerSec: 40,
-    selectedBRollId: null,
-    selectedPunchInIndex: null,
-    selectedListicleItemIndex: null,
-    selectedGap: null,
-    selectedKeepRegionIndex: null,
-    selectedCaptionIndex: null,
     waveform: null,
     waveformMax: 0,
 
@@ -281,6 +284,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         };
         const as = (await assetsRes.json()) as {
           assets?: Asset[];
+          sfx?: SfxAsset[];
           error?: string;
         };
         if (!epRes.ok) throw new Error(ep.error ?? "Failed to load episode");
@@ -299,6 +303,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           transcript: ep.transcript,
           props: ep.props,
           assets: as.assets ?? [],
+          sfxAssets: as.sfx ?? [],
           loadState: "ready",
           frame: 0,
           sourceSec: 0,
@@ -374,22 +379,57 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     },
 
     seekAdjacentCaption: (direction) => {
-      const { selectedCaptionIndex, transcript } = get();
-      if (!transcript || selectedCaptionIndex == null) return false;
-      const next = selectedCaptionIndex + direction;
+      const { transcript } = get();
+      const { selection, captionFocus, selectCaption } =
+        useSelection.getState();
+      if (!transcript || selection?.kind !== "caption") return false;
+      const focusId = captionFocus ?? primaryId(selection);
+      const focus = typeof focusId === "number" ? focusId : null;
+      if (focus == null) return false;
+      const next = focus + direction;
       if (next < 0 || next >= transcript.captions.length) return false;
       const caption = transcript.captions[next]!;
-      set({ selectedCaptionIndex: next });
+      selectCaption(next);
       get().seekSource(caption.start);
       return true;
     },
 
+    extendCaptionArrow: (direction) => {
+      const { transcript } = get();
+      const {
+        selection,
+        captionAnchor,
+        captionFocus,
+        selectCaptionRange,
+      } = useSelection.getState();
+      if (!transcript || selection?.kind !== "caption") return false;
+
+      const anchorId = captionAnchor ?? primaryId(selection);
+      const focusId = captionFocus ?? primaryId(selection);
+      const anchor = typeof anchorId === "number" ? anchorId : null;
+      const focus = typeof focusId === "number" ? focusId : null;
+      if (anchor == null || focus == null) return false;
+
+      const nextFocus = focus + direction;
+      if (nextFocus < 0 || nextFocus >= transcript.captions.length) return false;
+
+      const ordered = transcript.captions.map((_, i) => i);
+      selectCaptionRange(anchor, nextFocus, ordered);
+      get().seekSource(transcript.captions[nextFocus]!.start);
+      return true;
+    },
+
     syncActiveCaption: () => {
-      const { sourceSec, transcript, selectedCaptionIndex } = get();
+      const { sourceSec, transcript } = get();
+      const { selection, selectCaption } = useSelection.getState();
       if (!transcript) return;
+      if (selection?.kind === "caption" && selection.ids.length > 1) return;
       const index = captionIndexAt(sourceSec, transcript.captions);
-      if (index == null || index === selectedCaptionIndex) return;
-      set({ selectedCaptionIndex: index });
+      if (index == null) return;
+      const current =
+        selection?.kind === "caption" ? selection.ids[0] ?? null : null;
+      if (index === current) return;
+      selectCaption(index);
     },
 
     seekOutput: (frame) => {
@@ -401,91 +441,6 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     },
 
     setPxPerSec: (pxPerSec) => set({ pxPerSec }),
-
-    selectBRoll: (id) =>
-      set({
-        selectedBRollId: id,
-        ...(id != null
-          ? {
-              selectedGap: null,
-              selectedKeepRegionIndex: null,
-              selectedPunchInIndex: null,
-              selectedListicleItemIndex: null,
-            }
-          : {}),
-      }),
-    selectPunchIn: (index) =>
-      set({
-        selectedPunchInIndex: index,
-        ...(index != null
-          ? {
-              selectedBRollId: null,
-              selectedGap: null,
-              selectedKeepRegionIndex: null,
-              selectedListicleItemIndex: null,
-            }
-          : {}),
-      }),
-    selectListicleItem: (index) =>
-      set({
-        selectedListicleItemIndex: index,
-        ...(index != null
-          ? {
-              selectedBRollId: null,
-              selectedPunchInIndex: null,
-              selectedGap: null,
-              selectedKeepRegionIndex: null,
-            }
-          : {}),
-      }),
-    selectGap: (gapId) =>
-      set({
-        selectedGap: gapId,
-        ...(gapId != null
-          ? {
-              selectedBRollId: null,
-              selectedPunchInIndex: null,
-              selectedListicleItemIndex: null,
-              selectedKeepRegionIndex: null,
-              selectedCaptionIndex: null,
-            }
-          : {}),
-      }),
-    selectKeepRegion: (index) =>
-      set({
-        selectedKeepRegionIndex: index,
-        ...(index != null
-          ? {
-              selectedBRollId: null,
-              selectedPunchInIndex: null,
-              selectedListicleItemIndex: null,
-              selectedGap: null,
-              selectedCaptionIndex: null,
-            }
-          : {}),
-      }),
-    selectCaption: (index) =>
-      set({
-        selectedCaptionIndex: index,
-        ...(index != null
-          ? {
-              selectedBRollId: null,
-              selectedPunchInIndex: null,
-              selectedListicleItemIndex: null,
-              selectedGap: null,
-              selectedKeepRegionIndex: null,
-            }
-          : {}),
-      }),
-    clearSelection: () =>
-      set({
-        selectedBRollId: null,
-        selectedPunchInIndex: null,
-        selectedListicleItemIndex: null,
-        selectedGap: null,
-        selectedKeepRegionIndex: null,
-        selectedCaptionIndex: null,
-      }),
 
     beginGesture: () => {
       const snap = snapshot();
@@ -509,64 +464,101 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     },
 
     deleteSelection: () => {
-      const {
-        config,
-        transcript,
-        selectedGap,
-        selectedKeepRegionIndex,
-        selectedBRollId,
-        selectedPunchInIndex,
-      } = get();
-      if (!config || !transcript) return false;
-      if (selectedGap != null) {
+      const { config, transcript } = get();
+      const { selection, setSelection, clearSelection } =
+        useSelection.getState();
+      if (!config || !transcript || !selection) return false;
+
+      if (selection.kind === "gap") {
+        const gapId = selection.ids[0];
+        if (gapId == null) return false;
         commit({
-          config: restoreGap(config, selectedGap),
+          config: restoreGap(config, gapId),
           transcript,
         });
-        set({ selectedGap: null });
+        clearSelection();
         return true;
       }
-      if (selectedKeepRegionIndex != null) {
+
+      if (selection.kind === "keepRegion") {
+        const index = selection.ids[0];
+        if (index == null) return false;
         const keeps = cutsToKeepRegions(config.cuts, transcript.duration);
-        const keep = keeps[selectedKeepRegionIndex];
+        const keep = keeps[index];
         if (!keep) return false;
         const nextConfig = cutKeepRegion(
           config,
-          selectedKeepRegionIndex,
+          index,
           transcript.duration,
         );
         const gap = cutsToGaps(nextConfig.cuts).find(
           (g) => keep.start >= g.start - 0.001 && keep.start < g.end,
         );
         commit({ config: nextConfig, transcript });
-        set({ selectedKeepRegionIndex: null, selectedGap: gap?.id ?? null });
+        setSelection(
+          gap?.id != null
+            ? applySelection(null, "gap", [gap.id], "replace")
+            : null,
+        );
         return true;
       }
-      if (selectedPunchInIndex != null) {
-        if (!config.punchInSegments[selectedPunchInIndex]) return false;
+
+      if (selection.kind === "punchIn") {
+        const index = selection.ids[0];
+        if (index == null || !config.punchInSegments[index]) return false;
         commit({
           config: {
             ...config,
             punchInSegments: config.punchInSegments.filter(
-              (_, i) => i !== selectedPunchInIndex,
+              (_, i) => i !== index,
             ),
           },
           transcript,
         });
-        set({ selectedPunchInIndex: null });
+        clearSelection();
         return true;
       }
-      if (selectedBRollId) {
+
+      if (selection.kind === "broll") {
+        const id = selection.ids[0];
+        if (!id) return false;
         commit({
           config: {
             ...config,
-            bRolls: removeBRoll(config.bRolls, selectedBRollId),
+            bRolls: removeBRoll(config.bRolls, id),
           },
           transcript,
         });
-        set({ selectedBRollId: null });
+        clearSelection();
         return true;
       }
+
+      if (selection.kind === "sfx") {
+        const id = selection.ids[0];
+        if (!id) return false;
+        commit({
+          config: {
+            ...config,
+            sfx: removeSfx(config.sfx ?? [], id),
+          },
+          transcript,
+        });
+        clearSelection();
+        return true;
+      }
+
+      if (selection.kind === "caption") {
+        const indices = selection.ids.filter(
+          (id): id is number => typeof id === "number",
+        );
+        if (indices.length === 0) return false;
+        const firstIndex = Math.min(...indices);
+        const caption = transcript.captions[firstIndex];
+        if (!caption) return false;
+        get().cutCaption({ ...caption, index: firstIndex });
+        return true;
+      }
+
       return false;
     },
 
@@ -596,7 +588,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
       const clip: SourceBRoll = {
-        id: newId(),
+        id: newId("broll"),
         src: asset.src,
         start: caption.start,
         end: Math.max(caption.start + 0.04, caption.end),
@@ -604,50 +596,53 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const result = upsertBRoll(config.bRolls, clip);
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript });
-      set({
-        selectedBRollId: clip.id,
-        selectedGap: null,
-        selectedKeepRegionIndex: null,
-        selectedPunchInIndex: null,
-        selectedListicleItemIndex: null,
-      });
+      useSelection.getState().selectBRoll(clip.id);
+    },
+
+    placeSfxOnCaption: (asset, caption) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const srcDurationSec = Math.max(MIN_RANGE_SEC, asset.durationSec);
+      const clip: SourceSfx = {
+        id: newId("sfx"),
+        src: asset.src,
+        start: caption.start,
+        end: Math.min(transcript.duration, caption.start + srcDurationSec),
+        srcDurationSec,
+      };
+      const result = upsertSfx(config.sfx ?? [], clip);
+      if ("error" in result) return;
+      commit({ config: { ...config, sfx: result }, transcript });
+      useSelection.getState().selectSfx(clip.id);
     },
 
     addPunchInOnCaption: (caption) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
-      const segment = punchInForCaption(caption);
+      const { selection } = useSelection.getState();
+      const range = captionActionRange(transcript, selection, caption);
+      const segment = punchInForCaption(range);
       const punchInSegments = [...config.punchInSegments, segment].sort(
         (a, b) => a.start - b.start,
       );
       const newIndex = punchInSegments.indexOf(segment);
       commit({ config: { ...config, punchInSegments }, transcript });
-      set({
-        selectedPunchInIndex: newIndex,
-        selectedBRollId: null,
-        selectedGap: null,
-        selectedKeepRegionIndex: null,
-        selectedListicleItemIndex: null,
-        selectedCaptionIndex: caption.index,
-      });
+      useSelection.getState().selectPunchIn(newIndex);
     },
 
     cutCaption: (caption) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
-      const cuts = cutForCaption(config.cuts, caption);
+      const { selection } = useSelection.getState();
+      const range = captionActionRange(transcript, selection, caption);
+      const cuts = cutForCaption(config.cuts, range, transcript.captions);
       const gap = cutsToGaps(cuts).find(
-        (g) => caption.start >= g.start && caption.start < g.end,
+        (g) => range.start >= g.start && range.start < g.end,
       );
       commit({ config: { ...config, cuts }, transcript });
-      set({
-        selectedGap: gap?.id ?? null,
-        selectedKeepRegionIndex: null,
-        selectedBRollId: null,
-        selectedPunchInIndex: null,
-        selectedListicleItemIndex: null,
-        selectedCaptionIndex: caption.index,
-      });
+      const { selectGap, clearSelection } = useSelection.getState();
+      if (gap?.id != null) selectGap(gap.id);
+      else clearSelection();
     },
 
     updateBRollRange: (id, start, end, live = false) => {
@@ -663,6 +658,18 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       });
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript }, live);
+    },
+
+    updateSfxRange: (id, edge, value, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.sfx ?? []).find((c) => c.id === id);
+      if (!clip) return;
+      const next = applySfxEdge(clip, edge, value, transcript.duration);
+      if (next.start === clip.start && next.end === clip.end) return;
+      const result = upsertSfx(config.sfx ?? [], next);
+      if ("error" in result) return;
+      commit({ config: { ...config, sfx: result }, transcript }, live);
     },
 
     setSectionEdge: (sectionIndex, edge, targetSec, live = false) => {
@@ -753,4 +760,12 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
 export function useFlatCaptions(): FlatCaption[] {
   const captions = useEditor((s) => s.transcript?.captions);
   return useMemo(() => (captions ? flattenCaptions(captions) : []), [captions]);
+}
+
+export function useCaptionIndices(): number[] {
+  const captions = useEditor((s) => s.transcript?.captions);
+  return useMemo(
+    () => (captions ? captions.map((_, i) => i) : []),
+    [captions],
+  );
 }

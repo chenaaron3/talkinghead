@@ -1,0 +1,50 @@
+title: What Drives Personal Fulfillment
+cuts:
+  - start: 0
+    end: 0.32199999999999995
+  - start: 11.72
+    end: 13.162
+  - start: 18.5
+    end: 18.721
+  - start: 21.451
+    end: 21.577
+  - start: 23
+    end: 23.322
+  - start: 29.26
+    end: 29.443
+  - start: 37.4
+    end: 38.761
+  - start: 44.55
+    end: 45.614
+  - start: 50.22
+    end: 52.602
+  - start: 60.699
+    end: 60.843
+  - start: 63.48
+    end: 64.024
+  - start: 66.92
+    end: 67.6
+listicleOverlay:
+  start: 6.459
+  end: 57.298
+  items:
+    - label: Travel for growth
+      reveal: 22.077
+    - label: Career progress
+      reveal: 31.306
+    - label: Self-discovery path
+      reveal: 41.145
+punchInSegments:
+  - start: 6.459
+    end: 7.2589999999999995
+    scale: 1.12
+  - start: 10.315
+    end: 11.115
+    scale: 1.06
+  - start: 31.306
+    end: 32.329
+    scale: 1.06
+  - start: 61.808
+    end: 62.608
+    scale: 1.06
+

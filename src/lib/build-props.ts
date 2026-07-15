@@ -20,6 +20,8 @@ import type {
   SourceListicle,
   SourcePunchIn,
   SourceBRoll,
+  SourceSfx,
+  SfxClip,
 } from "./types";
 
 function secToFrames(sec: number, fps: number): number {
@@ -82,16 +84,20 @@ function mapSourceRangeToOutputFrames(
   captions: TranscriptCaption[],
   cuts: BuildPropsInput["config"]["cuts"],
   durationSec: number,
+  options: { clipToCaptions?: boolean } = {},
 ): { startFrame: number; endFrame: number } | null {
+  const clipToCaptions = options.clipToCaptions ?? true;
   const kept = intersectWithKeepRegions(start, end, cuts, durationSec);
   if (kept.length === 0) return null;
 
   let clipStart = kept[0]!.start;
   let clipEnd = kept[kept.length - 1]!.end;
-  const captionClip = clipRangeToCaptions(clipStart, clipEnd, captions);
-  if (!captionClip) return null;
-  clipStart = captionClip.start;
-  clipEnd = captionClip.end;
+  if (clipToCaptions) {
+    const captionClip = clipRangeToCaptions(clipStart, clipEnd, captions);
+    if (!captionClip) return null;
+    clipStart = captionClip.start;
+    clipEnd = captionClip.end;
+  }
 
   const startFrame = mapSourceSecToOutputFrame(clipStart, segments, fps);
   const endFrameRaw = mapSourceSecToOutputFrame(clipEnd, segments, fps);
@@ -204,6 +210,37 @@ function buildBRolls(
   return result.sort((a, b) => a.startFrame - b.startFrame);
 }
 
+function buildSfx(
+  sfx: SourceSfx[],
+  segments: KeepSegment[],
+  fps: number,
+  captions: TranscriptCaption[],
+  cuts: BuildPropsInput["config"]["cuts"],
+  durationSec: number,
+): SfxClip[] {
+  const result: SfxClip[] = [];
+  for (const clip of sfx) {
+    const frames = mapSourceRangeToOutputFrames(
+      clip.start,
+      clip.end,
+      segments,
+      fps,
+      captions,
+      cuts,
+      durationSec,
+      { clipToCaptions: false },
+    );
+    if (!frames) continue;
+    result.push({
+      id: clip.id,
+      src: clip.src,
+      startFrame: frames.startFrame,
+      endFrame: frames.endFrame,
+    });
+  }
+  return result.sort((a, b) => a.startFrame - b.startFrame);
+}
+
 /** Deterministically derive frame-only props from config + transcript. */
 export function buildProps(input: BuildPropsInput): EpisodeProps {
   const { episodeId, title, videoSrc, fps, config, transcript } = input;
@@ -253,6 +290,15 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     transcript.duration,
   );
 
+  const sfx = buildSfx(
+    config.sfx ?? [],
+    keepSegments,
+    fps,
+    transcript.captions,
+    config.cuts,
+    transcript.duration,
+  );
+
   return {
     episodeId,
     title,
@@ -272,6 +318,7 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     listicle,
     punchIns,
     bRolls,
+    sfx,
   };
 }
 

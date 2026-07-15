@@ -5,6 +5,7 @@ import { Video } from '@remotion/media';
 
 import { BRollOverlay } from './components/BRollOverlay';
 import { PunchIn } from './components/PunchIn';
+import { SfxOverlay } from './components/SfxOverlay';
 import { TikTokCaptions } from './components/TikTokCaptions';
 import { TikTokTitle } from './components/TikTokTitle';
 import { useListicleOverlay } from './hooks/useListicleOverlay';
@@ -21,6 +22,7 @@ export const TalkingHead: React.FC<EpisodeProps> = ({
   listicle,
   punchIns,
   bRolls,
+  sfx,
 }) => {
   const { fps } = useVideoConfig();
   const { showTitle, node: listicleNode } = useListicleOverlay(listicle);
@@ -54,6 +56,7 @@ export const TalkingHead: React.FC<EpisodeProps> = ({
 
       {/* Below title/listicle/captions so chrome stays readable over images */}
       <BRollOverlay bRolls={bRolls} />
+      <SfxOverlay sfx={sfx} />
 
       <AbsoluteFill
         style={{

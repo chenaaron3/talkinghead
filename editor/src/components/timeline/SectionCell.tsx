@@ -1,5 +1,7 @@
+import { isSelected } from "../../lib/selection";
 import { clampRangeEdge } from "../../lib/range";
 import { maybeSnapTimelineSec } from "../../lib/snap";
+import { useSelection } from "../../selection-store";
 import { useEditor, useFlatCaptions } from "../../store";
 import { Handle, useTrackDrag } from "./shared";
 import type { SectionLayoutItem } from "./useTimelineLayout";
@@ -11,12 +13,12 @@ type Props = {
 
 export function SectionCell({ item }: Props) {
   const setSectionEdge = useEditor((s) => s.setSectionEdge);
-  const selectedKeepRegionIndex = useEditor((s) => s.selectedKeepRegionIndex);
-  const selectKeepRegion = useEditor((s) => s.selectKeepRegion);
+  const selection = useSelection((s) => s.selection);
+  const selectKeepRegion = useSelection((s) => s.selectKeepRegion);
   const captions = useFlatCaptions();
   const { startDrag } = useTrackDrag();
 
-  const selected = selectedKeepRegionIndex === item.keepRegionIndex;
+  const selected = isSelected(selection, "keepRegion", item.keepRegionIndex);
   const duration = item.end - item.start;
 
   return (

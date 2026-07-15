@@ -44,7 +44,13 @@ function claimBulkVideo(filename: string): {
   return { episodeId, episodeDir };
 }
 
+function parseArgs(argv: string[]) {
+  const skipSchedule = argv.includes("--skip-schedule");
+  return { skipSchedule };
+}
+
 async function main() {
+  const { skipSchedule } = parseArgs(process.argv.slice(2));
   const videos = listBulkVideos();
   if (videos.length === 0) {
     console.log(`[bulk] no videos in ${path.relative(process.cwd(), BULK_DIR)}`);
@@ -52,6 +58,9 @@ async function main() {
   }
 
   console.log(`[bulk] ${videos.length} video(s): ${videos.join(", ")}`);
+  if (skipSchedule) {
+    console.log("[bulk] scheduling skipped (--skip-schedule)");
+  }
 
   const failures: Array<{ file: string; episodeId?: string; error: string }> =
     [];
@@ -64,7 +73,9 @@ async function main() {
       ({ episodeId } = claimBulkVideo(filename));
 
       await runProcess([path.join("source", episodeId)]);
-      await runSchedule([path.join("source", episodeId)]);
+      if (!skipSchedule) {
+        await runSchedule([path.join("source", episodeId)]);
+      }
 
       ok += 1;
       console.log(`[bulk] ok ${episodeId}`);

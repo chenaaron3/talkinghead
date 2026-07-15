@@ -6,6 +6,10 @@ export type RangeEdge = "start" | "end" | "middle" | "both";
 export type WordAnnotation = {
   bRollId?: string;
   bRollEdge?: RangeEdge;
+  /** SFX markers that start on this word. */
+  sfx?: Array<{ id: string; label: string }>;
+  /** SFX clips whose play range covers this word (for selected-range UI). */
+  sfxRanges?: Array<{ id: string; edge: RangeEdge }>;
   punchInIndex?: number;
   punchInEdge?: RangeEdge;
   listicleNumber?: number;
@@ -45,6 +49,20 @@ function listicleItemAt(
   return undefined;
 }
 
+function sfxLabel(src: string): string {
+  const file = src.split("/").pop() ?? src;
+  return file.replace(/\.[^.]+$/, "");
+}
+
+function sfxAt(
+  caption: FlatCaption,
+  clips: { id: string; src: string; start: number }[],
+): Array<{ id: string; label: string }> {
+  return clips
+    .filter((clip) => clip.start >= caption.start && clip.start < caption.end)
+    .map((clip) => ({ id: clip.id, label: sfxLabel(clip.src) }));
+}
+
 export function buildWordAnnotations(
   captions: FlatCaption[],
   config: EpisodeConfig | null,
@@ -65,6 +83,16 @@ export function buildWordAnnotations(
         break;
       }
     }
+
+    const sfx = sfxAt(caption, config.sfx ?? []);
+    if (sfx.length > 0) annotation.sfx = sfx;
+
+    const sfxRanges: Array<{ id: string; edge: RangeEdge }> = [];
+    for (const clip of config.sfx ?? []) {
+      const edge = rangeEdge(caption, clip.start, clip.end, captions);
+      if (edge) sfxRanges.push({ id: clip.id, edge });
+    }
+    if (sfxRanges.length > 0) annotation.sfxRanges = sfxRanges;
 
     for (let i = 0; i < config.punchInSegments.length; i++) {
       const punchIn = config.punchInSegments[i]!;

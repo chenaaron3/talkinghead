@@ -11,6 +11,7 @@ import {
   type SourceBRoll,
   type SourceListicle,
   type SourcePunchIn,
+  type SourceSfx,
   type SourceCut,
   SOURCE_DIR,
   VIDEO_EXTENSIONS,
@@ -197,6 +198,38 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
   });
 }
 
+function parseSfx(value: unknown, configPath: string): SourceSfx[] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error(`"sfx" must be a list in ${configPath}`);
+  }
+  return value.map((entry, index) => {
+    if (!isPlainObject(entry)) {
+      throw new Error(`"sfx[${index}]" must be an object in ${configPath}`);
+    }
+    const id = String(entry.id ?? "").trim();
+    const src = String(entry.src ?? "").trim();
+    const start = Number(entry.start);
+    const end = Number(entry.end);
+    if (!id || !src || !Number.isFinite(start) || !Number.isFinite(end)) {
+      throw new Error(
+        `"sfx[${index}]" needs id, src, start, end in ${configPath}`,
+      );
+    }
+    const srcDurationSec = Number(entry.srcDurationSec);
+    return {
+      id,
+      src,
+      start,
+      end,
+      srcDurationSec:
+        Number.isFinite(srcDurationSec) && srcDurationSec > 0
+          ? srcDurationSec
+          : Math.max(end - start, 0.04),
+    };
+  });
+}
+
 export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
   const configPath = path.join(episodeDir, "config.yaml");
   const defaults = readYaml(DEFAULT_CONFIG_PATH);
@@ -222,6 +255,7 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     listicleOverlay: parseListicleOverlay(local.listicleOverlay, configPath),
     punchInSegments: parsePunchInSegments(local.punchInSegments, configPath),
     bRolls: parseBRolls(local.bRolls, configPath),
+    sfx: parseSfx(local.sfx, configPath),
   };
 }
 

@@ -31,6 +31,60 @@ export function normalizeCuts(cuts: SourceCut[]): SourceCut[] {
   return merged;
 }
 
+function captionFullyInCut(
+  caption: { start: number; end: number },
+  cut: SourceCut,
+): boolean {
+  return (
+    caption.start >= cut.start - 0.001 && caption.end <= cut.end + 0.001
+  );
+}
+
+function captionFullyInCuts(
+  caption: { start: number; end: number },
+  cuts: SourceCut[],
+): boolean {
+  return normalizeCuts(cuts).some((cut) => captionFullyInCut(caption, cut));
+}
+
+function hasSurvivingCaptionBetween(
+  lo: number,
+  hi: number,
+  cuts: SourceCut[],
+  captions: readonly { start: number; end: number }[],
+): boolean {
+  if (hi <= lo + 0.001) return false;
+  return captions.some(
+    (caption) =>
+      caption.start < hi - 0.001 &&
+      caption.end > lo + 0.001 &&
+      !captionFullyInCuts(caption, cuts),
+  );
+}
+
+/** Bridge adjacent cuts when only removed captions (or silence) lie between them. */
+export function mergeCutsOverRemovedCaptions(
+  cuts: SourceCut[],
+  captions: readonly { start: number; end: number }[],
+): SourceCut[] {
+  const normalized = normalizeCuts(cuts);
+  if (normalized.length <= 1) return normalized;
+
+  const merged: SourceCut[] = [];
+  for (const cut of normalized) {
+    const last = merged[merged.length - 1];
+    if (
+      last &&
+      !hasSurvivingCaptionBetween(last.end, cut.start, normalized, captions)
+    ) {
+      last.end = Math.max(last.end, cut.end);
+    } else {
+      merged.push({ ...cut });
+    }
+  }
+  return merged;
+}
+
 /** Validate cuts are within source duration and non-overlapping. */
 export function validateCuts(cuts: SourceCut[], durationSec: number): void {
   const normalized = normalizeCuts(cuts);

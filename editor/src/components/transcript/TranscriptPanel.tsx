@@ -1,21 +1,26 @@
-import { ReactNode, type, useMemo } from 'react';
+import { type ReactNode, useMemo } from "react";
 
-import { captionInCut } from '../../lib/cuts';
-import { sourceGaps } from '../../lib/sections';
-import { buildWordAnnotations } from '../../lib/word-annotations';
-import { useEditor, useFlatCaptions } from '../../store';
-import { Gap } from './Gap';
-import { useRangeResize } from './useRangeResize';
-import { Word } from './Word';
+import { captionInCut } from "../../lib/cuts";
+import { sourceGaps } from "../../lib/sections";
+import { buildWordAnnotations } from "../../lib/word-annotations";
+import { useCaptionDragSelect } from "../../lib/use-caption-drag-select";
+import { useSelection } from "../../selection-store";
+import { useEditor, useFlatCaptions, useCaptionIndices } from "../../store";
+import { Gap } from "./Gap";
+import { useRangeResize } from "./useRangeResize";
+import { Word } from "./Word";
 
 export function TranscriptPanel() {
   const config = useEditor((s) => s.config);
-  const clearSelection = useEditor((s) => s.clearSelection);
+  const clearSelection = useSelection((s) => s.clearSelection);
   const captions = useFlatCaptions();
-  const { resize, snapToCaption, startBrollResize, startPunchInResize, startListicleDrag } =
-    useRangeResize();
-
-  const bRolls = config?.bRolls ?? [];
+  const {
+    resize,
+    snapToCaption,
+    startRangeResize,
+    startSfxDrag,
+    startListicleDrag,
+  } = useRangeResize();
 
   const gapMarkers = useMemo(
     () => (config ? sourceGaps(config) : []),
@@ -26,6 +31,9 @@ export function TranscriptPanel() {
     () => buildWordAnnotations(captions, config),
     [captions, config],
   );
+
+  const captionIndices = useCaptionIndices();
+  const { onDragStart } = useCaptionDragSelect(captionIndices);
 
   const nodes: ReactNode[] = [];
   let gapIdx = 0;
@@ -39,15 +47,17 @@ export function TranscriptPanel() {
     ) {
       const gap = gapMarkers[gapIdx]!;
       nodes.push(
-        <Gap key={`gap-${gap.id}`} id={gap.id} start={gap.start} end={gap.end} />,
+        <Gap
+          key={`gap-${gap.id}`}
+          id={gap.id}
+          start={gap.start}
+          end={gap.end}
+        />,
       );
       gapIdx += 1;
     }
 
     const annotation = annotations.get(caption.index) ?? {};
-    const clip = annotation.bRollId
-      ? bRolls.find((c) => c.id === annotation.bRollId)
-      : undefined;
 
     nodes.push(
       <Word
@@ -56,18 +66,14 @@ export function TranscriptPanel() {
         annotation={annotation}
         isResizing={!!resize}
         listicleDragging={resize?.kind === "listicle"}
+        sfxDraggingId={
+          resize?.kind === "sfx" && resize.edge === "start" ? resize.id : null
+        }
+        captionIndices={captionIndices}
+        onCaptionDragStart={(e) => onDragStart(caption.index, e)}
         onResizeEnter={(shiftKey) => snapToCaption(caption, shiftKey)}
-        onStartBrollResize={
-          clip
-            ? (e, edge) => startBrollResize(e, clip, edge)
-            : undefined
-        }
-        onStartPunchInResize={
-          annotation.punchInIndex != null
-            ? (e, edge) =>
-              startPunchInResize(e, annotation.punchInIndex!, edge)
-            : undefined
-        }
+        onStartRangeResize={startRangeResize}
+        onStartSfxDrag={startSfxDrag}
         onStartListicleDrag={
           annotation.listicleItemIndex != null
             ? (e) => startListicleDrag(e, annotation.listicleItemIndex!)

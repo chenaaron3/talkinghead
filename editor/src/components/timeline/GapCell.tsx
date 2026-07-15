@@ -1,4 +1,5 @@
-import { useEditor } from "../../store";
+import { isSelected } from "../../lib/selection";
+import { useSelection } from "../../selection-store";
 import type { GapLayoutItem } from "./useTimelineLayout";
 
 type Props = {
@@ -6,9 +7,9 @@ type Props = {
 };
 
 export function GapCell({ item }: Props) {
-  const selectedGap = useEditor((s) => s.selectedGap);
-  const selectGap = useEditor((s) => s.selectGap);
-  const selected = selectedGap === item.id;
+  const selection = useSelection((s) => s.selection);
+  const selectGap = useSelection((s) => s.selectGap);
+  const selected = isSelected(selection, "gap", item.id);
   const duration = item.end - item.start;
 
   return (

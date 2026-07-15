@@ -1,28 +1,35 @@
-import type { MouseEvent } from 'react';
-import { useEffect, useState } from 'react';
+import type { MouseEvent } from "react";
+import { useEffect, useState } from "react";
 
-import { wordClassName } from '../../lib/word-classes';
-import { Asset, useEditor } from '../../store';
-import { ListicleBadge } from './ListicleBadge';
-import { RangeHandle } from './RangeHandle';
+import {
+  handlesForSelectedRange,
+  resolveSelectedRange,
+  resolveStyleRange,
+  type StartRangeResize,
+} from "../../lib/active-range";
+import { isSelected } from "../../lib/selection";
+import { wordClassName } from "../../lib/word-classes";
+import { useSelection } from "../../selection-store";
+import { Asset, SfxAsset, useEditor } from "../../store";
+import { ListicleBadge } from "./ListicleBadge";
+import { SfxBadge } from "./SfxBadge";
+import { WordHandleSlot } from "./WordHandleSlot";
 
 import type { FlatCaption } from "../../lib/captions";
 import type { WordAnnotation } from "../../lib/word-annotations";
+
 type Props = {
   caption: FlatCaption;
   annotation: WordAnnotation;
   isResizing: boolean;
   onResizeEnter?: (shiftKey: boolean) => void;
-  onStartBrollResize?: (
-    e: MouseEvent,
-    edge: "start" | "end",
-  ) => void;
-  onStartPunchInResize?: (
-    e: MouseEvent,
-    edge: "start" | "end",
-  ) => void;
+  onStartRangeResize?: StartRangeResize;
+  onStartSfxDrag?: (e: MouseEvent, id: string) => void;
   onStartListicleDrag?: (e: MouseEvent) => void;
   listicleDragging?: boolean;
+  sfxDraggingId?: string | null;
+  captionIndices: number[];
+  onCaptionDragStart?: (e: MouseEvent) => void;
 };
 
 export function Word({
@@ -30,26 +37,27 @@ export function Word({
   annotation,
   isResizing,
   onResizeEnter,
-  onStartBrollResize,
-  onStartPunchInResize,
+  onStartRangeResize,
+  onStartSfxDrag,
   onStartListicleDrag,
   listicleDragging = false,
+  sfxDraggingId = null,
+  captionIndices,
+  onCaptionDragStart,
 }: Props) {
   const sourceSec = useEditor((s) => s.sourceSec);
-  const selectedBRollId = useEditor((s) => s.selectedBRollId);
-  const selectedPunchInIndex = useEditor((s) => s.selectedPunchInIndex);
-  const selectedListicleItemIndex = useEditor(
-    (s) => s.selectedListicleItemIndex,
-  );
+  const selection = useSelection((s) => s.selection);
   const seekSource = useEditor((s) => s.seekSource);
-  const selectCaption = useEditor((s) => s.selectCaption);
-  const selectedCaptionIndex = useEditor((s) => s.selectedCaptionIndex);
-  const selectBRoll = useEditor((s) => s.selectBRoll);
-  const selectPunchIn = useEditor((s) => s.selectPunchIn);
-  const selectListicleItem = useEditor((s) => s.selectListicleItem);
+  const selectCaption = useSelection((s) => s.selectCaption);
+  const selectCaptionExtend = useSelection((s) => s.selectCaptionExtend);
+  const selectBRoll = useSelection((s) => s.selectBRoll);
+  const selectSfx = useSelection((s) => s.selectSfx);
+  const selectPunchIn = useSelection((s) => s.selectPunchIn);
+  const selectListicleItem = useSelection((s) => s.selectListicleItem);
   const setCaptionText = useEditor((s) => s.setCaptionText);
   const setCaptionEmphasis = useEditor((s) => s.setCaptionEmphasis);
   const placeBRollOnCaption = useEditor((s) => s.placeBRollOnCaption);
+  const placeSfxOnCaption = useEditor((s) => s.placeSfxOnCaption);
   const addPunchInOnCaption = useEditor((s) => s.addPunchInOnCaption);
   const cutCaption = useEditor((s) => s.cutCaption);
 
@@ -65,26 +73,13 @@ export function Word({
   }, [menu]);
 
   const active = sourceSec >= caption.start && sourceSec < caption.end;
-  const inBroll = annotation.bRollId != null;
-  const inZoom = annotation.punchInIndex != null;
-  const brollSelected = inBroll && selectedBRollId === annotation.bRollId;
-  const zoomSelected =
-    inZoom && selectedPunchInIndex === annotation.punchInIndex;
-  const captionSelected = selectedCaptionIndex === caption.index;
-
-  const isRangeStart = (edge?: WordAnnotation["bRollEdge"]) =>
-    edge === "start" || edge === "both";
-  const isRangeEnd = (edge?: WordAnnotation["bRollEdge"]) =>
-    edge === "end" || edge === "both";
-
-  const showBrollStart =
-    brollSelected && isRangeStart(annotation.bRollEdge) && onStartBrollResize;
-  const showBrollEnd =
-    brollSelected && isRangeEnd(annotation.bRollEdge) && onStartBrollResize;
-  const showZoomStart =
-    zoomSelected && isRangeStart(annotation.punchInEdge) && onStartPunchInResize;
-  const showZoomEnd =
-    zoomSelected && isRangeEnd(annotation.punchInEdge) && onStartPunchInResize;
+  const styleRange = resolveStyleRange(annotation, selection);
+  const selectedRange = resolveSelectedRange(annotation, selection);
+  const { start: startHandle, end: endHandle } = handlesForSelectedRange(
+    selectedRange,
+    onStartRangeResize,
+  );
+  const captionSelected = isSelected(selection, "caption", caption.index);
 
   if (editing) {
     return (
@@ -111,38 +106,37 @@ export function Word({
 
   return (
     <>
-      {showBrollStart ? (
-        <RangeHandle
-          edge="start"
-          color="broll"
-          onMouseDown={(e) => onStartBrollResize!(e, "start")}
-        />
-      ) : null}
-      {showZoomStart ? (
-        <RangeHandle
-          edge="start"
-          color="zoom"
-          onMouseDown={(e) => onStartPunchInResize!(e, "start")}
-        />
-      ) : null}
       {annotation.listicleNumber != null &&
       annotation.listicleItemIndex != null ? (
         <ListicleBadge
           number={annotation.listicleNumber}
-          label={annotation.listicleLabel ?? `Item ${annotation.listicleNumber}`}
-          selected={
-            selectedListicleItemIndex === annotation.listicleItemIndex
+          label={
+            annotation.listicleLabel ?? `Item ${annotation.listicleNumber}`
           }
+          selected={isSelected(
+            selection,
+            "listicleItem",
+            annotation.listicleItemIndex!,
+          )}
           dragging={listicleDragging}
           onMouseDown={(e) => onStartListicleDrag?.(e)}
         />
       ) : null}
+      {annotation.sfx?.map((marker) => (
+        <SfxBadge
+          key={marker.id}
+          label={marker.label}
+          selected={isSelected(selection, "sfx", marker.id)}
+          dragging={sfxDraggingId === marker.id}
+          onMouseDown={(e) => onStartSfxDrag?.(e, marker.id)}
+        />
+      ))}
+      <WordHandleSlot edge="start" handle={startHandle} />
       <span
+        data-caption-index={caption.index}
         className={wordClassName({
           active,
-          annotation,
-          brollSelected,
-          zoomSelected,
+          styleRange,
           captionSelected,
           emphasis: caption.emphasis,
           isResizing,
@@ -150,9 +144,16 @@ export function Word({
         onMouseEnter={(e) => {
           if (isResizing) onResizeEnter?.(e.shiftKey);
         }}
+        onMouseDown={(e) => onCaptionDragStart?.(e)}
         onClick={(e) => {
           e.stopPropagation();
-          selectCaption(caption.index);
+          if (e.shiftKey) {
+            selectCaptionExtend(caption.index, captionIndices);
+          } else if (e.metaKey || e.ctrlKey) {
+            selectCaption(caption.index, "toggle");
+          } else {
+            selectCaption(caption.index);
+          }
           seekSource(caption.start);
           if (annotation.bRollId) {
             selectBRoll(annotation.bRollId);
@@ -160,6 +161,10 @@ export function Word({
             selectPunchIn(annotation.punchInIndex);
           } else if (annotation.listicleItemIndex != null) {
             selectListicleItem(annotation.listicleItemIndex);
+          } else if (annotation.sfxRanges?.[0]) {
+            selectSfx(annotation.sfxRanges[0].id);
+          } else if (annotation.sfx?.[0]) {
+            selectSfx(annotation.sfx[0].id);
           }
         }}
         onDoubleClick={(e) => {
@@ -173,34 +178,30 @@ export function Word({
           setMenu({ x: e.clientX, y: e.clientY });
         }}
         onDragOver={(e) => {
-          if (e.dataTransfer.types.includes("application/x-broll-asset")) {
+          const types = e.dataTransfer.types;
+          if (
+            types.includes("application/x-broll-asset") ||
+            types.includes("application/x-sfx-asset")
+          ) {
             e.preventDefault();
           }
         }}
         onDrop={(e) => {
           e.preventDefault();
+          const sfxRaw = e.dataTransfer.getData("application/x-sfx-asset");
+          if (sfxRaw) {
+            placeSfxOnCaption(JSON.parse(sfxRaw) as SfxAsset, caption);
+            return;
+          }
           const raw = e.dataTransfer.getData("application/x-broll-asset");
           if (!raw) return;
           placeBRollOnCaption(JSON.parse(raw) as Asset, caption);
         }}
         title={`${caption.text}  ${caption.start.toFixed(2)}–${caption.end.toFixed(2)}s`}
       >
-        {caption.text}{" "}
+        {caption.text}
       </span>
-      {showBrollEnd ? (
-        <RangeHandle
-          edge="end"
-          color="broll"
-          onMouseDown={(e) => onStartBrollResize!(e, "end")}
-        />
-      ) : null}
-      {showZoomEnd ? (
-        <RangeHandle
-          edge="end"
-          color="zoom"
-          onMouseDown={(e) => onStartPunchInResize!(e, "end")}
-        />
-      ) : null}
+      <WordHandleSlot edge="end" handle={endHandle} />
 
       {menu ? (
         <div

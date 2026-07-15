@@ -1,5 +1,8 @@
+import { EMPTY_CAPTIONS, EMPTY_PUNCH_INS } from "../../lib/empty";
+import { isSelected } from "../../lib/selection";
 import { clampRangeEdge } from "../../lib/range";
 import { maybeSnapTimelineSec } from "../../lib/snap";
+import { useSelection } from "../../selection-store";
 import { useEditor } from "../../store";
 import { Handle, TrackLabel, useTrackDrag } from "./shared";
 
@@ -9,19 +12,21 @@ type Props = {
 };
 
 export function PunchInTrack({ width, sourceX }: Props) {
-  const punchIns = useEditor((s) => s.config?.punchInSegments ?? []);
-  const selectedPunchInIndex = useEditor((s) => s.selectedPunchInIndex);
-  const selectPunchIn = useEditor((s) => s.selectPunchIn);
-  const captions = useEditor((s) => s.transcript?.captions ?? []);
+  const punchIns = useEditor((s) => s.config?.punchInSegments ?? EMPTY_PUNCH_INS);
+  const selection = useSelection((s) => s.selection);
+  const selectPunchIn = useSelection((s) => s.selectPunchIn);
+  const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
   const updatePunchInRange = useEditor((s) => s.updatePunchInRange);
   const { startDrag } = useTrackDrag();
+
+  if (punchIns.length === 0) return null;
 
   return (
     <TrackLabel label="Zoom" width={width}>
       {punchIns.map((p, i) => {
         const left = sourceX(p.start);
         const right = sourceX(p.end);
-        const selected = selectedPunchInIndex === i;
+        const selected = isSelected(selection, "punchIn", i);
         return (
           <div
             key={`punch-${i}`}

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { getPlayer } from "../../lib/player-bridge";
+import { useSelection } from "../../selection-store";
 import { isTimelineScrubbing, useEditor } from "../../store";
 import { BRollTrack } from "./BRollTrack";
 import { CaptionTrack } from "./CaptionTrack";
@@ -8,6 +9,7 @@ import { LABEL_OFFSET } from "./constants";
 import { ListicleTrack } from "./ListicleTrack";
 import { Playhead } from "./Playhead";
 import { PunchInTrack } from "./PunchInTrack";
+import { SfxTrack } from "./SfxTrack";
 import { TimelineRuler } from "./TimelineRuler";
 import { usePlayheadInteraction } from "./usePlayheadInteraction";
 import { useTimelineLayout } from "./useTimelineLayout";
@@ -36,8 +38,8 @@ export function Timeline() {
   const duration = useEditor((s) => s.transcript?.duration ?? 0);
   const pxPerSec = useEditor((s) => s.pxPerSec);
   const setPxPerSec = useEditor((s) => s.setPxPerSec);
-  const selectGap = useEditor((s) => s.selectGap);
-  const selectKeepRegion = useEditor((s) => s.selectKeepRegion);
+  const selectGap = useSelection((s) => s.selectGap);
+  const selectKeepRegion = useSelection((s) => s.selectKeepRegion);
   const seekSource = useEditor((s) => s.seekSource);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -161,6 +163,7 @@ export function Timeline() {
             <VideoTrack width={trackWidth} items={items} />
             <CaptionTrack width={trackWidth} sourceX={sourceX} />
             <BRollTrack width={trackWidth} sourceX={sourceX} />
+            <SfxTrack width={trackWidth} sourceX={sourceX} />
             <PunchInTrack width={trackWidth} sourceX={sourceX} />
             <ListicleTrack width={trackWidth} sourceX={sourceX} />
           </div>

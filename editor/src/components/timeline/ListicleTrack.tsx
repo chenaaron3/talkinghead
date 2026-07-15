@@ -1,3 +1,4 @@
+import { EMPTY_CAPTIONS } from "../../lib/empty";
 import { clampRangeEdge, MIN_LISTICLE_SEC } from "../../lib/range";
 import { maybeSnapTimelineSec } from "../../lib/snap";
 import { useEditor } from "../../store";
@@ -10,20 +11,14 @@ type Props = {
 
 export function ListicleTrack({ width, sourceX }: Props) {
   const listicle = useEditor((s) => s.config?.listicleOverlay);
-  const captions = useEditor((s) => s.transcript?.captions ?? []);
+  const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
   const updateListicleOverlay = useEditor((s) => s.updateListicleOverlay);
   const updateListicleItemReveal = useEditor(
     (s) => s.updateListicleItemReveal,
   );
   const { startDrag } = useTrackDrag();
 
-  if (!listicle) {
-    return (
-      <TrackLabel label="List" width={width}>
-        {null}
-      </TrackLabel>
-    );
-  }
+  if (!listicle) return null;
 
   const left = sourceX(listicle.start);
   const right = sourceX(listicle.end);

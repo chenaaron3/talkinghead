@@ -1,24 +1,35 @@
 import { useEffect, useState, type MouseEvent } from "react";
-import type { SourceBRoll } from "@src/lib/types";
 import type { FlatCaption } from "../../lib/captions";
+import type { RangeKind } from "../../lib/active-range";
 import { clampRangeEdge } from "../../lib/range";
 import { maybeSnapTimelineSec } from "../../lib/snap";
+import {
+  EMPTY_BROLLS,
+  EMPTY_CAPTIONS,
+  EMPTY_PUNCH_INS,
+  EMPTY_SFX,
+} from "../../lib/empty";
+import { useSelection } from "../../selection-store";
 import { useEditor } from "../../store";
 
 export type RangeResize =
   | { kind: "broll"; id: string; edge: "start" | "end" }
-  | { kind: "punchin"; index: number; edge: "start" | "end" }
+  | { kind: "sfx"; id: string; edge: "start" | "end" }
+  | { kind: "zoom"; id: number; edge: "start" | "end" }
   | { kind: "listicle"; itemIndex: number };
 
 export function useRangeResize() {
-  const bRolls = useEditor((s) => s.config?.bRolls ?? []);
-  const punchIns = useEditor((s) => s.config?.punchInSegments ?? []);
-  const captions = useEditor((s) => s.transcript?.captions ?? []);
+  const bRolls = useEditor((s) => s.config?.bRolls ?? EMPTY_BROLLS);
+  const sfx = useEditor((s) => s.config?.sfx ?? EMPTY_SFX);
+  const punchIns = useEditor((s) => s.config?.punchInSegments ?? EMPTY_PUNCH_INS);
+  const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
   const seekSource = useEditor((s) => s.seekSource);
-  const selectBRoll = useEditor((s) => s.selectBRoll);
-  const selectPunchIn = useEditor((s) => s.selectPunchIn);
-  const selectListicleItem = useEditor((s) => s.selectListicleItem);
+  const selectBRoll = useSelection((s) => s.selectBRoll);
+  const selectSfx = useSelection((s) => s.selectSfx);
+  const selectPunchIn = useSelection((s) => s.selectPunchIn);
+  const selectListicleItem = useSelection((s) => s.selectListicleItem);
   const updateBRollRange = useEditor((s) => s.updateBRollRange);
+  const updateSfxRange = useEditor((s) => s.updateSfxRange);
   const updatePunchInRange = useEditor((s) => s.updatePunchInRange);
   const updateListicleItemReveal = useEditor(
     (s) => s.updateListicleItemReveal,
@@ -59,40 +70,69 @@ export function useRangeResize() {
       return;
     }
 
-    const seg = punchIns[resize.index];
+    if (resize.kind === "sfx") {
+      const value =
+        resize.edge === "start"
+          ? maybeSnapTimelineSec(caption.start, captions, shiftKey)
+          : caption.end;
+      updateSfxRange(resize.id, resize.edge, value, true);
+      const next = useEditor
+        .getState()
+        .config?.sfx?.find((c) => c.id === resize.id);
+      if (next) {
+        seekSource(resize.edge === "start" ? next.start : next.end);
+      }
+      return;
+    }
+
+    const seg = punchIns[resize.id];
     if (!seg) return;
     const value = resize.edge === "start" ? caption.start : caption.end;
     const { start, end } = clampRangeEdge(resize.edge, value, seg);
-    updatePunchInRange(resize.index, start, end, true);
+    updatePunchInRange(resize.id, start, end, true);
     seekSource(resize.edge === "start" ? start : end);
   };
 
-  const startBrollResize = (
+  const startRangeResize = (
     e: MouseEvent,
-    clip: SourceBRoll,
+    kind: RangeKind,
+    id: string | number,
     edge: "start" | "end",
   ) => {
     e.preventDefault();
     e.stopPropagation();
     beginGesture();
-    selectBRoll(clip.id);
-    setResize({ kind: "broll", id: clip.id, edge });
-    seekSource(edge === "start" ? clip.start : clip.end);
-  };
 
-  const startPunchInResize = (
-    e: MouseEvent,
-    index: number,
-    edge: "start" | "end",
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (kind === "broll") {
+      const clipId = String(id);
+      const clip = bRolls.find((c) => c.id === clipId);
+      if (!clip) return;
+      selectBRoll(clipId);
+      setResize({ kind: "broll", id: clipId, edge });
+      seekSource(edge === "start" ? clip.start : clip.end);
+      return;
+    }
+
+    if (kind === "sfx") {
+      const clipId = String(id);
+      const clip = sfx.find((c) => c.id === clipId);
+      if (!clip) return;
+      selectSfx(clipId);
+      setResize({ kind: "sfx", id: clipId, edge });
+      seekSource(edge === "start" ? clip.start : clip.end);
+      return;
+    }
+
+    const index = Number(id);
     const seg = punchIns[index];
     if (!seg) return;
-    beginGesture();
     selectPunchIn(index);
-    setResize({ kind: "punchin", index, edge });
+    setResize({ kind: "zoom", id: index, edge });
     seekSource(edge === "start" ? seg.start : seg.end);
+  };
+
+  const startSfxDrag = (e: MouseEvent, id: string) => {
+    startRangeResize(e, "sfx", id, "start");
   };
 
   const startListicleDrag = (e: MouseEvent, itemIndex: number) => {
@@ -109,8 +149,8 @@ export function useRangeResize() {
   return {
     resize,
     snapToCaption,
-    startBrollResize,
-    startPunchInResize,
+    startRangeResize,
+    startSfxDrag,
     startListicleDrag,
   };
 }

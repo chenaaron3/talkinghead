@@ -78,7 +78,7 @@ export function Playhead({
         ref={activeRef}
         className="pointer-events-none absolute top-0 bottom-0 left-0 z-30 will-change-transform"
       >
-        <div className="relative h-full w-0.5 -translate-x-1/2 bg-sky-400">
+        <div className="relative h-full w-0.5 -translate-x-1/2 bg-sky-400 pointer-events-none">
           <div
             className="pointer-events-auto absolute top-0 left-1/2 h-3 w-2 -translate-x-1/2 cursor-ew-resize rounded-sm bg-sky-400"
             onMouseDown={(e) => {

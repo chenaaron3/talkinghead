@@ -139,12 +139,12 @@ async function scheduleReel(
     waitUntil: "commit",
     timeout: TIMEOUTS.navigation,
   });
-  await clickButton(page, /^Create reel$/i, TIMEOUTS.navigation);
+  await clickButton(page, /^Create reel$/i, TIMEOUTS.pageLoad);
 
   console.log("[instagram] video");
   const [videoChooser] = await Promise.all([
     page.waitForEvent("filechooser", { timeout: TIMEOUTS.fileChooser }),
-    clickButton(page, /^Add Video$/i),
+    clickButton(page, /^Add Video$/i, TIMEOUTS.pageLoad),
   ]);
   await videoChooser.setFiles(input.videoPath);
   await page

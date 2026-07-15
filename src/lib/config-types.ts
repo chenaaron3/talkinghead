@@ -29,6 +29,16 @@ export type SourceBRoll = {
   end: number;
 };
 
+export type SourceSfx = {
+  id: string;
+  /** Path under public/, e.g. `sfx/ding_light.wav` */
+  src: string;
+  start: number;
+  end: number;
+  /** Native length of the audio file (seconds); play duration cannot exceed this. */
+  srcDurationSec: number;
+};
+
 /** Episode settings stored in config.yaml (source timeline, seconds). */
 export type EpisodeConfig = {
   /** Null when omitted — process generates via OpenAI and writes config.yaml. */
@@ -44,4 +54,5 @@ export type EpisodeConfig = {
   listicleOverlay: SourceListicle | null;
   punchInSegments: SourcePunchIn[];
   bRolls: SourceBRoll[];
+  sfx: SourceSfx[];
 };

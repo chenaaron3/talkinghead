@@ -11,6 +11,17 @@ const COLOR_VAR: Record<ActiveRange["kind"], string> = {
   zoom: "var(--color-purple-400)",
 };
 
+const UNDERLINE: Record<"broll" | "zoom", string> = {
+  broll: "border-broll/70",
+  zoom: "border-purple-400/70",
+};
+
+const HIGHLIGHT: Record<"broll" | "zoom", { idle: string; playhead: string }> =
+  {
+    broll: { idle: "bg-broll/45", playhead: "bg-broll/50" },
+    zoom: { idle: "bg-purple-500/15", playhead: "bg-purple-500/20" },
+  };
+
 function roundEdge(edge: RangeEdge | undefined): string {
   if (edge === "both") return "rounded-sm";
   if (edge === "start") return "rounded-l-sm";
@@ -40,43 +51,48 @@ type Input = {
   isResizing: boolean;
 };
 
-function rangeTint(range: ActiveRange, active: boolean): string[] {
-  if (range.kind === "broll") {
-    const bg = active
-      ? "bg-broll/50"
-      : range.selected
-        ? "bg-broll/45"
-        : "bg-broll/30";
-    return [
-      "border-b-2 border-transparent",
-      bg,
-      !range.selected ? "hover:bg-broll/40" : "",
-      roundEdge(range.edge),
-      selectedEdgeShadow(range.edge, range.selected, COLOR_VAR.broll),
-    ];
-  }
+/** B-roll / zoom: inactive = underline, active = highlight; word selected = both. */
+function overlayRangeTint(
+  range: ActiveRange,
+  playheadActive: boolean,
+  captionSelected: boolean,
+): string[] {
+  const kind = range.kind === "zoom" ? "zoom" : "broll";
+  const showHighlight = range.selected || captionSelected;
+  const showUnderline = !range.selected || captionSelected;
 
-  if (range.kind === "sfx") {
-    const bg = active ? "bg-sfx/50" : "bg-sfx/45";
-    return [
-      "border-b-2 border-transparent",
-      bg,
-      roundEdge(range.edge),
-      selectedEdgeShadow(range.edge, true, COLOR_VAR.sfx),
-    ];
-  }
-
-  const zoomStyle = active
-    ? "border-b-purple-400 bg-purple-500/20"
-    : range.selected
-      ? "border-b-purple-300 bg-purple-500/15"
-      : "border-b-purple-400/70";
   return [
     "border-b-2",
-    zoomStyle,
+    showUnderline ? UNDERLINE[kind] : "border-transparent",
+    showHighlight
+      ? playheadActive
+        ? HIGHLIGHT[kind].playhead
+        : HIGHLIGHT[kind].idle
+      : "",
     roundEdge(range.edge),
-    selectedEdgeShadow(range.edge, range.selected, COLOR_VAR.zoom),
+    selectedEdgeShadow(range.edge, range.selected, COLOR_VAR[kind]),
   ];
+}
+
+function sfxRangeTint(range: ActiveRange, playheadActive: boolean): string[] {
+  const bg = playheadActive ? "bg-sfx/50" : "bg-sfx/45";
+  return [
+    "border-b-2 border-transparent",
+    bg,
+    roundEdge(range.edge),
+    selectedEdgeShadow(range.edge, true, COLOR_VAR.sfx),
+  ];
+}
+
+function rangeTint(
+  range: ActiveRange,
+  playheadActive: boolean,
+  captionSelected: boolean,
+): string[] {
+  if (range.kind === "sfx") {
+    return sfxRangeTint(range, playheadActive);
+  }
+  return overlayRangeTint(range, playheadActive, captionSelected);
 }
 
 export function wordClassName(input: Input): string {
@@ -89,7 +105,7 @@ export function wordClassName(input: Input): string {
   if (isResizing) parts.push("cursor-ew-resize");
 
   if (styleRange) {
-    parts.push(...rangeTint(styleRange, active));
+    parts.push(...rangeTint(styleRange, active, captionSelected));
     return parts.filter(Boolean).join(" ");
   }
 

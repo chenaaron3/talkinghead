@@ -6,12 +6,16 @@ export type RangeEdge = "start" | "end" | "middle" | "both";
 export type WordAnnotation = {
   bRollId?: string;
   bRollEdge?: RangeEdge;
+  /** B-roll markers that start on this word. */
+  bRollMarkers?: Array<{ id: string; src: string }>;
   /** SFX markers that start on this word. */
   sfx?: Array<{ id: string; label: string }>;
   /** SFX clips whose play range covers this word (for selected-range UI). */
   sfxRanges?: Array<{ id: string; edge: RangeEdge }>;
   punchInIndex?: number;
   punchInEdge?: RangeEdge;
+  /** Punch-in markers that start on this word. */
+  punchInMarkers?: Array<{ index: number }>;
   listicleNumber?: number;
   listicleItemIndex?: number;
   listicleLabel?: string;
@@ -63,6 +67,29 @@ function sfxAt(
     .map((clip) => ({ id: clip.id, label: sfxLabel(clip.src) }));
 }
 
+function bRollMarkersAt(
+  caption: FlatCaption,
+  clips: { id: string; src: string; start: number }[],
+): Array<{ id: string; src: string }> {
+  return clips
+    .filter((clip) => clip.start >= caption.start && clip.start < caption.end)
+    .map((clip) => ({ id: clip.id, src: clip.src }));
+}
+
+function punchInMarkersAt(
+  caption: FlatCaption,
+  segments: { start: number }[],
+): Array<{ index: number }> {
+  const out: Array<{ index: number }> = [];
+  for (let i = 0; i < segments.length; i++) {
+    const start = segments[i]!.start;
+    if (start >= caption.start && start < caption.end) {
+      out.push({ index: i });
+    }
+  }
+  return out;
+}
+
 export function buildWordAnnotations(
   captions: FlatCaption[],
   config: EpisodeConfig | null,
@@ -84,6 +111,9 @@ export function buildWordAnnotations(
       }
     }
 
+    const bRollMarkers = bRollMarkersAt(caption, config.bRolls);
+    if (bRollMarkers.length > 0) annotation.bRollMarkers = bRollMarkers;
+
     const sfx = sfxAt(caption, config.sfx ?? []);
     if (sfx.length > 0) annotation.sfx = sfx;
 
@@ -103,6 +133,12 @@ export function buildWordAnnotations(
         break;
       }
     }
+
+    const punchInMarkers = punchInMarkersAt(
+      caption,
+      config.punchInSegments,
+    );
+    if (punchInMarkers.length > 0) annotation.punchInMarkers = punchInMarkers;
 
     const listicleItem = listicleItemAt(caption, listicleItems);
     if (listicleItem) {

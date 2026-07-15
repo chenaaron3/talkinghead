@@ -7,7 +7,7 @@ import { useCaptionDragSelect } from "../../lib/use-caption-drag-select";
 import { useSelection } from "../../selection-store";
 import { useEditor, useFlatCaptions, useCaptionIndices } from "../../store";
 import { Gap } from "./Gap";
-import { useRangeResize } from "./useRangeResize";
+import { useRangeResize, markerDraggingFromResize } from "./useRangeResize";
 import { Word } from "./Word";
 
 export function TranscriptPanel() {
@@ -65,10 +65,7 @@ export function TranscriptPanel() {
         caption={caption}
         annotation={annotation}
         isResizing={!!resize}
-        listicleDragging={resize?.kind === "listicle"}
-        sfxDraggingId={
-          resize?.kind === "sfx" && resize.edge === "start" ? resize.id : null
-        }
+        draggingStart={markerDraggingFromResize(resize)}
         captionIndices={captionIndices}
         onCaptionDragStart={(e) => onDragStart(caption.index, e)}
         onResizeEnter={(shiftKey) => snapToCaption(caption, shiftKey)}

@@ -10,7 +10,7 @@ type Props = {
 
 /** ~half a word space per side; two adjacent slots ≈ one natural space. */
 const SLOT_CLASS =
-  "inline-flex w-[0.185em] shrink-0 items-end justify-center align-baseline";
+  "inline-flex w-[0.185em] shrink-0 items-center justify-center align-middle";
 
 /** Fixed-width margin that becomes a resize handle without shifting layout. */
 export function WordHandleSlot({ edge, handle }: Props) {

@@ -587,11 +587,13 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     placeBRollOnCaption: (asset, caption) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
+      const { selection } = useSelection.getState();
+      const range = captionActionRange(transcript, selection, caption);
       const clip: SourceBRoll = {
         id: newId("broll"),
         src: asset.src,
-        start: caption.start,
-        end: Math.max(caption.start + 0.04, caption.end),
+        start: range.start,
+        end: Math.max(range.start + MIN_RANGE_SEC, range.end),
       };
       const result = upsertBRoll(config.bRolls, clip);
       if ("error" in result) return;

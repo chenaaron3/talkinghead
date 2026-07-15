@@ -18,7 +18,7 @@ punchInSegments:
     scale: 1.12
 listicleOverlay: null
 bRolls:
-  - id: broll-mrmlk3tf-cllzu
+  - id: broll-mrmmjkr3-uzolw
     src: b-roll/20260715-185111-IMG-1695/Gym_After.png
     start: 7.203
     end: 9.38
@@ -26,6 +26,6 @@ sfx:
   - id: sfx-mrmkyko1-h48go
     src: sfx/anime_wow.mp3
     start: 1.946
-    end: 2.948999999999999
+    end: 2.949
     srcDurationSec: 3.265306
 

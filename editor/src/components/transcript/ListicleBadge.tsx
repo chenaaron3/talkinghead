@@ -18,7 +18,7 @@ export function ListicleBadge({
   return (
     <span
       className={[
-        "relative mx-0.5 inline-flex -translate-y-0.5 cursor-ew-resize flex-col items-center align-middle select-none",
+        "relative mx-0.5 inline-flex cursor-ew-resize items-center align-middle select-none",
         dragging ? "z-10" : "",
       ].join(" ")}
       title={`${number}. ${label} — drag to move reveal point`}
@@ -35,10 +35,6 @@ export function ListicleBadge({
       >
         {number}
       </span>
-      <span
-        className="mt-px h-1.5 w-0.5 rounded-full bg-[#00c853]/80"
-        aria-hidden
-      />
     </span>
   );
 }

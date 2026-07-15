@@ -12,8 +12,11 @@ import { wordClassName } from "../../lib/word-classes";
 import { useSelection } from "../../selection-store";
 import { Asset, SfxAsset, useEditor } from "../../store";
 import { ListicleBadge } from "./ListicleBadge";
+import { BRollBadge } from "./BRollBadge";
+import { PunchInBadge } from "./PunchInBadge";
 import { SfxBadge } from "./SfxBadge";
 import { WordHandleSlot } from "./WordHandleSlot";
+import type { MarkerDragging } from "./useRangeResize";
 
 import type { FlatCaption } from "../../lib/captions";
 import type { WordAnnotation } from "../../lib/word-annotations";
@@ -26,8 +29,7 @@ type Props = {
   onStartRangeResize?: StartRangeResize;
   onStartSfxDrag?: (e: MouseEvent, id: string) => void;
   onStartListicleDrag?: (e: MouseEvent) => void;
-  listicleDragging?: boolean;
-  sfxDraggingId?: string | null;
+  draggingStart?: MarkerDragging | null;
   captionIndices: number[];
   onCaptionDragStart?: (e: MouseEvent) => void;
 };
@@ -40,8 +42,7 @@ export function Word({
   onStartRangeResize,
   onStartSfxDrag,
   onStartListicleDrag,
-  listicleDragging = false,
-  sfxDraggingId = null,
+  draggingStart = null,
   captionIndices,
   onCaptionDragStart,
 }: Props) {
@@ -118,16 +119,48 @@ export function Word({
             "listicleItem",
             annotation.listicleItemIndex!,
           )}
-          dragging={listicleDragging}
+          dragging={
+            draggingStart?.kind === "listicle" &&
+            draggingStart.id === annotation.listicleItemIndex
+          }
           onMouseDown={(e) => onStartListicleDrag?.(e)}
         />
       ) : null}
+      {annotation.bRollMarkers?.map((marker) => (
+        <BRollBadge
+          key={marker.id}
+          src={marker.src}
+          label={marker.src.split("/").pop() ?? marker.src}
+          selected={isSelected(selection, "broll", marker.id)}
+          dragging={
+            draggingStart?.kind === "broll" && draggingStart.id === marker.id
+          }
+          onMouseDown={(e) =>
+            onStartRangeResize?.(e, "broll", marker.id, "start")
+          }
+        />
+      ))}
+      {annotation.punchInMarkers?.map((marker) => (
+        <PunchInBadge
+          key={`zoom-${marker.index}`}
+          selected={isSelected(selection, "punchIn", marker.index)}
+          dragging={
+            draggingStart?.kind === "zoom" &&
+            draggingStart.id === marker.index
+          }
+          onMouseDown={(e) =>
+            onStartRangeResize?.(e, "zoom", marker.index, "start")
+          }
+        />
+      ))}
       {annotation.sfx?.map((marker) => (
         <SfxBadge
           key={marker.id}
           label={marker.label}
           selected={isSelected(selection, "sfx", marker.id)}
-          dragging={sfxDraggingId === marker.id}
+          dragging={
+            draggingStart?.kind === "sfx" && draggingStart.id === marker.id
+          }
           onMouseDown={(e) => onStartSfxDrag?.(e, marker.id)}
         />
       ))}

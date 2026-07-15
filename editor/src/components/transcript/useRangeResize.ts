@@ -16,7 +16,26 @@ export type RangeResize =
   | { kind: "broll"; id: string; edge: "start" | "end" }
   | { kind: "sfx"; id: string; edge: "start" | "end" }
   | { kind: "zoom"; id: number; edge: "start" | "end" }
-  | { kind: "listicle"; itemIndex: number };
+  | { kind: "listicle"; id: number };
+
+/** Active start-marker drag (listicle is always a point/start drag). */
+export type MarkerDragging = {
+  kind: RangeResize["kind"];
+  id: string | number;
+};
+
+export function markerDraggingFromResize(
+  resize: RangeResize | null,
+): MarkerDragging | null {
+  if (!resize) return null;
+  if (resize.kind === "listicle") {
+    return { kind: "listicle", id: resize.id };
+  }
+  if (resize.edge === "start") {
+    return { kind: resize.kind, id: resize.id };
+  }
+  return null;
+}
 
 export function useRangeResize() {
   const bRolls = useEditor((s) => s.config?.bRolls ?? EMPTY_BROLLS);
@@ -54,7 +73,7 @@ export function useRangeResize() {
         captions,
         shiftKey,
       );
-      updateListicleItemReveal(resize.itemIndex, reveal, true);
+      updateListicleItemReveal(resize.id, reveal, true);
       seekSource(reveal);
       return;
     }
@@ -142,7 +161,7 @@ export function useRangeResize() {
     if (!item) return;
     beginGesture();
     selectListicleItem(itemIndex);
-    setResize({ kind: "listicle", itemIndex });
+    setResize({ kind: "listicle", id: itemIndex });
     seekSource(item.reveal);
   };
 

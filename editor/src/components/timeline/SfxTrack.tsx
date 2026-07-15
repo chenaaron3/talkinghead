@@ -28,7 +28,7 @@ export function SfxTrack({ width, sourceX }: Props) {
         return (
           <div
             key={clip.id}
-            className={`absolute top-1 bottom-1 flex items-center overflow-hidden rounded bg-sfx px-1.5 text-[10px] text-[#042f2e] select-none ${
+            className={`absolute top-1 bottom-1 flex cursor-grab items-center overflow-hidden rounded bg-sfx px-1.5 text-[10px] text-[#042f2e] select-none active:cursor-grabbing ${
               isSelected(selection, "sfx", clip.id)
                 ? "z-[2] outline outline-2 outline-white"
                 : ""
@@ -37,6 +37,16 @@ export function SfxTrack({ width, sourceX }: Props) {
             onClick={(e) => {
               e.stopPropagation();
               selectSfx(clip.id);
+            }}
+            onMouseDown={(e) => {
+              if (e.button !== 0) return;
+              const origin = clip.start;
+              selectSfx(clip.id);
+              startDrag(e, (dxSec, _dxPx, shiftKey) => {
+                const raw = Math.max(0, origin + dxSec);
+                const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+                updateSfxRange(clip.id, "start", snapped, true);
+              });
             }}
           >
             <Handle

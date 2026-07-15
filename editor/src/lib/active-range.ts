@@ -34,7 +34,8 @@ function isEndEdge(edge: RangeEdge): boolean {
 
 /**
  * Range covering this word for transcript tint.
- * Priority: b-roll (always if present) > selected sfx > zoom (always if present).
+ * Priority: b-roll > selected sfx > zoom.
+ * B-roll/zoom always cover; sfx only when selected (marker-first elsewhere).
  */
 export function resolveStyleRange(
   annotation: WordAnnotation,

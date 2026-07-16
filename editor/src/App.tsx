@@ -1,6 +1,8 @@
 import { useEffect } from "react";
+import { cn } from "./lib/utils";
 import { togglePlayback } from "./lib/player-bridge";
 import { AssetsPanel } from "./components/AssetsPanel";
+import { Navbar } from "./components/Navbar";
 import { PlayerPanel } from "./components/PlayerPanel";
 import { Timeline } from "./components/timeline/Timeline";
 import { TranscriptPanel } from "./components/transcript/TranscriptPanel";
@@ -62,7 +64,8 @@ function useGlobalShortcuts() {
 export function App() {
   const loadState = useEditor((s) => s.loadState);
   const error = useEditor((s) => s.error);
-  const episodeId = useEditor((s) => s.props?.episodeId);
+  const episodeId = useEditor((s) => s.episodeId);
+  const title = useEditor((s) => s.title);
   const dirty = useEditor((s) => s.dirty);
 
   useEffect(() => {
@@ -71,41 +74,50 @@ export function App() {
   useGlobalShortcuts();
 
   useEffect(() => {
-    document.title = episodeId
-      ? `${dirty ? "● " : ""}${episodeId}`
-      : "Editor";
-  }, [episodeId, dirty]);
-
-  if (loadState === "loading") {
-    return (
-      <div className="flex h-full items-center justify-center bg-[#12141a] text-sm text-muted">
-        Loading episode…
-      </div>
-    );
-  }
-  if (loadState === "error") {
-    return (
-      <div className="bg-red-950 px-3 py-2 text-sm text-red-200">
-        {error ?? "Failed to load episode"}
-      </div>
-    );
-  }
+    const label =
+      loadState === "ready" && title
+        ? title
+        : episodeId
+          ? episodeId
+          : "Editor";
+    document.title = `${dirty ? "● " : ""}${label}`;
+  }, [episodeId, title, dirty, loadState]);
 
   return (
-    <div className="grid h-full min-h-0 w-full max-w-[100vw] grid-rows-[1fr_280px] overflow-hidden bg-[#12141a] text-[#e8eaef] font-sans">
+    <div
+      className={cn(
+        "relative grid h-full min-h-0 w-full max-w-[100vw] overflow-hidden bg-[#12141a] text-[#e8eaef] font-sans",
+        loadState === "ready" ? "grid-rows-[auto_1fr_280px]" : "grid-rows-[auto_1fr]",
+      )}
+    >
+      <Navbar />
+
       {error ? (
-        <div className="absolute left-0 right-0 top-0 z-20 bg-red-950 px-3 py-2 text-sm text-red-200">
-          {error}
+        <div className="pointer-events-none absolute left-0 right-0 top-11 z-20 px-3 py-2">
+          <div className="pointer-events-auto rounded-md bg-red-950 px-3 py-2 text-sm text-red-200 shadow-lg">
+            {error}
+          </div>
         </div>
       ) : null}
 
-      <div className="grid min-h-0 min-w-0 grid-cols-[200px_1fr_280px] overflow-hidden border-b border-border">
-        <AssetsPanel />
-        <TranscriptPanel />
-        <PlayerPanel />
-      </div>
+      {loadState === "loading" ? (
+        <div className="flex min-h-0 items-center justify-center text-sm text-muted">
+          Loading episode…
+        </div>
+      ) : loadState === "idle" ? (
+        <div className="flex min-h-0 flex-col items-center justify-center gap-2 text-sm text-muted">
+          <p>No episode open.</p>
+          <p className="text-xs">Press ⌘K or click the title to choose one.</p>
+        </div>
+      ) : (
+        <div className="grid min-h-0 min-w-0 grid-cols-[200px_1fr_280px] overflow-hidden border-b border-border">
+          <AssetsPanel />
+          <TranscriptPanel />
+          <PlayerPanel />
+        </div>
+      )}
 
-      <Timeline />
+      {loadState === "ready" ? <Timeline /> : null}
     </div>
   );
 }

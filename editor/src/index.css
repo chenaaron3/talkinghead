@@ -2,11 +2,18 @@
 
 @theme {
   --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --color-background: #12141a;
+  --color-foreground: #e8eaef;
+  --color-popover: #161922;
+  --color-popover-foreground: #e8eaef;
   --color-panel: #1a1d26;
   --color-panel-2: #222632;
   --color-border: #2e3444;
   --color-muted: #8b93a7;
+  --color-muted-foreground: #8b93a7;
   --color-accent: #5b8cff;
+  --color-accent-foreground: #ffffff;
+  --color-ring: #5b8cff;
   --color-broll: #c9a227;
   --color-sfx: #2dd4bf;
 }

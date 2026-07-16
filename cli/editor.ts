@@ -5,7 +5,11 @@ import { resolveEpisodeId } from "../editor/server/api-plugin";
 
 async function main() {
   const episodeId = resolveEpisodeId(process.argv.slice(2));
-  process.env.EDITOR_EPISODE = episodeId;
+  if (episodeId) {
+    process.env.EDITOR_EPISODE = episodeId;
+  } else {
+    delete process.env.EDITOR_EPISODE;
+  }
 
   const server = await createServer({
     configFile: path.resolve(__dirname, "../editor/vite.config.ts"),
@@ -14,7 +18,11 @@ async function main() {
   await server.listen();
   const info = server.resolvedUrls;
   const url = info?.local[0] ?? "http://localhost:5173/";
-  console.log(`[editor] episode=${episodeId}`);
+  console.log(
+    episodeId
+      ? `[editor] episode=${episodeId}`
+      : "[editor] no default episode — browse at startup",
+  );
   console.log(`[editor] ${url}`);
 }
 

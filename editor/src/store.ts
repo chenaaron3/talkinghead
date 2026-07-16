@@ -8,6 +8,8 @@ import {
   snapSourceSecToKeep,
 } from '@src/lib/source-timeline';
 
+import { episodeHeaders } from './lib/api';
+
 import { removeBRoll, upsertBRoll } from './lib/broll';
 import { removeSfx, upsertSfx, applySfxEdge } from './lib/sfx';
 import { captionIndexAt, flattenCaptions, updateCaption } from './lib/captions';
@@ -51,7 +53,7 @@ type EpisodeSnapshot = {
 };
 
 type EditorState = {
-  loadState: "loading" | "ready" | "error";
+  loadState: "idle" | "loading" | "ready" | "error";
   error: string | null;
   episodeId: string | null;
   title: string;
@@ -73,10 +75,14 @@ type EditorState = {
   pxPerSec: number;
   waveform: WaveformData | null;
   waveformMax: number;
+  scheduledLabel: string | null;
+  fullyScheduled: boolean;
 };
 
 type EditorActions = {
-  load: () => Promise<void>;
+  load: (episodeId?: string | null) => Promise<void>;
+  switchEpisode: (episodeId: string) => Promise<void>;
+  refreshSchedule: () => Promise<void>;
   save: () => Promise<void>;
   seekSource: (sourceSec: number) => void;
   seekOutput: (frame: number) => void;
@@ -134,6 +140,27 @@ const history: EpisodeSnapshot[] = [];
 const future: EpisodeSnapshot[] = [];
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let scrubbing = false;
+
+function resetHistory() {
+  history.length = 0;
+  future.length = 0;
+}
+
+function setEpisodeUrl(episodeId: string | null) {
+  const url = new URL(window.location.href);
+  if (episodeId) {
+    url.searchParams.set("episode", episodeId);
+  } else {
+    url.searchParams.delete("episode");
+  }
+  window.history.replaceState(null, "", url);
+}
+
+function resolveInitialEpisodeId(defaultEpisodeId: string | null): string | null {
+  const fromUrl = new URL(window.location.href).searchParams.get("episode");
+  if (fromUrl?.trim()) return fromUrl.trim();
+  return defaultEpisodeId;
+}
 
 export function setTimelineScrubbing(active: boolean) {
   scrubbing = active;
@@ -267,12 +294,55 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     pxPerSec: 40,
     waveform: null,
     waveformMax: 0,
+    scheduledLabel: null,
+    fullyScheduled: false,
 
-    load: async () => {
+    load: async (requestedEpisodeId?: string | null) => {
+      set({ loadState: "loading", error: null });
       try {
+        let episodeId = requestedEpisodeId ?? null;
+        if (!episodeId) {
+          const bootstrapRes = await fetch("/api/bootstrap");
+          const bootstrap = (await bootstrapRes.json()) as {
+            defaultEpisodeId?: string | null;
+          };
+          episodeId = resolveInitialEpisodeId(
+            bootstrap.defaultEpisodeId ?? null,
+          );
+        }
+
+        if (!episodeId) {
+          resetHistory();
+          set({
+            loadState: "idle",
+            episodeId: null,
+            title: "",
+            videoSrc: "",
+            fps: 30,
+            width: 0,
+            height: 0,
+            config: null,
+            transcript: null,
+            props: null,
+            assets: [],
+            sfxAssets: [],
+            dirty: false,
+            frame: 0,
+            sourceSec: 0,
+            waveform: null,
+            waveformMax: 0,
+            scheduledLabel: null,
+            fullyScheduled: false,
+            error: null,
+          });
+          setEpisodeUrl(null);
+          return;
+        }
+
+        const headers = episodeHeaders(episodeId);
         const [epRes, assetsRes] = await Promise.all([
-          fetch("/api/episode"),
-          fetch("/api/assets"),
+          fetch("/api/episode", { headers }),
+          fetch("/api/assets", { headers }),
         ]);
         const ep = (await epRes.json()) as {
           episodeId?: string;
@@ -280,6 +350,10 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           transcript?: Transcript;
           props?: EpisodeProps;
           waveform?: SerializedWaveform | null;
+          schedule?: {
+            scheduledLabel?: string | null;
+            fullyScheduled?: boolean;
+          };
           error?: string;
         };
         const as = (await assetsRes.json()) as {
@@ -292,6 +366,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         if (!ep.config || !ep.transcript || !ep.props) {
           throw new Error("Episode payload incomplete");
         }
+        resetHistory();
         set({
           episodeId: ep.episodeId ?? ep.props.episodeId,
           title: ep.props.title,
@@ -305,11 +380,16 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           assets: as.assets ?? [],
           sfxAssets: as.sfx ?? [],
           loadState: "ready",
+          dirty: false,
           frame: 0,
           sourceSec: 0,
           waveform: null,
           waveformMax: 0,
+          scheduledLabel: ep.schedule?.scheduledLabel ?? null,
+          fullyScheduled: ep.schedule?.fullyScheduled ?? false,
+          error: null,
         });
+        setEpisodeUrl(ep.episodeId ?? ep.props.episodeId);
 
         if (ep.waveform?.peaks?.length) {
           const waveform = deserializeWaveform(ep.waveform);
@@ -326,14 +406,53 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       }
     },
 
+    switchEpisode: async (episodeId: string) => {
+      const { dirty, episodeId: currentEpisodeId } = get();
+      if (episodeId === currentEpisodeId) return;
+      if (dirty) {
+        const discard = window.confirm(
+          "You have unsaved changes. Discard them and switch episodes?",
+        );
+        if (!discard) return;
+      }
+      await get().load(episodeId);
+    },
+
+    refreshSchedule: async () => {
+      const { episodeId } = get();
+      if (!episodeId) return;
+      try {
+        const res = await fetch("/api/episode", {
+          headers: episodeHeaders(episodeId),
+        });
+        const data = (await res.json()) as {
+          schedule?: {
+            scheduledLabel?: string | null;
+            fullyScheduled?: boolean;
+          };
+          error?: string;
+        };
+        if (!res.ok) throw new Error(data.error ?? "Failed to refresh schedule");
+        set({
+          scheduledLabel: data.schedule?.scheduledLabel ?? null,
+          fullyScheduled: data.schedule?.fullyScheduled ?? false,
+        });
+      } catch (err) {
+        set({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+
     save: async () => {
-      const { config, transcript } = get();
-      if (!config || !transcript) return;
+      const { config, transcript, episodeId } = get();
+      if (!config || !transcript || !episodeId) return;
       set({ saving: true });
       try {
         const res = await fetch("/api/episode", {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...episodeHeaders(episodeId),
+          },
           body: JSON.stringify({ config, transcript }),
         });
         const data = (await res.json()) as {

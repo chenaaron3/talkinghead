@@ -1,7 +1,10 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
+import YAML from "yaml";
 import { buildProps } from "../../src/lib/build-props";
+import { runSchedule } from "../../cli/schedule/run";
 import {
   findSourceVideo,
   loadEpisodeConfig,
@@ -19,8 +22,49 @@ import {
 import { renderEpisode } from "../../cli/render-episode";
 import type { EpisodeConfig, Transcript } from "../../cli/helpers/types";
 import type { SerializedWaveform } from "../../src/lib/waveform";
-import YAML from "yaml";
-import { spawnSync } from "node:child_process";
+import { getEpisodeScheduleInfo, listEditorEpisodes } from "./episodes";
+
+function sendNdjson(
+  res: import("http").ServerResponse,
+  writeEvent: (data: unknown) => void,
+) {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no");
+  if (typeof (res as { flushHeaders?: () => void }).flushHeaders === "function") {
+    (res as { flushHeaders: () => void }).flushHeaders();
+  }
+  return writeEvent;
+}
+
+async function withConsoleLogs(
+  onLine: (line: string) => void,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const emit = (args: unknown[]) => {
+    const line = args
+      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .join(" ");
+    if (line.trim()) onLine(line);
+  };
+  const prevLog = console.log;
+  const prevError = console.error;
+  console.log = (...args: unknown[]) => {
+    emit(args);
+    prevLog(...args);
+  };
+  console.error = (...args: unknown[]) => {
+    emit(args);
+    prevError(...args);
+  };
+  try {
+    await fn();
+  } finally {
+    console.log = prevLog;
+    console.error = prevError;
+  }
+}
 
 function ensureDir(dir: string) {
   fs.mkdirSync(dir, { recursive: true });
@@ -189,7 +233,35 @@ function ensureBRollAssets(bRolls: EpisodeConfig["bRolls"]) {
   }
 }
 
-export function editorApiPlugin(episodeId: string): Plugin {
+function episodeIdFromRequest(
+  req: import("http").IncomingMessage,
+  url: URL,
+  defaultEpisodeId: string | null,
+): string | null {
+  const header = req.headers["x-episode-id"];
+  if (typeof header === "string" && header.trim()) {
+    return header.trim();
+  }
+  const query = url.searchParams.get("episodeId");
+  if (query?.trim()) {
+    return query.trim();
+  }
+  return defaultEpisodeId;
+}
+
+function requireEpisodeId(
+  req: import("http").IncomingMessage,
+  url: URL,
+  defaultEpisodeId: string | null,
+): string {
+  const episodeId = episodeIdFromRequest(req, url, defaultEpisodeId);
+  if (!episodeId) {
+    throw new Error("No episode selected");
+  }
+  return episodeId;
+}
+
+export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
   return {
     name: "talking-head-editor-api",
     configureServer(server) {
@@ -198,19 +270,31 @@ export function editorApiPlugin(episodeId: string): Plugin {
         const { pathname } = url;
 
         try {
+          if (req.method === "GET" && pathname === "/api/bootstrap") {
+            return sendJson(res, 200, { defaultEpisodeId });
+          }
+
+          if (req.method === "GET" && pathname === "/api/episodes") {
+            return sendJson(res, 200, { episodes: listEditorEpisodes() });
+          }
+
           if (req.method === "GET" && pathname === "/api/episode") {
+            const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
             const { config, transcript, props, waveform } =
               loadEpisodeData(episodeId);
+            const schedule = getEpisodeScheduleInfo(episodeId);
             return sendJson(res, 200, {
               episodeId,
               config,
               transcript,
               props,
               waveform,
+              schedule,
             });
           }
 
           if (req.method === "GET" && pathname === "/api/assets") {
+            const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
             const assets = listEpisodeImages(episodeId).map((a) => {
               linkIntoPublic(a.sourcePath, a.publicSrc);
               return {
@@ -225,6 +309,7 @@ export function editorApiPlugin(episodeId: string): Plugin {
           }
 
           if (req.method === "PUT" && pathname === "/api/episode") {
+            const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
             const raw = await readBody(req);
             const body = JSON.parse(raw) as {
               config: EpisodeConfig;
@@ -270,6 +355,7 @@ export function editorApiPlugin(episodeId: string): Plugin {
           }
 
           if (req.method === "POST" && pathname === "/api/ensure-broll") {
+            requireEpisodeId(req, url, defaultEpisodeId);
             const raw = await readBody(req);
             const body = JSON.parse(raw) as { key: string };
             const absSource = path.join(SOURCE_DIR, body.key);
@@ -284,6 +370,7 @@ export function editorApiPlugin(episodeId: string): Plugin {
           }
 
           if (req.method === "POST" && pathname === "/api/export") {
+            const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
             const episodeDir = path.join(SOURCE_DIR, episodeId);
             const raw = await readBody(req);
             if (raw.trim()) {
@@ -348,6 +435,7 @@ export function editorApiPlugin(episodeId: string): Plugin {
           }
 
           if (req.method === "GET" && pathname === "/api/export/download") {
+            const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
             const videoPath = path.join(ROOT, "out", episodeId, "video.mp4");
             if (!fs.existsSync(videoPath)) {
               return sendJson(res, 404, { error: "No exported video yet" });
@@ -364,6 +452,31 @@ export function editorApiPlugin(episodeId: string): Plugin {
             return;
           }
 
+          if (req.method === "POST" && pathname === "/api/schedule") {
+            const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
+            const episodeDir = path.join(SOURCE_DIR, episodeId);
+            if (!fs.existsSync(episodeDir)) {
+              return sendJson(res, 404, { error: `Episode not found: ${episodeId}` });
+            }
+
+            const writeEvent = sendNdjson(res, (data) => {
+              res.write(`${JSON.stringify(data)}\n`);
+            });
+
+            try {
+              await withConsoleLogs(
+                (line) => writeEvent({ type: "log", line }),
+                () => runSchedule([`source/${episodeId}`]),
+              );
+              writeEvent({ type: "done" });
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              writeEvent({ type: "error", error: message });
+            }
+            res.end();
+            return;
+          }
+
           next();
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
@@ -374,12 +487,10 @@ export function editorApiPlugin(episodeId: string): Plugin {
   };
 }
 
-export function resolveEpisodeId(argv: string[]): string {
+export function resolveEpisodeId(argv: string[]): string | null {
   const positional = argv.filter((a) => !a.startsWith("-"));
   if (positional.length === 0) {
-    throw new Error(
-      "Usage: pnpm editor -- <episodeId>\nExample: pnpm editor -- day4",
-    );
+    return null;
   }
   const episodeId = positional[0]!;
   const transcriptPath = path.join(

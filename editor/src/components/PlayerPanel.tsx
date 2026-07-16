@@ -4,7 +4,6 @@ import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from "@src/lib/constants";
 import { TalkingHead } from "@src/TalkingHead";
 import { setPlayer } from "../lib/player-bridge";
 import { isTimelineScrubbing, useEditor } from "../store";
-import { ExportButton } from "./ExportButton";
 
 export function PlayerPanel() {
   const props = useEditor((s) => s.props);
@@ -71,9 +70,6 @@ export function PlayerPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#0b0c10]">
-      <div className="shrink-0 border-b border-border p-2">
-        <ExportButton />
-      </div>
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
         <div
           className="w-full max-h-full"

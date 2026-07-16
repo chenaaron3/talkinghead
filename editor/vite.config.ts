@@ -5,15 +5,12 @@ import tailwindcss from "@tailwindcss/vite";
 import { editorApiPlugin } from "./server/api-plugin";
 
 const ROOT = path.resolve(__dirname, "..");
-const episodeId = process.env.EDITOR_EPISODE;
-if (!episodeId) {
-  throw new Error("EDITOR_EPISODE env var is required");
-}
+const defaultEpisodeId = process.env.EDITOR_EPISODE ?? null;
 
 export default defineConfig({
   root: path.resolve(__dirname),
   publicDir: path.join(ROOT, "public"),
-  plugins: [react(), tailwindcss(), editorApiPlugin(episodeId)],
+  plugins: [react(), tailwindcss(), editorApiPlugin(defaultEpisodeId)],
   resolve: {
     alias: {
       "@src": path.join(ROOT, "src"),

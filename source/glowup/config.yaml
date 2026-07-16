@@ -17,14 +17,47 @@ listicleOverlay:
     - label: Improve your style
       reveal: 27.62
 punchInSegments:
-  - start: 29.625
-    end: 32.601
+  - start: 2.955
+    end: 3.236
     scale: 1.12
-  - start: 35.7
-    end: 36.183
+  - start: 5.011
+    end: 5.5
     scale: 1.12
-  - start: 38.458
-    end: 38.76
+  - start: 9.802
+    end: 10.023
     scale: 1.12
-bRolls: []
+bRolls:
+  - id: broll-mrn6gfo4-uht8d
+    src: b-roll/glowup/Perm_Before.jpg
+    start: 6.281
+    end: 7.6
+  - id: broll-mrn6gog0-pjdvs
+    src: b-roll/glowup/Perm_After.jpg
+    start: 7.76
+    end: 8.459
+  - id: broll-mrn6gwp3-8vjr3
+    src: b-roll/glowup/Perm_After_Joke.jpg
+    start: 10.687
+    end: 11.873
+  - id: broll-mrn6h7xv-d2ttu
+    src: b-roll/glowup/Gym_Before.jpg
+    start: 16.725
+    end: 18.68
+  - id: broll-mrn6hi9x-ai0fs
+    src: b-roll/glowup/Gym_After.png
+    start: 21.246
+    end: 22.44
+  - id: broll-mrn6hq3g-067ca
+    src: b-roll/glowup/Glasses_Before.JPG
+    start: 24.453
+    end: 25.24
+  - id: broll-mrn6iiam-7ftvp
+    src: b-roll/glowup/Perm_Before.jpg
+    start: 29.625
+    end: 31.96
+  - id: broll-mrn6in2l-2uok4
+    src: b-roll/glowup/Fashion_After.jpg
+    start: 32.923
+    end: 34.84
+sfx: []
 

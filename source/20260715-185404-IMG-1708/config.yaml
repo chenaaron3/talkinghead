@@ -2,8 +2,8 @@ title: Beating The Three Second Rule
 cuts:
   - start: 0
     end: 0.7050000000000001
-  - start: 18.153
-    end: 18.217
+  - start: 17.372
+    end: 19.38
 punchInSegments:
   - start: 2.431
     end: 3.736
@@ -14,4 +14,12 @@ punchInSegments:
   - start: 15.886
     end: 16.77
     scale: 1.06
+listicleOverlay: null
+bRolls: []
+sfx:
+  - id: sfx-mrn62nlz-v7gv7
+    src: sfx/bruh.mp3
+    start: 13.172
+    end: 13.720571000000001
+    srcDurationSec: 0.548571
 

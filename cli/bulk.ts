@@ -1,18 +1,10 @@
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
-import { BULK_DIR, SOURCE_DIR, VIDEO_EXTENSIONS } from "./helpers/types";
+import { claimVideoIntoEpisode } from "./helpers/episode-id";
+import { BULK_DIR, VIDEO_EXTENSIONS } from "./helpers/types";
 import { runProcess } from "./process";
 import { runSchedule } from "./schedule/run";
-
-/** Local wall-clock stamp: YYYYMMDD-HHMMSS */
-function formatEpisodeTimestamp(date: Date): string {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-    .toISOString()
-    .replace(/[-:]/g, "")
-    .replace("T", "-")
-    .slice(0, 15);
-}
 
 function listBulkVideos(): string[] {
   if (!fs.existsSync(BULK_DIR)) {
@@ -24,24 +16,6 @@ function listBulkVideos(): string[] {
     .map((entry) => entry.name)
     .filter((name) => VIDEO_EXTENSIONS.has(path.extname(name)))
     .sort((a, b) => a.localeCompare(b));
-}
-
-function claimBulkVideo(filename: string): {
-  episodeId: string;
-  episodeDir: string;
-} {
-  const basename = path
-    .basename(filename, path.extname(filename))
-    .replace(/[^a-zA-Z0-9-]/g, "-");
-  const episodeId = `${formatEpisodeTimestamp(new Date())}-${basename}`;
-  const episodeDir = path.join(SOURCE_DIR, episodeId);
-
-  fs.mkdirSync(episodeDir, { recursive: true });
-  const from = path.join(BULK_DIR, filename);
-  const to = path.join(episodeDir, filename);
-  fs.renameSync(from, to);
-  console.log(`[bulk] moved ${filename} → source/${episodeId}/`);
-  return { episodeId, episodeDir };
 }
 
 function parseArgs(argv: string[]) {
@@ -70,7 +44,8 @@ async function main() {
     let episodeId: string | undefined;
     try {
       console.log(`\n[bulk] ── ${filename} ──`);
-      ({ episodeId } = claimBulkVideo(filename));
+      ({ episodeId } = claimVideoIntoEpisode(path.join(BULK_DIR, filename)));
+      console.log(`[bulk] moved ${filename} → source/${episodeId}/`);
 
       await runProcess([path.join("source", episodeId)]);
       if (!skipSchedule) {

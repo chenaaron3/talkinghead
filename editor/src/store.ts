@@ -16,7 +16,7 @@ import { captionIndexAt, flattenCaptions, updateCaption } from './lib/captions';
 import { captionActionRange } from './lib/caption-selection';
 import { applySelection, primaryId } from './lib/selection';
 import { useSelection } from './selection-store';
-import { cutForCaption } from './lib/cuts';
+import { cutForCaption, cutForPause } from './lib/cuts';
 import { sourceSecToOutputFrame, outputFrameToSourceSec } from './lib/frames';
 import { punchInForCaption } from './lib/punchin';
 import { MIN_LISTICLE_SEC, MIN_RANGE_SEC } from './lib/range';
@@ -46,6 +46,8 @@ export type SfxAsset = {
   src: string;
   durationSec: number;
 };
+
+export type EditorMode = "default" | "scissor";
 
 type EpisodeSnapshot = {
   config: EpisodeConfig;
@@ -77,11 +79,13 @@ type EditorState = {
   waveformMax: number;
   scheduledLabel: string | null;
   fullyScheduled: boolean;
+  mode: EditorMode;
 };
 
 type EditorActions = {
   load: (episodeId?: string | null) => Promise<void>;
   switchEpisode: (episodeId: string) => Promise<void>;
+  refreshAssets: () => Promise<void>;
   refreshSchedule: () => Promise<void>;
   save: () => Promise<void>;
   seekSource: (sourceSec: number) => void;
@@ -104,6 +108,13 @@ type EditorActions = {
   placeSfxOnCaption: (asset: SfxAsset, caption: FlatCaption) => void;
   addPunchInOnCaption: (caption: FlatCaption) => void;
   cutCaption: (caption: FlatCaption) => void;
+  setMode: (mode: EditorMode) => void;
+  toggleMode: () => void;
+  setCaptionsAtATime: (n: number) => void;
+  cutInterWordPause: (pause: {
+    cutStart: number;
+    cutEnd: number;
+  }) => void;
   updateBRollRange: (
     id: string,
     start: number,
@@ -296,6 +307,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     waveformMax: 0,
     scheduledLabel: null,
     fullyScheduled: false,
+    mode: "default",
 
     load: async (requestedEpisodeId?: string | null) => {
       set({ loadState: "loading", error: null });
@@ -387,6 +399,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           waveformMax: 0,
           scheduledLabel: ep.schedule?.scheduledLabel ?? null,
           fullyScheduled: ep.schedule?.fullyScheduled ?? false,
+          mode: "default",
           error: null,
         });
         setEpisodeUrl(ep.episodeId ?? ep.props.episodeId);
@@ -416,6 +429,28 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         if (!discard) return;
       }
       await get().load(episodeId);
+    },
+
+    refreshAssets: async () => {
+      const { episodeId } = get();
+      if (!episodeId) return;
+      try {
+        const res = await fetch("/api/assets", {
+          headers: episodeHeaders(episodeId),
+        });
+        const data = (await res.json()) as {
+          assets?: Asset[];
+          sfx?: SfxAsset[];
+          error?: string;
+        };
+        if (!res.ok) throw new Error(data.error ?? "Failed to refresh assets");
+        set({
+          assets: data.assets ?? [],
+          sfxAssets: data.sfx ?? [],
+        });
+      } catch (err) {
+        set({ error: err instanceof Error ? err.message : String(err) });
+      }
     },
 
     refreshSchedule: async () => {
@@ -759,6 +794,45 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const cuts = cutForCaption(config.cuts, range, transcript.captions);
       const gap = cutsToGaps(cuts).find(
         (g) => range.start >= g.start && range.start < g.end,
+      );
+      commit({ config: { ...config, cuts }, transcript });
+      const { selectGap, clearSelection } = useSelection.getState();
+      if (gap?.id != null) selectGap(gap.id);
+      else clearSelection();
+    },
+
+    setMode: (mode) => {
+      set({ mode });
+    },
+
+    toggleMode: () => {
+      set((state) => ({
+        mode: state.mode === "scissor" ? "default" : "scissor",
+      }));
+    },
+
+    setCaptionsAtATime: (n) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const captionsAtATime = Math.min(5, Math.max(1, Math.round(n)));
+      if (captionsAtATime === config.captionsAtATime) return;
+      commit({
+        config: { ...config, captionsAtATime },
+        transcript,
+      });
+    },
+
+    cutInterWordPause: (pause) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const cuts = cutForPause(config.cuts, {
+        start: pause.cutStart,
+        end: pause.cutEnd,
+      });
+      const gap = cutsToGaps(cuts).find(
+        (g) =>
+          pause.cutStart >= g.start - 0.001 &&
+          pause.cutStart < g.end + 0.001,
       );
       commit({ config: { ...config, cuts }, transcript });
       const { selectGap, clearSelection } = useSelection.getState();

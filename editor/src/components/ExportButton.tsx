@@ -11,7 +11,12 @@ type ExportEvent =
       progress: number;
       overall: number;
     }
-  | { type: "done"; downloadUrl: string; filename: string }
+  | {
+      type: "done";
+      downloadUrl: string;
+      filename: string;
+      skipped?: boolean;
+    }
   | { type: "error"; error: string };
 
 type ScheduleEvent =
@@ -94,14 +99,6 @@ export function ExportButton({ compact = false }: { compact?: boolean }) {
   };
 
   const onExportAndSchedule = async () => {
-    if (
-      !window.confirm(
-        `Export "${episodeId}" and schedule it on all configured platforms? This renders the video, then opens browser automation.`,
-      )
-    ) {
-      return;
-    }
-
     setExporting(true);
     setError(null);
     setProgress(0);

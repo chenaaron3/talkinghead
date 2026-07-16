@@ -5,10 +5,13 @@ export const WHISPER_MODEL = "large-v3-turbo" as const;
 /** Whisper language code */
 export const WHISPER_LANGUAGE = "en" as const;
 
-/** Silence longer than this (seconds) is cut */
-export const GAP_THRESHOLD_SEC = 0.5;
-/** Extra audio kept around filler cuts so consonants aren't clipped */
-export const FILLER_PADDING_SEC = 0.5;
+export {
+  FILLER_PADDING_SEC,
+  PROCESS_GAP_THRESHOLD_SEC,
+  SCISSOR_GAP_THRESHOLD_SEC,
+  SCISSOR_MARGIN_SEC,
+  WORD_MARGIN_SEC,
+} from "../../src/lib/editing-constants";
 /** Title/caption fade in/out duration (seconds) */
 export const FADE_DURATION_SEC = 0.15;
 

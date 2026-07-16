@@ -1,12 +1,24 @@
 import { useRef, useState } from "react";
 
+import { episodeHeaders } from "../lib/api";
 import { useEditor, type Asset, type SfxAsset } from "../store";
+import { Dropzone } from "./ui/dropzone";
 
 type Tab = "broll" | "sfx";
 
-function BRollGrid({ assets }: { assets: Asset[] }) {
+function BRollGrid({
+  assets,
+  dropError,
+  importing,
+  isDragActive,
+}: {
+  assets: Asset[];
+  dropError: string | null;
+  importing: boolean;
+  isDragActive: boolean;
+}) {
   return (
-    <div className="grid grid-cols-2 gap-2 p-2.5">
+    <div className="grid min-h-full grid-cols-2 content-start gap-2 p-2.5">
       {assets.map((asset) => (
         <div
           key={asset.key}
@@ -31,9 +43,20 @@ function BRollGrid({ assets }: { assets: Asset[] }) {
           </span>
         </div>
       ))}
-      {assets.length === 0 ? (
+      {assets.length === 0 && !importing ? (
         <p className="col-span-2 text-xs text-muted">
-          Drop images into this episode folder to use as b-roll.
+          Drop images here to use as b-roll.
+        </p>
+      ) : null}
+      {importing ? (
+        <p className="col-span-2 text-xs text-muted">Importing images…</p>
+      ) : null}
+      {dropError ? (
+        <p className="col-span-2 text-xs text-red-400">{dropError}</p>
+      ) : null}
+      {isDragActive ? (
+        <p className="col-span-2 text-center text-xs font-medium text-accent">
+          Drop images to add
         </p>
       ) : null}
     </div>
@@ -120,7 +143,42 @@ function SfxGrid({ assets }: { assets: SfxAsset[] }) {
 export function AssetsPanel() {
   const assets = useEditor((s) => s.assets);
   const sfxAssets = useEditor((s) => s.sfxAssets);
+  const episodeId = useEditor((s) => s.episodeId);
+  const refreshAssets = useEditor((s) => s.refreshAssets);
   const [tab, setTab] = useState<Tab>("broll");
+  const [dropError, setDropError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  const importImages = async (files: File[]) => {
+    if (!episodeId) {
+      setDropError("Select an episode before adding b-roll.");
+      return;
+    }
+    setImporting(true);
+    setDropError(null);
+    try {
+      for (const file of files) {
+        const res = await fetch("/api/import-broll", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-Filename": encodeURIComponent(file.name),
+            ...episodeHeaders(episodeId),
+          },
+          body: file,
+        });
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) {
+          throw new Error(data.error ?? `Failed to import ${file.name}`);
+        }
+      }
+      await refreshAssets();
+    } catch (err) {
+      setDropError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImporting(false);
+    }
+  };
 
   return (
     <div className="flex min-h-0 flex-col overflow-hidden border-r border-border bg-panel">
@@ -145,13 +203,40 @@ export function AssetsPanel() {
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
-        {tab === "broll" ? (
-          <BRollGrid assets={assets} />
-        ) : (
+      {tab === "broll" ? (
+        <Dropzone
+          className="min-h-0 flex-1 overflow-auto"
+          multiple
+          noClick
+          noKeyboard
+          accept={{
+            "image/jpeg": [".jpg", ".jpeg"],
+            "image/png": [".png"],
+            "image/webp": [".webp"],
+            "image/gif": [".gif"],
+          }}
+          onDrop={(accepted) => {
+            if (accepted.length === 0) return;
+            void importImages(accepted);
+          }}
+          onDropRejected={() => {
+            setDropError("Drop image files (.jpg / .png / .webp / .gif).");
+          }}
+        >
+          {(dz) => (
+            <BRollGrid
+              assets={assets}
+              dropError={dropError}
+              importing={importing}
+              isDragActive={dz.isDragActive}
+            />
+          )}
+        </Dropzone>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto">
           <SfxGrid assets={sfxAssets} />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { isFiller } from "../../src/lib/caption-words";
 import { normalizeCuts } from "../../src/lib/source-timeline";
-import { FILLER_PADDING_SEC, GAP_THRESHOLD_SEC } from "./constants";
+import { FILLER_PADDING_SEC, PROCESS_GAP_THRESHOLD_SEC, WORD_MARGIN_SEC } from "@src/lib/editing-constants";
 import type { SourceCut, TranscriptCaption } from "./types";
 
 export { isFiller } from "../../src/lib/caption-words";
@@ -13,7 +13,7 @@ export function buildNumberedTranscript(captions: TranscriptCaption[]): string {
 /**
  * Auto-detect cuts from transcript captions:
  * - drop filler words (with small padding so consonants aren't clipped)
- * - collapse gaps longer than GAP_THRESHOLD_SEC between speech
+ * - collapse gaps longer than PROCESS_GAP_THRESHOLD_SEC between speech (WORD_MARGIN_SEC at boundaries)
  */
 export function buildCutsFromWords(options: {
   captions: TranscriptCaption[];
@@ -68,7 +68,7 @@ export function buildCutsFromWords(options: {
     );
 
     if (inRegion.length === 0) {
-      if (region.end - region.start <= GAP_THRESHOLD_SEC) {
+      if (region.end - region.start <= PROCESS_GAP_THRESHOLD_SEC) {
         speechKeep.push(region);
       }
       continue;
@@ -76,14 +76,14 @@ export function buildCutsFromWords(options: {
 
     const first = inRegion[0]!;
     let segStart = Math.max(region.start, first.start);
-    segStart = Math.max(region.start, segStart - FILLER_PADDING_SEC);
+    segStart = Math.max(region.start, segStart - WORD_MARGIN_SEC);
 
     for (let i = 0; i < inRegion.length; i++) {
       const word = inRegion[i]!;
       const next = inRegion[i + 1];
 
       if (!next) {
-        const segEnd = Math.min(region.end, word.end + FILLER_PADDING_SEC);
+        const segEnd = Math.min(region.end, word.end + WORD_MARGIN_SEC);
         if (segEnd > segStart) {
           speechKeep.push({ start: segStart, end: segEnd });
         }
@@ -91,12 +91,12 @@ export function buildCutsFromWords(options: {
       }
 
       const gap = next.start - word.end;
-      if (gap > GAP_THRESHOLD_SEC) {
-        const segEnd = Math.min(region.end, word.end + FILLER_PADDING_SEC);
+      if (gap > PROCESS_GAP_THRESHOLD_SEC) {
+        const segEnd = Math.min(region.end, word.end + WORD_MARGIN_SEC);
         if (segEnd > segStart) {
           speechKeep.push({ start: segStart, end: segEnd });
         }
-        segStart = Math.max(region.start, next.start - FILLER_PADDING_SEC);
+        segStart = Math.max(region.start, next.start - WORD_MARGIN_SEC);
       }
     }
   }

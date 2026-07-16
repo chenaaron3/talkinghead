@@ -24,6 +24,7 @@
     "radix-ui": "^1.6.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-dropzone": "^17.0.0",
     "remotion": "4.0.487",
     "tailwind-merge": "^3.6.0",
     "yaml": "^2.8.0",

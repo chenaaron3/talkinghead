@@ -4,6 +4,14 @@ import {
 } from "@src/lib/source-timeline";
 import type { SourceCut, TranscriptCaption } from "@src/lib/types";
 
+export function cutForPause(
+  cuts: SourceCut[],
+  range: { start: number; end: number },
+): SourceCut[] {
+  if (range.end <= range.start) return cuts;
+  return normalizeCuts([...cuts, { start: range.start, end: range.end }]);
+}
+
 export function cutForCaption(
   cuts: SourceCut[],
   range: { start: number; end: number },

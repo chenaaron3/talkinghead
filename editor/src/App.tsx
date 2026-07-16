@@ -32,11 +32,20 @@ function useGlobalShortcuts() {
         else editor.undo();
       } else if (e.key === "Escape") {
         selection.clearSelection();
+        editor.setMode("default");
       } else if (e.key === "Delete" || e.key === "Backspace") {
         if (isTypingTarget(e.target)) return;
         if (editor.deleteSelection()) e.preventDefault();
       } else if (isTypingTarget(e.target)) {
         return;
+      } else if (
+        !meta &&
+        !e.altKey &&
+        e.key.toLowerCase() === "c" &&
+        editor.loadState === "ready"
+      ) {
+        e.preventDefault();
+        editor.toggleMode();
       } else if (e.key === " " || e.code === "Space") {
         e.preventDefault();
         togglePlayback();

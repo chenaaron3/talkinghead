@@ -6,8 +6,11 @@ import { buildWordAnnotations } from "../../lib/word-annotations";
 import { useCaptionDragSelect } from "../../lib/use-caption-drag-select";
 import { useSelection } from "../../selection-store";
 import { useEditor, useFlatCaptions, useCaptionIndices } from "../../store";
+import { GhostGap } from "./GhostGap";
 import { Gap } from "./Gap";
+import { TranscriptToolbar } from "./TranscriptToolbar";
 import { useRangeResize, markerDraggingFromResize } from "./useRangeResize";
+import { useScissorGhosts } from "./useScissorGhosts";
 import { Word } from "./Word";
 
 export function TranscriptPanel() {
@@ -21,6 +24,7 @@ export function TranscriptPanel() {
     startSfxDrag,
     startListicleDrag,
   } = useRangeResize();
+  const scissors = useScissorGhosts();
 
   const gapMarkers = useMemo(
     () => (config ? sourceGaps(config) : []),
@@ -57,6 +61,11 @@ export function TranscriptPanel() {
       gapIdx += 1;
     }
 
+    const ghost = scissors.beforeCaption(caption.index);
+    if (ghost) {
+      nodes.push(<GhostGap key={ghost.key} pause={ghost} />);
+    }
+
     const annotation = annotations.get(caption.index) ?? {};
 
     nodes.push(
@@ -64,10 +73,13 @@ export function TranscriptPanel() {
         key={caption.index}
         caption={caption}
         annotation={annotation}
+        scissorMode={scissors.active}
         isResizing={!!resize}
         draggingStart={markerDraggingFromResize(resize)}
         captionIndices={captionIndices}
-        onCaptionDragStart={(e) => onDragStart(caption.index, e)}
+        onCaptionDragStart={
+          scissors.active ? undefined : (e) => onDragStart(caption.index, e)
+        }
         onResizeEnter={(shiftKey) => snapToCaption(caption, shiftKey)}
         onStartRangeResize={startRangeResize}
         onStartSfxDrag={startSfxDrag}
@@ -88,15 +100,24 @@ export function TranscriptPanel() {
     gapIdx += 1;
   }
 
+  if (scissors.trailing) {
+    nodes.push(
+      <GhostGap key={scissors.trailing.key} pause={scissors.trailing} />,
+    );
+  }
+
   return (
-    <div
-      className="min-h-0 overflow-auto border-r border-border bg-panel"
-      onClick={() => {
-        if (!resize) clearSelection();
-      }}
-    >
-      <div className="max-w-[52rem] px-6 py-5 text-[18px] leading-[1.85] tracking-wide text-[#e8eaef]">
-        {nodes}
+    <div className="flex min-h-0 flex-col border-r border-border bg-panel">
+      <TranscriptToolbar />
+      <div
+        className="min-h-0 flex-1 overflow-auto"
+        onClick={() => {
+          if (!resize) clearSelection();
+        }}
+      >
+        <div className="max-w-[52rem] px-6 py-5 text-[18px] leading-[1.85] tracking-wide text-[#e8eaef]">
+          {nodes}
+        </div>
       </div>
     </div>
   );

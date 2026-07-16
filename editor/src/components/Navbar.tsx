@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useEditor } from '../store';
-import { EpisodePicker } from './EpisodePicker';
-import { ExportButton } from './ExportButton';
-import { Button } from './ui/button';
+import { useEpisodeImport } from "../lib/use-episode-import";
+import { useEditor } from "../store";
+import { EpisodePicker } from "./EpisodePicker";
+import { ExportButton } from "./ExportButton";
+import { Button } from "./ui/button";
 
 import type { EpisodeListItem } from "../types/episodes";
+
 export function Navbar() {
   const episodeId = useEditor((s) => s.episodeId);
   const title = useEditor((s) => s.title);
@@ -34,6 +36,12 @@ export function Navbar() {
       setEpisodesLoading(false);
     }
   }, []);
+
+  const { importJobs, importVideos } = useEpisodeImport({
+    onEpisodesChanged: () => {
+      void refreshEpisodes();
+    },
+  });
 
   useEffect(() => {
     void refreshEpisodes();
@@ -99,7 +107,6 @@ export function Navbar() {
             {dirty ? "● " : ""}
             {displayTitle}
           </span>
-          <span className="shrink-0 text-xs text-muted">⌘K</span>
         </Button>
 
         <div className="flex items-center gap-2">
@@ -112,8 +119,10 @@ export function Navbar() {
         episodes={episodes}
         currentEpisodeId={episodeId}
         loading={episodesLoading}
+        importJobs={importJobs}
         onClose={() => setPickerOpen(false)}
         onSelect={(id) => void onSelectEpisode(id)}
+        onImportVideos={importVideos}
       />
     </>
   );

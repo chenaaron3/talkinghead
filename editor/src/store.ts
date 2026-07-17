@@ -10,7 +10,12 @@ import {
 
 import { episodeHeaders } from './lib/api';
 
-import { removeBRoll, upsertBRoll } from './lib/broll';
+import {
+  removeBRoll,
+  upsertBRoll,
+  withBRollTransform,
+  type Transform,
+} from './lib/broll';
 import { removeSfx, upsertSfx, applySfxEdge } from './lib/sfx';
 import { captionIndexAt, flattenCaptions, updateCaption } from './lib/captions';
 import { captionActionRange } from './lib/caption-selection';
@@ -111,6 +116,7 @@ type EditorActions = {
   setMode: (mode: EditorMode) => void;
   toggleMode: () => void;
   setCaptionsAtATime: (n: number) => void;
+  setTitle: (title: string) => void;
   cutInterWordPause: (pause: {
     cutStart: number;
     cutEnd: number;
@@ -119,6 +125,11 @@ type EditorActions = {
     id: string,
     start: number,
     end: number,
+    live?: boolean,
+  ) => void;
+  updateBRollTransform: (
+    id: string,
+    patch: Partial<Transform>,
     live?: boolean,
   ) => void;
   updateSfxRange: (
@@ -232,9 +243,12 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     const state = get();
     if (!state.episodeId) return;
 
+    const title =
+      next.config.title?.trim() || state.episodeId;
+
     const props = recomputeProps({
       episodeId: state.episodeId,
-      title: state.title,
+      title,
       videoSrc: state.videoSrc,
       fps: state.fps,
       width: state.width,
@@ -248,6 +262,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     set({
       config: next.config,
       transcript: next.transcript,
+      title,
       props,
       frame: sourceSecToOutputFrame(
         sourceSec,
@@ -265,9 +280,10 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
   const restore = (snap: EpisodeSnapshot) => {
     const state = get();
     if (!state.episodeId) return;
+    const title = snap.config.title?.trim() || state.episodeId;
     const props = recomputeProps({
       episodeId: state.episodeId,
-      title: state.title,
+      title,
       videoSrc: state.videoSrc,
       fps: state.fps,
       width: state.width,
@@ -278,6 +294,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     set({
       config: snap.config,
       transcript: snap.transcript,
+      title,
       props,
       dirty: true,
     });
@@ -822,6 +839,20 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       });
     },
 
+    setTitle: (title) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const next = title.length === 0 ? null : title;
+      if (next === config.title) return;
+      commit(
+        {
+          config: { ...config, title: next },
+          transcript,
+        },
+        true,
+      );
+    },
+
     cutInterWordPause: (pause) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
@@ -851,6 +882,17 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         start,
         end,
       });
+      if ("error" in result) return;
+      commit({ config: { ...config, bRolls: result }, transcript }, live);
+    },
+
+    updateBRollTransform: (id, patch, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = config.bRolls.find((c) => c.id === id);
+      if (!clip) return;
+      const next = withBRollTransform(clip, patch);
+      const result = upsertBRoll(config.bRolls, next);
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript }, live);
     },

@@ -51,4 +51,5 @@ punchInSegments:
     scale: 1.06
 bRolls: []
 sfx: []
+captionsAtATime: 1
 

@@ -6,6 +6,7 @@ import { buildWordAnnotations } from "../../lib/word-annotations";
 import { useCaptionDragSelect } from "../../lib/use-caption-drag-select";
 import { useSelection } from "../../selection-store";
 import { useEditor, useFlatCaptions, useCaptionIndices } from "../../store";
+import { InspectorPanel } from "../inspector/InspectorPanel";
 import { GhostGap } from "./GhostGap";
 import { Gap } from "./Gap";
 import { TranscriptToolbar } from "./TranscriptToolbar";
@@ -107,7 +108,7 @@ export function TranscriptPanel() {
   }
 
   return (
-    <div className="flex min-h-0 flex-col border-r border-border bg-panel">
+    <div className="relative flex min-h-0 flex-col border-r border-border bg-panel">
       <TranscriptToolbar />
       <div
         className="min-h-0 flex-1 overflow-auto"
@@ -119,6 +120,7 @@ export function TranscriptPanel() {
           {nodes}
         </div>
       </div>
+      <InspectorPanel />
     </div>
   );
 }

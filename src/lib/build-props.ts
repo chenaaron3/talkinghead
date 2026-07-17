@@ -205,6 +205,10 @@ function buildBRolls(
       src: clip.src,
       startFrame: frames.startFrame,
       endFrame: frames.endFrame,
+      scale: clip.scale ?? 1,
+      offsetX: clip.offsetX ?? 0,
+      offsetY: clip.offsetY ?? 0,
+      rotation: clip.rotation ?? 0,
     });
   }
   return result.sort((a, b) => a.startFrame - b.startFrame);

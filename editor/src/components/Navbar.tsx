@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Menu } from "lucide-react";
 
 import { useEpisodeImport } from "../lib/use-episode-import";
 import { useEditor } from "../store";
@@ -10,7 +11,6 @@ import type { EpisodeListItem } from "../types/episodes";
 
 export function Navbar() {
   const episodeId = useEditor((s) => s.episodeId);
-  const title = useEditor((s) => s.title);
   const dirty = useEditor((s) => s.dirty);
   const loadState = useEditor((s) => s.loadState);
   const switchEpisode = useEditor((s) => s.switchEpisode);
@@ -86,13 +86,6 @@ export function Navbar() {
     void refreshEpisodes();
   };
 
-  const displayTitle =
-    loadState === "ready" && title
-      ? title
-      : episodeId
-        ? episodeId
-        : "Select episode…";
-
   return (
     <>
       <header className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-border bg-[#0f1117] px-3">
@@ -100,13 +93,18 @@ export function Navbar() {
           type="button"
           variant="ghost"
           size="sm"
-          className="max-w-[min(420px,45vw)] justify-start gap-2 px-2 font-medium"
+          className="relative h-8 w-8 px-0"
+          aria-label="Switch episode"
+          title="Switch episode (⌘K)"
           onClick={openPicker}
         >
-          <span className="truncate">
-            {dirty ? "● " : ""}
-            {displayTitle}
-          </span>
+          <Menu className="size-4" />
+          {dirty ? (
+            <span
+              className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-accent"
+              aria-hidden
+            />
+          ) : null}
         </Button>
 
         <div className="flex items-center gap-2">

@@ -1,10 +1,14 @@
-import { useCallback, useLayoutEffect, useRef } from "react";
-import { Player, type PlayerRef } from "@remotion/player";
-import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from "@src/lib/constants";
-import { TalkingHead } from "@src/TalkingHead";
-import { setPlayer } from "../lib/player-bridge";
-import { isTimelineScrubbing, useEditor } from "../store";
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
+import { Player } from '@remotion/player';
+import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from '@src/lib/constants';
+import { TalkingHead } from '@src/TalkingHead';
+
+import { setPlayer } from '../lib/player-bridge';
+import { isTimelineScrubbing, useEditor } from '../store';
+import { BRollTransformOverlay } from './player/BRollTransformOverlay';
+
+import type { PlayerRef } from '@remotion/player';
 export function PlayerPanel() {
   const props = useEditor((s) => s.props);
   const frame = useEditor((s) => s.frame);
@@ -14,6 +18,7 @@ export function PlayerPanel() {
   const ref = useRef<PlayerRef | null>(null);
   /** While set, ignore player→store frame sync until player catches up. */
   const seekTargetRef = useRef<number | null>(null);
+  const [transformDragging, setTransformDragging] = useState(false);
 
   const setPlayerRef = useCallback((instance: PlayerRef | null) => {
     ref.current = instance;
@@ -72,7 +77,7 @@ export function PlayerPanel() {
     <div className="flex h-full min-h-0 flex-col bg-[#0b0c10]">
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
         <div
-          className="w-full max-h-full"
+          className="relative h-full max-h-full w-auto max-w-full"
           style={{
             aspectRatio: `${COMPOSITION_WIDTH} / ${COMPOSITION_HEIGHT}`,
           }}
@@ -86,11 +91,12 @@ export function PlayerPanel() {
             compositionHeight={COMPOSITION_HEIGHT}
             fps={props.fps}
             style={{ width: "100%", height: "100%" }}
-            controls
-            clickToPlay
+            controls={!transformDragging}
+            clickToPlay={!transformDragging}
             spaceKeyToPlayOrPause={false}
             acknowledgeRemotionLicense
           />
+          <BRollTransformOverlay onDraggingChange={setTransformDragging} />
         </div>
       </div>
       <div className="shrink-0 border-t border-border px-2 py-1 text-center text-xs text-muted">

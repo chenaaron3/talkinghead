@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Minus, Plus, Scissors } from "lucide-react";
 
 import { useEditor } from "../../store";
@@ -14,7 +15,21 @@ export function TranscriptToolbar() {
   const toggleMode = useEditor((s) => s.toggleMode);
   const captionsAtATime = useEditor((s) => s.config?.captionsAtATime ?? 1);
   const setCaptionsAtATime = useEditor((s) => s.setCaptionsAtATime);
+  const title = useEditor((s) => s.title);
+  const configTitle = useEditor((s) => s.config?.title ?? "");
+  const setTitle = useEditor((s) => s.setTitle);
   const scissorMode = mode === "scissor";
+
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+  }, [editing]);
 
   const tooltip = scissorMode
     ? "Click pauses to cut · Click words to delete · Esc to exit"
@@ -27,12 +42,41 @@ export function TranscriptToolbar() {
         scissorMode ? "bg-[#1a1d28]" : "bg-panel",
       ].join(" ")}
     >
-      <span className="text-xs font-medium uppercase tracking-wide text-muted">
-        Transcript
-      </span>
+      <div className="min-w-0 flex-1">
+        {editing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={configTitle}
+            aria-label="Episode title"
+            className="h-7 w-full min-w-0 rounded-md border border-accent bg-panel-2 px-2 text-sm font-medium text-[#e8eaef] outline-none"
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => setEditing(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                (e.target as HTMLInputElement).blur();
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="h-7 max-w-full truncate rounded-md px-1 text-left text-sm font-medium text-[#e8eaef] hover:bg-panel-2"
+            title="Click to edit title"
+            onClick={() => setEditing(true)}
+          >
+            {title || "Untitled"}
+          </button>
+        )}
+      </div>
 
       <TooltipProvider>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex h-7 items-center overflow-hidden rounded-md border border-border bg-panel-2">

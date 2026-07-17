@@ -1,0 +1,19 @@
+title: Editing Automation
+cuts:
+  - start: 0
+    end: 0.554
+  - start: 4.69
+    end: 4.866667
+punchInSegments:
+  - start: 2.692
+    end: 3.616
+    scale: 1.12
+captionsAtATime: 5
+listicleOverlay: null
+bRolls:
+  - id: broll-mrp2pqj4-070yw
+    src: b-roll/20260717-165156-IMG-1877/brand.jpeg
+    start: 2.109
+    end: 2.451
+sfx: []
+

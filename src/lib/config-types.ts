@@ -21,13 +21,29 @@ export type SourcePunchIn = {
   scale: number;
 };
 
+/**
+ * Layout transform shared by overlays (b-roll, captions, text, etc.).
+ * Stored fields are optional (omit identity in config.yaml); resolved
+ * values always have defaults applied.
+ */
+export type Transform = {
+  /** Uniform scale relative to contain-fit / natural size. Default 1. */
+  scale: number;
+  /** Offset as fraction of composition size, center-origin. Default 0. */
+  offsetX: number;
+  offsetY: number;
+  /** Rotation in degrees. Default 0. */
+  rotation: number;
+};
+
 export type SourceBRoll = {
   id: string;
   /** Path under public/, e.g. `b-roll/glowup/Perm_Before.jpg` */
   src: string;
   start: number;
   end: number;
-};
+} & Partial<Transform>;
+
 
 export type SourceSfx = {
   id: string;

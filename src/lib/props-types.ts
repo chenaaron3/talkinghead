@@ -1,4 +1,5 @@
 import type { CaptionEmphasis } from "./transcript-types";
+import type { Transform } from "./config-types";
 
 export type OutputSection = {
   trimBefore: number;
@@ -42,7 +43,8 @@ export type BRollClip = {
   src: string;
   startFrame: number;
   endFrame: number;
-};
+} & Partial<Transform>;
+
 
 export type SfxClip = {
   id: string;

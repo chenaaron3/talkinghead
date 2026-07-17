@@ -1,0 +1,84 @@
+title: Easy Editing Tool
+cuts:
+  - start: 0
+    end: 0.553
+  - start: 4.729
+    end: 5.555
+  - start: 9.469
+    end: 11.94
+  - start: 15.161
+    end: 16.603
+  - start: 25.169
+    end: 25.996
+  - start: 35.302
+    end: 35.564
+  - start: 37.026
+    end: 39.111
+  - start: 42.177
+    end: 42.228
+  - start: 43.788
+    end: 44.485
+  - start: 47.54
+    end: 47.716
+listicleOverlay:
+  start: 19.563
+  end: 40.064
+  items:
+    - label: Add b-roll
+      reveal: 20.006
+    - label: Add emphasis
+      reveal: 26.769
+    - label: Zoom into video
+      reveal: 31.445
+punchInSegments:
+  - start: 3.636
+    end: 4.436
+    scale: 1.12
+  - start: 12.19
+    end: 13.434
+    scale: 1.06
+  - start: 14.217
+    end: 15
+    scale: 1.12
+  - start: 18.336
+    end: 19.136
+    scale: 1.06
+  - start: 20.268
+    end: 21.094
+    scale: 1.12
+  - start: 26.769
+    end: 28.698
+    scale: 1.06
+  - start: 31.665
+    end: 33.309
+    scale: 1.12
+  - start: 40.506
+    end: 43.506
+    scale: 1.12
+captionsAtATime: 5
+bRolls:
+  - id: broll-mrp3v8vg-1batp
+    src: b-roll/20260717-173723-editor/brand.jpeg
+    start: 2.109
+    end: 2.451
+    scale: 1.0227272727272727
+  - id: broll-mrp3vg5h-lr83h
+    src: b-roll/20260717-173723-editor/capcut.jpeg
+    start: 6.689
+    end: 7.11
+  - id: broll-mrp3vkrp-7qkgt
+    src: b-roll/20260717-173723-editor/descript.png
+    start: 7.251
+    end: 7.793
+sfx:
+  - id: sfx-mrp49chr-5r04b
+    src: sfx/oof_minecraft.mp3
+    start: 8.998
+    end: 9.468204
+    srcDurationSec: 0.470204
+  - id: sfx-mrp48lii-1q4mc
+    src: sfx/anime_wow.mp3
+    start: 40.506
+    end: 43.771306
+    srcDurationSec: 3.265306
+

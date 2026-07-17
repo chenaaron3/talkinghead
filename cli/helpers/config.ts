@@ -194,7 +194,18 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
         `"bRolls[${index}]" needs id, src, start, end in ${configPath}`,
       );
     }
-    return { id, src, start, end };
+    const clip: SourceBRoll = { id, src, start, end };
+    const scale = Number(entry.scale);
+    const offsetX = Number(entry.offsetX);
+    const offsetY = Number(entry.offsetY);
+    const rotation = Number(entry.rotation);
+    if (entry.scale != null && Number.isFinite(scale)) clip.scale = scale;
+    if (entry.offsetX != null && Number.isFinite(offsetX)) clip.offsetX = offsetX;
+    if (entry.offsetY != null && Number.isFinite(offsetY)) clip.offsetY = offsetY;
+    if (entry.rotation != null && Number.isFinite(rotation)) {
+      clip.rotation = rotation;
+    }
+    return clip;
   });
 }
 

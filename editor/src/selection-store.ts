@@ -9,6 +9,7 @@ import {
   type Selection,
   type SelectionMode,
 } from "./lib/selection";
+import { useEditor } from "./store";
 
 export type { Selection, SelectionKind, SelectionMode } from "./lib/selection";
 export { isSelected } from "./lib/selection";
@@ -99,7 +100,17 @@ export const useSelection = create<SelectionState & SelectionActions>(
       });
     },
 
-    selectBRoll: (id) => get().select("broll", id),
+    selectBRoll: (id) => {
+      get().select("broll", id);
+      if (id == null) return;
+      // Seek into the clip so inspector/handles can appear (selected + in range).
+      const editor = useEditor.getState();
+      const clip = editor.config?.bRolls.find((c) => c.id === id);
+      if (!clip) return;
+      if (editor.sourceSec < clip.start || editor.sourceSec >= clip.end) {
+        editor.seekSource(clip.start);
+      }
+    },
     selectSfx: (id) => get().select("sfx", id),
     selectPunchIn: (index) => get().select("punchIn", index),
     selectListicleItem: (index) => get().select("listicleItem", index),

@@ -18,19 +18,12 @@ export type RenderProgress = {
 
 type ProgressCb = (p: RenderProgress) => void;
 
-let bundlePromise: Promise<string> | null = null;
-
 async function getServeUrl(): Promise<string> {
-  if (!bundlePromise) {
-    bundlePromise = bundle({
-      entryPoint: path.join(ROOT, "src", "index.ts"),
-      webpackOverride: (config) => config,
-    }).catch((err) => {
-      bundlePromise = null;
-      throw err;
-    });
-  }
-  return bundlePromise;
+  // Bundle fresh each export so newly-linked public/episodes assets are included.
+  return bundle({
+    entryPoint: path.join(ROOT, "src", "index.ts"),
+    webpackOverride: (config) => config,
+  });
 }
 
 function overallFor(phase: RenderProgress["phase"], progress: number): number {

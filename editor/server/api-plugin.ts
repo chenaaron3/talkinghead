@@ -1,35 +1,26 @@
-import { spawnSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import YAML from 'yaml';
+
+import { findSourceVideo, loadEpisodeConfig, writeEpisodeConfig } from '../../cli/helpers/config';
+import { createEpisodeWithVideo } from '../../cli/helpers/episode-id';
+import { rebuildAllPropsIndex } from '../../cli/helpers/props-index';
+import {
+    AUDIO_EXTENSIONS, HEIC_EXTENSIONS, IMAGE_EXTENSIONS, PUBLIC_SFX_DIR, ROOT, SOURCE_DIR,
+    VIDEO_EXTENSIONS
+} from '../../cli/helpers/types';
+import { probeVideoFps } from '../../cli/helpers/whisper';
+import { runProcess } from '../../cli/process';
+import { renderEpisode } from '../../cli/render-episode';
+import { runSchedule } from '../../cli/schedule/run';
+import { buildProps } from '../../src/lib/build-props';
+import { normalizeBRollMedia, probeMedia } from './broll-media';
+import { getEpisodeScheduleInfo, listEditorEpisodes } from './episodes';
+
 import type { Plugin } from "vite";
-import YAML from "yaml";
-import { buildProps } from "../../src/lib/build-props";
-import { runSchedule } from "../../cli/schedule/run";
-import {
-  findSourceVideo,
-  loadEpisodeConfig,
-  writeEpisodeConfig,
-} from "../../cli/helpers/config";
-import {
-  createEpisodeWithVideo,
-  uniqueFilenameInDir,
-} from "../../cli/helpers/episode-id";
-import { rebuildAllPropsIndex } from "../../cli/helpers/props-index";
-import { probeVideoFps } from "../../cli/helpers/whisper";
-import {
-  AUDIO_EXTENSIONS,
-  IMAGE_EXTENSIONS,
-  PUBLIC_SFX_DIR,
-  ROOT,
-  SOURCE_DIR,
-  VIDEO_EXTENSIONS,
-} from "../../cli/helpers/types";
-import { runProcess } from "../../cli/process";
-import { renderEpisode } from "../../cli/render-episode";
 import type { EpisodeConfig, Transcript } from "../../cli/helpers/types";
 import type { SerializedWaveform } from "../../src/lib/waveform";
-import { getEpisodeScheduleInfo, listEditorEpisodes } from "./episodes";
-
 function sendNdjson(
   res: import("http").ServerResponse,
   writeEvent: (data: unknown) => void,
@@ -38,7 +29,9 @@ function sendNdjson(
   res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("X-Accel-Buffering", "no");
-  if (typeof (res as { flushHeaders?: () => void }).flushHeaders === "function") {
+  if (
+    typeof (res as { flushHeaders?: () => void }).flushHeaders === "function"
+  ) {
     (res as { flushHeaders: () => void }).flushHeaders();
   }
   return writeEvent;
@@ -98,56 +91,96 @@ function linkIntoPublic(absPath: string, publicRel: string): string {
   return publicRel.split(path.sep).join("/");
 }
 
-function listEpisodeImages(episodeId: string) {
+function isBRollExt(ext: string): boolean {
+  return (
+    IMAGE_EXTENSIONS.has(ext) ||
+    IMAGE_EXTENSIONS.has(ext.toLowerCase()) ||
+    VIDEO_EXTENSIONS.has(ext) ||
+    VIDEO_EXTENSIONS.has(ext.toLowerCase())
+  );
+}
+
+function isHeicExt(ext: string): boolean {
+  return HEIC_EXTENSIONS.has(ext) || HEIC_EXTENSIONS.has(ext.toLowerCase());
+}
+
+function isBRollImportExt(ext: string): boolean {
+  return isBRollExt(ext) || isHeicExt(ext);
+}
+
+function isVideoExt(ext: string): boolean {
+  return VIDEO_EXTENSIONS.has(ext) || VIDEO_EXTENSIONS.has(ext.toLowerCase());
+}
+
+/** Convert HEIC/HEIF → JPEG for Remotion / browser preview. */
+function convertHeicToJpeg(srcAbs: string, destAbs: string): void {
+  const sips = spawnSync(
+    "sips",
+    ["-s", "format", "jpeg", srcAbs, "--out", destAbs],
+    { encoding: "utf8" },
+  );
+  if (sips.status === 0 && fs.existsSync(destAbs)) return;
+
+  const ffmpeg = spawnSync("ffmpeg", ["-y", "-i", srcAbs, destAbs], {
+    encoding: "utf8",
+  });
+  if (ffmpeg.status === 0 && fs.existsSync(destAbs)) return;
+
+  const detail = [sips.stderr, ffmpeg.stderr].filter(Boolean).join("\n").trim();
+  throw new Error(
+    detail
+      ? `Failed to convert HEIC: ${detail}`
+      : "Failed to convert HEIC (tried sips and ffmpeg)",
+  );
+}
+
+function listEpisodeBRollAssets(episodeId: string) {
   const absDir = path.join(SOURCE_DIR, episodeId);
   if (!fs.existsSync(absDir)) return [];
+
+  let arollAbs: string | null = null;
+  try {
+    const config = loadEpisodeConfig(absDir);
+    arollAbs = path.resolve(findSourceVideo(absDir, config.aroll));
+  } catch {
+    // Episode may not have a resolvable A-roll yet.
+  }
+
   const out: Array<{
     key: string;
     label: string;
     sourcePath: string;
     publicSrc: string;
+    width: number;
+    height: number;
+    durationSec?: number;
   }> = [];
   for (const entry of fs.readdirSync(absDir, { withFileTypes: true })) {
     if (!entry.isFile()) continue;
     const ext = path.extname(entry.name);
-    if (!IMAGE_EXTENSIONS.has(ext)) continue;
-    const abs = path.join(absDir, entry.name);
+    if (!isBRollExt(ext)) continue;
+    const abs = path.resolve(path.join(absDir, entry.name));
+    // Never list the episode A-roll as b-roll material.
+    if (arollAbs && abs === arollAbs) continue;
     const key = path.join(episodeId, entry.name).split(path.sep).join("/");
     const publicSrc = path.join("b-roll", key).split(path.sep).join("/");
+    const video = isVideoExt(ext);
+    normalizeBRollMedia(abs, video);
+    const probe = probeMedia(abs);
+    if (probe.width == null || probe.height == null) {
+      throw new Error(`No visual dimensions for ${abs}`);
+    }
     out.push({
       key,
       label: entry.name,
       sourcePath: abs,
       publicSrc,
+      width: probe.width,
+      height: probe.height,
+      ...(video ? { durationSec: probe.durationSec } : {}),
     });
   }
   return out;
-}
-
-function probeAudioDurationSec(absPath: string): number {
-  const result = spawnSync(
-    "ffprobe",
-    [
-      "-v",
-      "error",
-      "-show_entries",
-      "format=duration",
-      "-of",
-      "json",
-      absPath,
-    ],
-    { encoding: "utf8" },
-  );
-  if (result.status !== 0) return 0.5;
-  try {
-    const parsed = JSON.parse(result.stdout) as {
-      format?: { duration?: string };
-    };
-    const duration = Number(parsed.format?.duration);
-    return Number.isFinite(duration) && duration > 0 ? duration : 0.5;
-  } catch {
-    return 0.5;
-  }
 }
 
 function listSfxAssets() {
@@ -168,7 +201,7 @@ function listSfxAssets() {
       key: entry.name,
       label: entry.name.replace(/\.[^.]+$/, ""),
       src,
-      durationSec: probeAudioDurationSec(abs),
+      durationSec: probeMedia(abs).durationSec,
     });
   }
   return out.sort((a, b) => a.label.localeCompare(b.label));
@@ -221,7 +254,7 @@ function loadEpisodeData(episodeId: string) {
     fs.readFileSync(transcriptPath, "utf8"),
   ) as Transcript;
 
-  const videoPath = findSourceVideo(episodeDir);
+  const videoPath = findSourceVideo(episodeDir, config.aroll);
   const probe = probeVideoFps(videoPath);
   const ext = path.extname(videoPath).toLowerCase();
   const videoSrc = `episodes/${episodeId}/video${ext}`;
@@ -318,13 +351,18 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
 
           if (req.method === "GET" && pathname === "/api/assets") {
             const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
-            const assets = listEpisodeImages(episodeId).map((a) => {
+            const assets = listEpisodeBRollAssets(episodeId).map((a) => {
               linkIntoPublic(a.sourcePath, a.publicSrc);
               return {
                 key: a.key,
                 label: a.label,
                 src: a.publicSrc,
                 thumbUrl: `/${a.publicSrc}`,
+                width: a.width,
+                height: a.height,
+                ...(a.durationSec != null
+                  ? { durationSec: a.durationSec }
+                  : {}),
               };
             });
             const sfx = listSfxAssets();
@@ -347,14 +385,15 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             const episodeDir = path.join(SOURCE_DIR, episodeId);
             const configPath = path.join(episodeDir, "config.yaml");
             const existingYaml = fs.existsSync(configPath)
-              ? (YAML.parse(fs.readFileSync(configPath, "utf8")) as Record<
+              ? ((YAML.parse(fs.readFileSync(configPath, "utf8")) as Record<
                   string,
                   unknown
-                >) ?? {}
+                >) ?? {})
               : {};
 
             writeEpisodeConfig(episodeDir, {
               ...existingYaml,
+              aroll: body.config.aroll,
               title: body.config.title,
               captionsAtATime: body.config.captionsAtATime,
               cuts: body.config.cuts,
@@ -388,7 +427,8 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             }
             const publicSrc = path
               .join("b-roll", body.key)
-              .split(path.sep).join("/");
+              .split(path.sep)
+              .join("/");
             linkIntoPublic(absSource, publicSrc);
             return sendJson(res, 200, { src: publicSrc });
           }
@@ -422,14 +462,11 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
           if (req.method === "POST" && pathname === "/api/import-broll") {
             const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
             const filename = filenameFromRequest(req);
-            const imageExt = path.extname(filename);
-            if (
-              !IMAGE_EXTENSIONS.has(imageExt) &&
-              !IMAGE_EXTENSIONS.has(imageExt.toLowerCase())
-            ) {
+            const mediaExt = path.extname(filename);
+            if (!isBRollImportExt(mediaExt)) {
               return sendJson(res, 400, {
                 error:
-                  "Unsupported image type. Drop .jpg / .png / .webp / .gif files.",
+                  "Unsupported media type. Drop .jpg / .png / .webp / .gif / .heic / .mp4 / .mov / .webm files.",
               });
             }
             const data = await readBodyBuffer(req);
@@ -440,11 +477,44 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             if (!fs.existsSync(episodeDir)) {
               return sendJson(res, 404, { error: "Episode not found" });
             }
-            const uniqueName = uniqueFilenameInDir(episodeDir, filename);
-            const absPath = path.join(episodeDir, uniqueName);
-            fs.writeFileSync(absPath, data);
+
+            const safeName = path.basename(filename).replace(/[/\\]/g, "");
+            const destName = isHeicExt(mediaExt)
+              ? `${path.basename(safeName, mediaExt)}.jpg`
+              : safeName;
+            const absPath = path.join(episodeDir, destName);
+            if (fs.existsSync(absPath)) {
+              return sendJson(res, 409, {
+                error: `${destName} already exists in this episode`,
+              });
+            }
+
+            if (isHeicExt(mediaExt)) {
+              const tmpHeic = `${absPath}.heic-import`;
+              fs.writeFileSync(tmpHeic, data);
+              try {
+                convertHeicToJpeg(tmpHeic, absPath);
+              } catch (err) {
+                const message =
+                  err instanceof Error ? err.message : String(err);
+                return sendJson(res, 500, { error: message });
+              } finally {
+                try {
+                  fs.unlinkSync(tmpHeic);
+                } catch {
+                  // ignore
+                }
+              }
+            } else {
+              fs.writeFileSync(absPath, data);
+            }
+
+            const video =
+              isVideoExt(mediaExt) || isVideoExt(path.extname(destName));
+            normalizeBRollMedia(absPath, video);
+
             const key = path
-              .join(episodeId, uniqueName)
+              .join(episodeId, destName)
               .split(path.sep)
               .join("/");
             const publicSrc = path
@@ -452,11 +522,73 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               .split(path.sep)
               .join("/");
             linkIntoPublic(absPath, publicSrc);
+            const probe = probeMedia(absPath);
+            if (probe.width == null || probe.height == null) {
+              return sendJson(res, 500, {
+                error: `No visual dimensions for ${destName}`,
+              });
+            }
             return sendJson(res, 200, {
               key,
-              label: uniqueName,
+              label: destName,
               src: publicSrc,
               thumbUrl: `/${publicSrc}`,
+              width: probe.width,
+              height: probe.height,
+              ...(video ? { durationSec: probe.durationSec } : {}),
+            });
+          }
+
+          if (req.method === "DELETE" && pathname === "/api/broll-asset") {
+            const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
+            const raw = await readBody(req);
+            const body = JSON.parse(raw || "{}") as { key?: string };
+            const key = String(body.key ?? "").trim();
+            if (!key) {
+              return sendJson(res, 400, { error: "Missing asset key" });
+            }
+            const prefix = `${episodeId}/`;
+            if (!key.startsWith(prefix) || key.includes("..")) {
+              return sendJson(res, 400, { error: "Invalid asset key" });
+            }
+            const absSource = path.resolve(path.join(SOURCE_DIR, key));
+            const episodeDir = path.resolve(path.join(SOURCE_DIR, episodeId));
+            if (
+              absSource !== episodeDir &&
+              !absSource.startsWith(episodeDir + path.sep)
+            ) {
+              return sendJson(res, 400, { error: "Invalid asset path" });
+            }
+            try {
+              const config = loadEpisodeConfig(episodeDir);
+              const arollAbs = path.resolve(
+                findSourceVideo(episodeDir, config.aroll),
+              );
+              if (absSource === arollAbs) {
+                return sendJson(res, 400, {
+                  error: "Cannot delete the episode A-roll",
+                });
+              }
+            } catch {
+              // No resolvable A-roll — still allow deleting b-roll files.
+            }
+            if (!fs.existsSync(absSource)) {
+              return sendJson(res, 404, { error: "Asset not found" });
+            }
+            fs.unlinkSync(absSource);
+            const publicRel = path
+              .join("b-roll", key)
+              .split(path.sep)
+              .join("/");
+            const publicAbs = path.join(ROOT, "public", publicRel);
+            try {
+              fs.unlinkSync(publicAbs);
+            } catch {
+              // missing public link is fine
+            }
+            return sendJson(res, 200, {
+              ok: true,
+              src: publicRel,
             });
           }
 
@@ -472,6 +604,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               if (body.config && body.transcript) {
                 ensureBRollAssets(body.config.bRolls);
                 writeEpisodeConfig(episodeDir, {
+                  aroll: body.config.aroll,
                   captionsAtATime: body.config.captionsAtATime,
                   cuts: body.config.cuts,
                   listicleOverlay: body.config.listicleOverlay,
@@ -493,10 +626,16 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             }
 
             res.statusCode = 200;
-            res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+            res.setHeader(
+              "Content-Type",
+              "application/x-ndjson; charset=utf-8",
+            );
             res.setHeader("Cache-Control", "no-cache");
             res.setHeader("X-Accel-Buffering", "no");
-            if (typeof (res as { flushHeaders?: () => void }).flushHeaders === "function") {
+            if (
+              typeof (res as { flushHeaders?: () => void }).flushHeaders ===
+              "function"
+            ) {
               (res as { flushHeaders: () => void }).flushHeaders();
             }
 
@@ -557,7 +696,9 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
             const episodeDir = path.join(SOURCE_DIR, episodeId);
             if (!fs.existsSync(episodeDir)) {
-              return sendJson(res, 404, { error: `Episode not found: ${episodeId}` });
+              return sendJson(res, 404, {
+                error: `Episode not found: ${episodeId}`,
+              });
             }
 
             const writeEvent = sendNdjson(res, (data) => {

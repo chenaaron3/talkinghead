@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { writeEpisodeConfig } from "./config";
 import { SOURCE_DIR, VIDEO_EXTENSIONS } from "./types";
 
 /** Local wall-clock stamp: YYYYMMDD-HHMMSS */
@@ -47,6 +48,7 @@ export function createEpisodeWithVideo(opts: {
   fs.mkdirSync(episodeDir, { recursive: true });
   const videoPath = path.join(episodeDir, safeName);
   fs.writeFileSync(videoPath, data);
+  writeEpisodeConfig(episodeDir, { aroll: safeName });
   return { episodeId, episodeDir, videoPath };
 }
 
@@ -64,6 +66,7 @@ export function claimVideoIntoEpisode(absFrom: string): {
   fs.mkdirSync(episodeDir, { recursive: true });
   const to = path.join(episodeDir, filename);
   fs.renameSync(absFrom, to);
+  writeEpisodeConfig(episodeDir, { aroll: filename });
   return { episodeId, episodeDir };
 }
 

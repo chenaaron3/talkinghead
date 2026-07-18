@@ -11,12 +11,15 @@ import {
 import { episodeHeaders } from './lib/api';
 
 import {
+  clampBRollRange,
   removeBRoll,
   upsertBRoll,
+  withBRollMediaOffset,
   withBRollTransform,
+  withBRollVolume,
   type Transform,
 } from './lib/broll';
-import { removeSfx, upsertSfx, applySfxEdge } from './lib/sfx';
+import { removeSfx, upsertSfx, applySfxEdge, withSfxVolume } from './lib/sfx';
 import { captionIndexAt, flattenCaptions, updateCaption } from './lib/captions';
 import { captionActionRange } from './lib/caption-selection';
 import { applySelection, primaryId } from './lib/selection';
@@ -38,11 +41,16 @@ import type {
   SourceSfx,
   Transcript,
 } from "@src/lib/types";
-export type Asset = {
+/** Library tile in the assets panel (not a timeline clip). */
+export type LibraryAsset = {
   key: string;
   label: string;
   src: string;
   thumbUrl: string;
+  width: number;
+  height: number;
+  /** Present for video b-roll; used to clamp play duration. */
+  durationSec?: number;
 };
 
 export type SfxAsset = {
@@ -71,7 +79,7 @@ type EditorState = {
   config: EpisodeConfig | null;
   transcript: Transcript | null;
   props: EpisodeProps | null;
-  assets: Asset[];
+  assets: LibraryAsset[];
   sfxAssets: SfxAsset[];
   dirty: boolean;
   saving: boolean;
@@ -104,12 +112,13 @@ type EditorActions = {
   undo: () => void;
   redo: () => void;
   deleteSelection: () => boolean;
+  removeBRollsBySrc: (src: string) => void;
   setCaptionText: (caption: FlatCaption, text: string) => void;
   setCaptionEmphasis: (
     caption: FlatCaption,
     emphasis: CaptionEmphasis | undefined,
   ) => void;
-  placeBRollOnCaption: (asset: Asset, caption: FlatCaption) => void;
+  placeBRollOnCaption: (asset: LibraryAsset, caption: FlatCaption) => void;
   placeSfxOnCaption: (asset: SfxAsset, caption: FlatCaption) => void;
   addPunchInOnCaption: (caption: FlatCaption) => void;
   cutCaption: (caption: FlatCaption) => void;
@@ -132,12 +141,19 @@ type EditorActions = {
     patch: Partial<Transform>,
     live?: boolean,
   ) => void;
+  updateBRollMediaOffset: (
+    id: string,
+    mediaOffsetSec: number,
+    live?: boolean,
+  ) => void;
+  updateBRollVolume: (id: string, volume: number, live?: boolean) => void;
   updateSfxRange: (
     id: string,
     edge: "start" | "end",
     value: number,
     live?: boolean,
   ) => void;
+  updateSfxVolume: (id: string, volume: number, live?: boolean) => void;
   setSectionEdge: (
     sectionIndex: number,
     edge: "start" | "end",
@@ -386,7 +402,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           error?: string;
         };
         const as = (await assetsRes.json()) as {
-          assets?: Asset[];
+          assets?: LibraryAsset[];
           sfx?: SfxAsset[];
           error?: string;
         };
@@ -456,7 +472,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           headers: episodeHeaders(episodeId),
         });
         const data = (await res.json()) as {
-          assets?: Asset[];
+          assets?: LibraryAsset[];
           sfx?: SfxAsset[];
           error?: string;
         };
@@ -733,6 +749,22 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       return false;
     },
 
+    removeBRollsBySrc: (src) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const next = config.bRolls.filter((c) => c.src !== src);
+      if (next.length === config.bRolls.length) return;
+      commit({
+        config: { ...config, bRolls: next },
+        transcript,
+      });
+      const { selection, clearSelection } = useSelection.getState();
+      if (selection?.kind === "broll") {
+        const stillThere = next.some((c) => selection.ids.includes(c.id));
+        if (!stillThere) clearSelection();
+      }
+    },
+
     setCaptionText: (caption, text) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
@@ -760,12 +792,29 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       if (!config || !transcript) return;
       const { selection } = useSelection.getState();
       const range = captionActionRange(transcript, selection, caption);
-      const clip: SourceBRoll = {
+      let end = Math.max(range.start + MIN_RANGE_SEC, range.end);
+      const base = {
         id: newId("broll"),
         src: asset.src,
         start: range.start,
-        end: Math.max(range.start + MIN_RANGE_SEC, range.end),
+        end,
+        width: asset.width,
+        height: asset.height,
       };
+      let clip: SourceBRoll;
+      if (asset.durationSec != null && asset.durationSec > 0) {
+        const maxEnd = range.start + asset.durationSec;
+        if (end > maxEnd) {
+          end = Math.max(range.start + MIN_RANGE_SEC, maxEnd);
+        }
+        clip = {
+          ...base,
+          end,
+          srcDurationSec: asset.durationSec,
+        };
+      } else {
+        clip = base;
+      }
       const result = upsertBRoll(config.bRolls, clip);
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript });
@@ -877,10 +926,11 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const clip = config.bRolls.find((c) => c.id === id);
       if (!clip) return;
       if (end <= start + MIN_RANGE_SEC) return;
+      const clamped = clampBRollRange(clip, start, end);
       const result = upsertBRoll(config.bRolls, {
         ...clip,
-        start,
-        end,
+        start: clamped.start,
+        end: clamped.end,
       });
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript }, live);
@@ -897,6 +947,28 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       commit({ config: { ...config, bRolls: result }, transcript }, live);
     },
 
+    updateBRollMediaOffset: (id, mediaOffsetSec, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = config.bRolls.find((c) => c.id === id);
+      if (!clip) return;
+      const next = withBRollMediaOffset(clip, mediaOffsetSec);
+      const result = upsertBRoll(config.bRolls, next);
+      if ("error" in result) return;
+      commit({ config: { ...config, bRolls: result }, transcript }, live);
+    },
+
+    updateBRollVolume: (id, volume, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = config.bRolls.find((c) => c.id === id);
+      if (!clip) return;
+      const next = withBRollVolume(clip, volume);
+      const result = upsertBRoll(config.bRolls, next);
+      if ("error" in result) return;
+      commit({ config: { ...config, bRolls: result }, transcript }, live);
+    },
+
     updateSfxRange: (id, edge, value, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
@@ -904,6 +976,17 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       if (!clip) return;
       const next = applySfxEdge(clip, edge, value, transcript.duration);
       if (next.start === clip.start && next.end === clip.end) return;
+      const result = upsertSfx(config.sfx ?? [], next);
+      if ("error" in result) return;
+      commit({ config: { ...config, sfx: result }, transcript }, live);
+    },
+
+    updateSfxVolume: (id, volume, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.sfx ?? []).find((c) => c.id === id);
+      if (!clip) return;
+      const next = withSfxVolume(clip, volume);
       const result = upsertSfx(config.sfx ?? [], next);
       if ("error" in result) return;
       commit({ config: { ...config, sfx: result }, transcript }, live);

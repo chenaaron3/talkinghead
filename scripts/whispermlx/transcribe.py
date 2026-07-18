@@ -36,6 +36,27 @@ def resolve_model(name: str) -> str:
     return MLX_MODEL_MAP.get(name, f"mlx-community/whisper-{name}-mlx")
 
 
+def resolve_local_model(repo_or_path: str) -> str:
+    """Prefer the on-disk HF cache so mlx_whisper never blocks on hub.repo_info()."""
+    from pathlib import Path
+
+    if Path(repo_or_path).exists():
+        return repo_or_path
+    try:
+        from huggingface_hub import snapshot_download
+
+        local = snapshot_download(repo_or_path, local_files_only=True)
+        print(f"[whispermlx] using cached model at {local}", file=sys.stderr)
+        return local
+    except Exception:
+        print(
+            f"[whispermlx] cache miss for {repo_or_path}; downloading from Hugging Face…",
+            file=sys.stderr,
+            flush=True,
+        )
+        return repo_or_path
+
+
 def main() -> int:
     args = parse_args()
 
@@ -48,7 +69,7 @@ def main() -> int:
         )
         return 1
 
-    model_path = resolve_model(args.model)
+    model_path = resolve_local_model(resolve_model(args.model))
     print(f"[whispermlx] loading audio…", file=sys.stderr)
     audio = whispermlx.load_audio(args.audio_path)
     duration_sec = len(audio) / 16_000

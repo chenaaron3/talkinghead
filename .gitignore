@@ -14,18 +14,47 @@ secrets/*
 whispermlx-env/
 whisperx-env/
 whisper.cpp/
+**/__pycache__/
+*.pyc
 tmp.json
 tmp/
 
-# Generated per-episode artifacts (source video + config stay tracked)
-source/**/generated/
+# Episode source (configs + media — local only)
+source/
+
+# Generated / public media
 public/episodes/
 src/generated/
 
-# Large source videos — keep configs, ignore media
-source/**/*.mp4
-source/**/*.mov
-source/**/*.webm
-source/**/*.MP4
-source/**/*.MOV
-source/**/*.WEBM
+# Media assets under public/ (image / video / audio)
+# (gitignore does not support brace expansion — list each ext)
+public/**/*.jpg
+public/**/*.jpeg
+public/**/*.png
+public/**/*.webp
+public/**/*.gif
+public/**/*.heic
+public/**/*.heif
+public/**/*.mp4
+public/**/*.mov
+public/**/*.webm
+public/**/*.wav
+public/**/*.mp3
+public/**/*.m4a
+public/**/*.ogg
+public/**/*.flac
+public/**/*.JPG
+public/**/*.JPEG
+public/**/*.PNG
+public/**/*.WEBP
+public/**/*.GIF
+public/**/*.HEIC
+public/**/*.HEIF
+public/**/*.MP4
+public/**/*.MOV
+public/**/*.WEBM
+public/**/*.WAV
+public/**/*.MP3
+public/**/*.M4A
+public/**/*.OGG
+public/**/*.FLAC

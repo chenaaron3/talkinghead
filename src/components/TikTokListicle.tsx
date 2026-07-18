@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 
 import { FADE_DURATION_SEC } from '../lib/constants';
-import { Sfx } from './Sfx';
+import { SfxOverlay } from './SfxOverlay';
 
 import type { ListicleItem, ListicleOverlay } from "../lib/types";
 
@@ -161,14 +161,16 @@ export const TikTokListicle: React.FC<{
   const fadeFrames = Math.max(1, Math.round(FADE_DURATION_SEC * fps));
 
   // Rendered outside the visual's early returns so pops aren't cut short.
-  const sfx = listicle.items.map((item, index) => (
-    <Sfx
-      key={`${item.revealFrame}-${index}`}
-      src="sfx/mouse_click.wav"
-      from={item.revealFrame}
-      durationSec={0.2}
+  const sfx = (
+    <SfxOverlay
+      sfx={listicle.items.map((item, index) => ({
+        id: `listicle-${item.revealFrame}-${index}`,
+        src: "sfx/mouse_click.wav",
+        startFrame: item.revealFrame,
+        endFrame: item.revealFrame + Math.max(1, Math.ceil(0.2 * fps)),
+      }))}
     />
-  ));
+  );
 
   if (frame < listicle.startFrame || frame >= listicle.endFrame) {
     return sfx;

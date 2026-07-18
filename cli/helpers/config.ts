@@ -14,8 +14,8 @@ import {
   type SourceSfx,
   type SourceCut,
   SOURCE_DIR,
-  VIDEO_EXTENSIONS,
 } from "./types";
+import { isVideoSrc } from "../../src/lib/media";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -75,24 +75,19 @@ export function resolveEpisodeDir(input: string): {
   );
 }
 
-export function findSourceVideo(episodeDir: string): string {
-  const entries = fs
-    .readdirSync(episodeDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => entry.name)
-    .filter((name) => VIDEO_EXTENSIONS.has(path.extname(name)));
-
-  if (entries.length === 0) {
+/** Absolute path to the A-roll file named by `config.aroll`. */
+export function findSourceVideo(episodeDir: string, aroll: string): string {
+  const filename = path.basename(aroll.trim());
+  if (!filename) {
+    throw new Error(`Missing "aroll" filename for episode ${episodeDir}`);
+  }
+  const abs = path.join(episodeDir, filename);
+  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
     throw new Error(
-      `No video found in ${episodeDir}. Add exactly one .mp4 / .mov / .webm file.`,
+      `A-roll not found: ${filename} in ${episodeDir} (config.aroll)`,
     );
   }
-  if (entries.length > 1) {
-    throw new Error(
-      `Multiple videos in ${episodeDir}: ${entries.join(", ")}. Keep exactly one.`,
-    );
-  }
-  return path.join(episodeDir, entries[0]!);
+  return abs;
 }
 
 function parseCuts(value: unknown, configPath: string): SourceCut[] {
@@ -194,16 +189,58 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
         `"bRolls[${index}]" needs id, src, start, end in ${configPath}`,
       );
     }
-    const clip: SourceBRoll = { id, src, start, end };
+    const width = Number(entry.width);
+    const height = Number(entry.height);
+    if (
+      !Number.isFinite(width) ||
+      width <= 0 ||
+      !Number.isFinite(height) ||
+      height <= 0
+    ) {
+      throw new Error(
+        `"bRolls[${index}]" needs positive width and height in ${configPath}`,
+      );
+    }
     const scale = Number(entry.scale);
     const offsetX = Number(entry.offsetX);
     const offsetY = Number(entry.offsetY);
     const rotation = Number(entry.rotation);
+    const srcDurationSec = Number(entry.srcDurationSec);
+    const mediaOffsetSec = Number(entry.mediaOffsetSec);
+    const volume = Number(entry.volume);
+
+    const isVideo = isVideoSrc(src);
+    let clip: SourceBRoll;
+    if (isVideo) {
+      if (
+        entry.srcDurationSec == null ||
+        !Number.isFinite(srcDurationSec) ||
+        srcDurationSec <= 0
+      ) {
+        throw new Error(
+          `"bRolls[${index}]" video needs positive srcDurationSec in ${configPath}`,
+        );
+      }
+      clip = { id, src, start, end, width, height, srcDurationSec };
+    } else {
+      clip = { id, src, start, end, width, height };
+    }
+
     if (entry.scale != null && Number.isFinite(scale)) clip.scale = scale;
     if (entry.offsetX != null && Number.isFinite(offsetX)) clip.offsetX = offsetX;
     if (entry.offsetY != null && Number.isFinite(offsetY)) clip.offsetY = offsetY;
     if (entry.rotation != null && Number.isFinite(rotation)) {
       clip.rotation = rotation;
+    }
+    if (
+      entry.mediaOffsetSec != null &&
+      Number.isFinite(mediaOffsetSec) &&
+      mediaOffsetSec > 0
+    ) {
+      clip.mediaOffsetSec = mediaOffsetSec;
+    }
+    if (entry.volume != null && Number.isFinite(volume)) {
+      clip.volume = Math.min(1, Math.max(0, volume));
     }
     return clip;
   });
@@ -228,7 +265,8 @@ function parseSfx(value: unknown, configPath: string): SourceSfx[] {
       );
     }
     const srcDurationSec = Number(entry.srcDurationSec);
-    return {
+    const volume = Number(entry.volume);
+    const clip: SourceSfx = {
       id,
       src,
       start,
@@ -238,6 +276,10 @@ function parseSfx(value: unknown, configPath: string): SourceSfx[] {
           ? srcDurationSec
           : Math.max(end - start, 0.04),
     };
+    if (entry.volume != null && Number.isFinite(volume)) {
+      clip.volume = Math.min(1, Math.max(0, volume));
+    }
+    return clip;
   });
 }
 
@@ -249,8 +291,13 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
 
   const titleRaw = String(merged.title ?? "").trim();
   const title = titleRaw.length > 0 ? titleRaw : null;
+  const aroll = path.basename(String(merged.aroll ?? "").trim());
+  if (!aroll) {
+    throw new Error(`Missing required "aroll" in ${configPath}`);
+  }
 
   return {
+    aroll,
     title,
     captionsAtATime: Math.max(
       1,

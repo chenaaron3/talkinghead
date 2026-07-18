@@ -20,6 +20,13 @@ export const IMAGE_EXTENSIONS = new Set([
   ".WEBP",
   ".GIF",
 ]);
+/** Accepted on b-roll import; converted to JPEG before storage (not listed as-is). */
+export const HEIC_EXTENSIONS = new Set([
+  ".heic",
+  ".heif",
+  ".HEIC",
+  ".HEIF",
+]);
 export const AUDIO_EXTENSIONS = new Set([
   ".wav",
   ".mp3",

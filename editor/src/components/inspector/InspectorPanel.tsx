@@ -2,23 +2,44 @@ import type { ReactNode } from "react";
 import { X } from "lucide-react";
 
 import { useEditableBRoll } from "../../lib/use-editable-broll";
+import { primaryId } from "../../lib/selection";
 import { useSelection } from "../../selection-store";
+import { useEditor } from "../../store";
 import { BRollInspector } from "./BRollInspector";
+import { SfxInspector } from "./SfxInspector";
 
 /**
  * Generic selection inspector overlay. Sits on the right edge of the transcript
- * panel (full height). V1: b-roll transforms only; punch-ins / captions later.
+ * panel (full height).
  */
 export function InspectorPanel() {
-  const editable = useEditableBRoll();
+  const editableBRoll = useEditableBRoll();
+  const selection = useSelection((s) => s.selection);
+  const sfx = useEditor((s) => s.config?.sfx);
   const clearSelection = useSelection((s) => s.clearSelection);
 
-  if (!editable) return null;
+  let title: string | null = null;
+  let body: ReactNode = null;
 
-  const title = "B-roll";
-  const body: ReactNode = (
-    <BRollInspector clip={editable.clip} transform={editable.transform} />
-  );
+  if (editableBRoll) {
+    title = "B-roll";
+    body = (
+      <BRollInspector
+        clip={editableBRoll.clip}
+        transform={editableBRoll.transform}
+      />
+    );
+  } else if (selection?.kind === "sfx") {
+    const id = primaryId(selection);
+    const clip =
+      typeof id === "string" ? sfx?.find((c) => c.id === id) : undefined;
+    if (clip) {
+      title = "SFX";
+      body = <SfxInspector clip={clip} />;
+    }
+  }
+
+  if (!title || !body) return null;
 
   return (
     <aside

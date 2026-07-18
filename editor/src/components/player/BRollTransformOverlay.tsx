@@ -22,32 +22,6 @@ type DragMode =
   | { kind: "scale"; startDist: number; origin: Transform }
   | { kind: "rotate"; startAngle: number; origin: Transform };
 
-function useImageSize(src: string | undefined): { w: number; h: number } | null {
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
-
-  useEffect(() => {
-    if (!src) {
-      setSize(null);
-      return;
-    }
-    let cancelled = false;
-    const img = new Image();
-    img.onload = () => {
-      if (cancelled) return;
-      setSize({ w: img.naturalWidth, h: img.naturalHeight });
-    };
-    img.onerror = () => {
-      if (!cancelled) setSize(null);
-    };
-    img.src = src.startsWith("/") ? src : `/${src}`;
-    return () => {
-      cancelled = true;
-    };
-  }, [src]);
-
-  return size;
-}
-
 function clientToComp(
   clientX: number,
   clientY: number,
@@ -77,13 +51,12 @@ export function BRollTransformOverlay({
   const boxRef = useRef<{ w: number; h: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [guides, setGuides] = useState<SnapGuide[]>([]);
-  const imgSize = useImageSize(editable?.clip.src);
 
   clipIdRef.current = editable?.clip.id ?? null;
-  const base = imgSize
+  const base = editable
     ? containSize(
-        imgSize.w,
-        imgSize.h,
+        editable.clip.width,
+        editable.clip.height,
         COMPOSITION_WIDTH,
         COMPOSITION_HEIGHT,
       )
@@ -185,7 +158,7 @@ export function BRollTransformOverlay({
     };
   }, [dragging, updateBRollTransform]);
 
-  if (!editable || !imgSize || !base) return null;
+  if (!editable || !base) return null;
 
   const t = editable.transform;
   const boxW = (base.w / COMPOSITION_WIDTH) * 100;

@@ -76,7 +76,7 @@ export async function runProcess(argv: string[]): Promise<{ episodeId: string }>
   const { input, force } = parseArgs(argv);
   const { episodeId, episodeDir } = resolveEpisodeDir(input);
   let config = loadEpisodeConfig(episodeDir);
-  const videoPath = findSourceVideo(episodeDir);
+  const videoPath = findSourceVideo(episodeDir, config.aroll);
   const videoStat = fs.statSync(videoPath);
   const generatedDir = path.join(episodeDir, "generated");
   ensureDir(generatedDir);

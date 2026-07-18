@@ -1,5 +1,7 @@
 import type { MouseEvent } from "react";
 
+import { isVideoSrc } from "../../lib/broll";
+
 type Props = {
   src: string;
   label: string;
@@ -18,6 +20,11 @@ export function BRollBadge({
   dragging,
   onMouseDown,
 }: Props) {
+  const ring =
+    selected || dragging
+      ? "shadow-[inset_0_0_0_2px_#e4bc3a]"
+      : "hover:brightness-110";
+
   return (
     <span
       className={[
@@ -30,17 +37,23 @@ export function BRollBadge({
       onMouseDown={onMouseDown}
       onClick={(e) => e.stopPropagation()}
     >
-      <img
-        src={`/${src}`}
-        alt=""
-        className={[
-          "h-full w-full rounded-sm object-cover",
-          selected || dragging
-            ? "shadow-[inset_0_0_0_2px_#e4bc3a]"
-            : "hover:brightness-110",
-        ].join(" ")}
-        draggable={false}
-      />
+      {isVideoSrc(src) ? (
+        <video
+          src={`/${src}`}
+          muted
+          playsInline
+          preload="metadata"
+          className={["h-full w-full rounded-sm object-cover", ring].join(" ")}
+          draggable={false}
+        />
+      ) : (
+        <img
+          src={`/${src}`}
+          alt=""
+          className={["h-full w-full rounded-sm object-cover", ring].join(" ")}
+          draggable={false}
+        />
+      )}
     </span>
   );
 }

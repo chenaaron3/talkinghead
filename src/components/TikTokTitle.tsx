@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 
 import { FADE_DURATION_SEC } from '../lib/constants';
-import { Sfx } from './Sfx';
+import { SfxOverlay } from './SfxOverlay';
 
 const BOARD_STYLE: React.CSSProperties = {
   width: "100%",
@@ -65,7 +65,16 @@ export const TikTokTitle: React.FC<{
 
   // Rendered outside the visual's early return so the exit tail can finish.
   const sfx = (
-    <Sfx src="sfx/title-enter.wav" from={0} durationSec={0.35} />
+    <SfxOverlay
+      sfx={[
+        {
+          id: "title-enter",
+          src: "sfx/title-enter.wav",
+          startFrame: 0,
+          endFrame: Math.max(1, Math.ceil(0.35 * fps)),
+        },
+      ]}
+    />
   );
 
   if (frame >= durationFrames) {

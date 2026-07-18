@@ -10,7 +10,7 @@ import {
 import { isSelected } from "../../lib/selection";
 import { wordClassName } from "../../lib/word-classes";
 import { useSelection } from "../../selection-store";
-import { Asset, SfxAsset, useEditor } from "../../store";
+import { LibraryAsset, SfxAsset, useEditor } from "../../store";
 import { ListicleBadge } from "./ListicleBadge";
 import { BRollBadge } from "./BRollBadge";
 import { PunchInBadge } from "./PunchInBadge";
@@ -232,7 +232,7 @@ export function Word({
             }
             const raw = e.dataTransfer.getData("application/x-broll-asset");
             if (!raw) return;
-            placeBRollOnCaption(JSON.parse(raw) as Asset, caption);
+            placeBRollOnCaption(JSON.parse(raw) as LibraryAsset, caption);
           }}
           title={`${caption.text}  ${caption.start.toFixed(2)}–${caption.end.toFixed(2)}s`}
         >

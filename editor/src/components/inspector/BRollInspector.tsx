@@ -1,100 +1,18 @@
-import type { ReactNode } from "react";
 import {
   BROLL_SCALE_MAX,
   BROLL_SCALE_MIN,
   TRANSFORM_DEFAULTS,
+  bRollSrcDurationSec,
+  isVideoSrc,
   type Transform,
 } from "../../lib/broll";
+import { MIN_RANGE_SEC } from "../../lib/range";
 import { useEditor } from "../../store";
+import { VIDEO_BROLL_VOLUME_DEFAULT } from "@src/lib/media";
 import type { SourceBRoll } from "@src/lib/types";
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-[10px] uppercase tracking-wider text-muted">
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function NumberRow({
-  label,
-  value,
-  step,
-  min,
-  max,
-  onLiveChange,
-}: {
-  label: string;
-  value: number;
-  step: number;
-  min?: number;
-  max?: number;
-  onLiveChange: (v: number) => void;
-}) {
-  return (
-    <Field label={label}>
-      <input
-        type="number"
-        className="h-8 w-full rounded-md border border-border bg-panel-2 px-2 text-xs text-[#e8eaef] outline-none focus:border-accent"
-        value={Number.isFinite(value) ? Number(value.toFixed(3)) : 0}
-        step={step}
-        min={min}
-        max={max}
-        onFocus={() => useEditor.getState().beginGesture()}
-        onChange={(e) => {
-          const next = Number(e.target.value);
-          if (!Number.isFinite(next)) return;
-          onLiveChange(next);
-        }}
-      />
-    </Field>
-  );
-}
-
-function SliderRow({
-  label,
-  value,
-  min,
-  max,
-  step,
-  display,
-  onLiveChange,
-  onCommit,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  display: string;
-  onLiveChange: (v: number) => void;
-  onCommit: (v: number) => void;
-}) {
-  return (
-    <Field label={`${label} · ${display}`}>
-      <input
-        type="range"
-        className="w-full accent-(--color-accent)"
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onPointerDown={() => useEditor.getState().beginGesture()}
-        onChange={(e) => onLiveChange(Number(e.target.value))}
-        onPointerUp={(e) => onCommit(Number((e.target as HTMLInputElement).value))}
-      />
-    </Field>
-  );
-}
+import { Button } from "../ui/button";
+import { NumberField, SliderField } from "./field";
 
 export function BRollInspector({
   clip,
@@ -104,10 +22,19 @@ export function BRollInspector({
   transform: Transform;
 }) {
   const updateBRollTransform = useEditor((s) => s.updateBRollTransform);
+  const updateBRollMediaOffset = useEditor((s) => s.updateBRollMediaOffset);
+  const updateBRollVolume = useEditor((s) => s.updateBRollVolume);
+  const isVideo = isVideoSrc(clip.src);
 
   const patch = (partial: Partial<Transform>, live: boolean) => {
     updateBRollTransform(clip.id, partial, live);
   };
+
+  const mediaOffset = clip.mediaOffsetSec ?? 0;
+  const volume = clip.volume ?? VIDEO_BROLL_VOLUME_DEFAULT;
+  const srcDur = bRollSrcDurationSec(clip);
+  const maxOffset =
+    srcDur != null ? Math.max(0, srcDur - MIN_RANGE_SEC) : 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -115,7 +42,32 @@ export function BRollInspector({
         {clip.src.split("/").pop()}
       </p>
 
-      <SliderRow
+      {isVideo ? (
+        <>
+          <SliderField
+            label="Media offset"
+            value={mediaOffset}
+            min={0}
+            max={maxOffset || 0.001}
+            step={0.01}
+            display={`${mediaOffset.toFixed(2)}s`}
+            onLiveChange={(v) => updateBRollMediaOffset(clip.id, v, true)}
+            onCommit={(v) => updateBRollMediaOffset(clip.id, v, true)}
+          />
+          <SliderField
+            label="Volume"
+            value={volume}
+            min={0}
+            max={1}
+            step={0.01}
+            display={`${Math.round(volume * 100)}%`}
+            onLiveChange={(v) => updateBRollVolume(clip.id, v, true)}
+            onCommit={(v) => updateBRollVolume(clip.id, v, true)}
+          />
+        </>
+      ) : null}
+
+      <SliderField
         label="Scale"
         value={transform.scale}
         min={BROLL_SCALE_MIN}
@@ -126,21 +78,21 @@ export function BRollInspector({
         onCommit={(scale) => patch({ scale }, true)}
       />
 
-      <NumberRow
+      <NumberField
         label="Offset X"
         value={transform.offsetX}
         step={0.01}
         onLiveChange={(offsetX) => patch({ offsetX }, true)}
       />
 
-      <NumberRow
+      <NumberField
         label="Offset Y"
         value={transform.offsetY}
         step={0.01}
         onLiveChange={(offsetY) => patch({ offsetY }, true)}
       />
 
-      <SliderRow
+      <SliderField
         label="Rotation"
         value={((transform.rotation % 360) + 360 + 180) % 360 - 180}
         min={-180}
@@ -151,16 +103,18 @@ export function BRollInspector({
         onCommit={(rotation) => patch({ rotation }, true)}
       />
 
-      <button
+      <Button
         type="button"
-        className="mt-1 rounded-md border border-border bg-panel-2 px-2 py-1.5 text-xs text-[#e8eaef] hover:bg-[#2a3142]"
+        variant="outline"
+        size="sm"
+        className="mt-1 w-full"
         onClick={() => {
           useEditor.getState().beginGesture();
           patch({ ...TRANSFORM_DEFAULTS }, false);
         }}
       >
         Reset transform
-      </button>
+      </Button>
     </div>
   );
 }

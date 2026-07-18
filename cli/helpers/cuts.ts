@@ -1,6 +1,6 @@
 import { isFiller } from "../../src/lib/caption-words";
 import { normalizeCuts } from "../../src/lib/source-timeline";
-import { FILLER_PADDING_SEC, PROCESS_GAP_THRESHOLD_SEC, WORD_MARGIN_SEC } from "@src/lib/editing-constants";
+import { FILLER_PADDING_SEC, PROCESS_GAP_THRESHOLD_SEC, WORD_MARGIN_SEC } from "../../src/lib/editing-constants";
 import type { SourceCut, TranscriptCaption } from "./types";
 
 export { isFiller } from "../../src/lib/caption-words";

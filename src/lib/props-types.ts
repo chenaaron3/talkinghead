@@ -41,10 +41,16 @@ export type BRollClip = {
   id: string;
   /** Path under public/, e.g. `b-roll/glowup/Perm_Before.jpg` */
   src: string;
+  /** Native pixel size of the media file. */
+  width: number;
+  height: number;
   startFrame: number;
   endFrame: number;
+  /** Video only; seconds into source. Default 0. */
+  mediaOffsetSec?: number;
+  /** Video only; 0–1. Default 0 (muted). */
+  volume?: number;
 } & Partial<Transform>;
-
 
 export type SfxClip = {
   id: string;
@@ -52,6 +58,8 @@ export type SfxClip = {
   src: string;
   startFrame: number;
   endFrame: number;
+  /** 0–1. Default 0.4. */
+  volume?: number;
 };
 
 /** Derived render payload stored in props.json (output timeline, frames). */

@@ -200,16 +200,25 @@ function buildBRolls(
       durationSec,
     );
     if (!frames) continue;
-    result.push({
+    const built: BRollClip = {
       id: clip.id,
       src: clip.src,
+      width: clip.width,
+      height: clip.height,
       startFrame: frames.startFrame,
       endFrame: frames.endFrame,
       scale: clip.scale ?? 1,
       offsetX: clip.offsetX ?? 0,
       offsetY: clip.offsetY ?? 0,
       rotation: clip.rotation ?? 0,
-    });
+    };
+    if (clip.mediaOffsetSec != null && clip.mediaOffsetSec > 0) {
+      built.mediaOffsetSec = clip.mediaOffsetSec;
+    }
+    if (clip.volume != null) {
+      built.volume = clip.volume;
+    }
+    result.push(built);
   }
   return result.sort((a, b) => a.startFrame - b.startFrame);
 }
@@ -235,12 +244,16 @@ function buildSfx(
       { clipToCaptions: false },
     );
     if (!frames) continue;
-    result.push({
+    const built: SfxClip = {
       id: clip.id,
       src: clip.src,
       startFrame: frames.startFrame,
       endFrame: frames.endFrame,
-    });
+    };
+    if (clip.volume != null) {
+      built.volume = clip.volume;
+    }
+    result.push(built);
   }
   return result.sort((a, b) => a.startFrame - b.startFrame);
 }

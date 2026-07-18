@@ -1,12 +1,12 @@
 import { useCallback, useRef } from 'react';
 
-import { isSelected } from '../../lib/selection';
-import { useCaptionDragSelect } from '../../lib/use-caption-drag-select';
-import { useSelection } from '../../selection-store';
-import { useCaptionIndices, useEditor, useFlatCaptions } from '../../store';
-import { TrackLabel } from './shared';
+import { isSelected } from '../../../lib/selection';
+import { useCaptionDragSelect } from '../../../lib/use-caption-drag-select';
+import { useSelection } from '../../../selection-store';
+import { useCaptionIndices, useEditor, useFlatCaptions } from '../../../store';
+import { TrackLabel } from '../shared';
 
-import type { FlatCaption } from "../../lib/captions";
+import type { FlatCaption } from "../../../lib/captions";
 
 type Props = {
   width: number;

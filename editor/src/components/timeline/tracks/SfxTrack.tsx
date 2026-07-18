@@ -1,9 +1,9 @@
-import { EMPTY_CAPTIONS, EMPTY_SFX } from "../../lib/empty";
-import { isSelected } from "../../lib/selection";
-import { maybeSnapTimelineSec } from "../../lib/snap";
-import { useSelection } from "../../selection-store";
-import { useEditor } from "../../store";
-import { Handle, TrackLabel, useTrackDrag } from "./shared";
+import { EMPTY_CAPTIONS, EMPTY_SFX } from "../../../lib/empty";
+import { isSelected } from "../../../lib/selection";
+import { maybeSnapTimelineSec } from "../../../lib/snap";
+import { useSelection } from "../../../selection-store";
+import { useEditor } from "../../../store";
+import { Handle, TrackLabel, useTrackDrag } from "../shared";
 
 type Props = {
   width: number;

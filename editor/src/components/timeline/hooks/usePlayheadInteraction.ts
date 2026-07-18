@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { setTimelineScrubbing } from "../../store";
-import { LABEL_OFFSET } from "./constants";
+import { setTimelineScrubbing } from "../../../store";
+import { LABEL_OFFSET } from "../constants";
 
 type Options = {
   contentRef: React.RefObject<HTMLDivElement | null>;

@@ -3,18 +3,18 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { getPlayer } from "../../lib/player-bridge";
 import { useSelection } from "../../selection-store";
 import { isTimelineScrubbing, useEditor } from "../../store";
-import { BRollTrack } from "./BRollTrack";
-import { CaptionTrack } from "./CaptionTrack";
 import { LABEL_OFFSET } from "./constants";
-import { ListicleTrack } from "./ListicleTrack";
+import { usePlayheadInteraction } from "./hooks/usePlayheadInteraction";
+import { useTimelineLayout } from "./hooks/useTimelineLayout";
 import { Playhead } from "./Playhead";
-import { PunchInTrack } from "./PunchInTrack";
-import { MusicTrack } from "./MusicTrack";
-import { SfxTrack } from "./SfxTrack";
 import { TimelineRuler } from "./TimelineRuler";
-import { usePlayheadInteraction } from "./usePlayheadInteraction";
-import { useTimelineLayout } from "./useTimelineLayout";
-import { VideoTrack } from "./VideoTrack";
+import { BRollTrack } from "./tracks/BRollTrack";
+import { CaptionTrack } from "./tracks/CaptionTrack";
+import { ListicleTrack } from "./tracks/ListicleTrack";
+import { MusicTrack } from "./tracks/MusicTrack";
+import { PunchInTrack } from "./tracks/PunchInTrack";
+import { SfxTrack } from "./tracks/SfxTrack";
+import { VideoTrack } from "./tracks/VideoTrack";
 
 function playheadContentX(sourceSec: number, pxPerSec: number): number {
   return LABEL_OFFSET + sourceSec * pxPerSec;

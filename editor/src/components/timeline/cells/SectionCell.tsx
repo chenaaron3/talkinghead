@@ -1,11 +1,11 @@
-import { isSelected } from "../../lib/selection";
-import { clampRangeEdge } from "../../lib/range";
-import { maybeSnapTimelineSec } from "../../lib/snap";
-import { useSelection } from "../../selection-store";
-import { useEditor, useFlatCaptions } from "../../store";
-import { Handle, useTrackDrag } from "./shared";
-import type { SectionLayoutItem } from "./useTimelineLayout";
-import { VoiceBand } from "./VoiceBand";
+import { isSelected } from "../../../lib/selection";
+import { clampRangeEdge } from "../../../lib/range";
+import { maybeSnapTimelineSec } from "../../../lib/snap";
+import { useSelection } from "../../../selection-store";
+import { useEditor, useFlatCaptions } from "../../../store";
+import type { SectionLayoutItem } from "../hooks/useTimelineLayout";
+import { Handle, useTrackDrag } from "../shared";
+import { VoiceBand } from "../tracks/VoiceBand";
 
 type Props = {
   item: SectionLayoutItem;

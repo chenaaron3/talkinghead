@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import type { FlatCaption } from "../../lib/captions";
+import type { FlatCaption } from "../../../lib/captions";
 import { sampleWaveformRange } from "@src/lib/waveform";
-import { useEditor } from "../../store";
+import { useEditor } from "../../../store";
 
 type Props = {
   start: number;

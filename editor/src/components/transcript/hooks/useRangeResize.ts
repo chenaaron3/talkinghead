@@ -1,16 +1,16 @@
 import { useEffect, useState, type MouseEvent } from "react";
-import type { FlatCaption } from "../../lib/captions";
-import type { RangeKind } from "../../lib/active-range";
-import { clampRangeEdge } from "../../lib/range";
-import { maybeSnapTimelineSec } from "../../lib/snap";
+import type { FlatCaption } from "../../../lib/captions";
+import type { RangeKind } from "../../../lib/active-range";
+import { clampRangeEdge } from "../../../lib/range";
+import { maybeSnapTimelineSec } from "../../../lib/snap";
 import {
   EMPTY_BROLLS,
   EMPTY_CAPTIONS,
   EMPTY_PUNCH_INS,
   EMPTY_SFX,
-} from "../../lib/empty";
-import { useSelection } from "../../selection-store";
-import { useEditor } from "../../store";
+} from "../../../lib/empty";
+import { useSelection } from "../../../selection-store";
+import { useEditor } from "../../../store";
 
 export type RangeResize =
   | { kind: "broll"; id: string; edge: "start" | "end" }

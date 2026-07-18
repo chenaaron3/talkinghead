@@ -4,7 +4,7 @@ import {
   findScissorPauses,
   type InterWordPause,
 } from "@src/lib/inter-word-gaps";
-import { useEditor } from "../../store";
+import { useEditor } from "../../../store";
 
 export type ScissorGhosts = {
   active: boolean;

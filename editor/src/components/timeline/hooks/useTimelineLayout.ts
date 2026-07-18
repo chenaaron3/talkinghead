@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { cutsToTimelineRegions } from "@src/lib/source-timeline";
-import { EMPTY_CUTS } from "../../lib/empty";
-import { useEditor } from "../../store";
+import { EMPTY_CUTS } from "../../../lib/empty";
+import { useEditor } from "../../../store";
 
 export type SectionLayoutItem = {
   kind: "section";

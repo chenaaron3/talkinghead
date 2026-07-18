@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 
-import { isVideoSrc } from "../../lib/broll";
+import { isVideoSrc } from "../../../lib/broll";
 
 type Props = {
   src: string;

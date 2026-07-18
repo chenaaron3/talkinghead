@@ -7,12 +7,12 @@ import { useCaptionDragSelect } from "../../lib/use-caption-drag-select";
 import { useSelection } from "../../selection-store";
 import { useEditor, useFlatCaptions, useCaptionIndices } from "../../store";
 import { InspectorPanel } from "../inspector/InspectorPanel";
-import { GhostGap } from "./GhostGap";
-import { Gap, gapIntensity } from "./Gap";
+import { Gap, gapIntensity } from "./cells/Gap";
+import { GhostGap } from "./cells/GhostGap";
+import { Word } from "./cells/Word";
+import { useRangeResize, markerDraggingFromResize } from "./hooks/useRangeResize";
+import { useScissorGhosts } from "./hooks/useScissorGhosts";
 import { TranscriptToolbar } from "./TranscriptToolbar";
-import { useRangeResize, markerDraggingFromResize } from "./useRangeResize";
-import { useScissorGhosts } from "./useScissorGhosts";
-import { Word } from "./Word";
 
 export function TranscriptPanel() {
   const config = useEditor((s) => s.config);

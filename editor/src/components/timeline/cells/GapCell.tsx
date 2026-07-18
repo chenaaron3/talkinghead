@@ -1,6 +1,6 @@
-import { isSelected } from "../../lib/selection";
-import { useSelection } from "../../selection-store";
-import type { GapLayoutItem } from "./useTimelineLayout";
+import { isSelected } from "../../../lib/selection";
+import { useSelection } from "../../../selection-store";
+import type { GapLayoutItem } from "../hooks/useTimelineLayout";
 
 type Props = {
   item: GapLayoutItem;

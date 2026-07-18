@@ -6,21 +6,21 @@ import {
   resolveSelectedRange,
   resolveStyleRange,
   type StartRangeResize,
-} from "../../lib/active-range";
-import { isSelected } from "../../lib/selection";
-import { wordClassName } from "../../lib/word-classes";
-import { useSelection } from "../../selection-store";
-import { LibraryAsset, SfxAsset, useEditor } from "../../store";
-import { ListicleBadge } from "./ListicleBadge";
-import { BRollBadge } from "./BRollBadge";
-import { PunchInBadge } from "./PunchInBadge";
-import { SfxBadge } from "./SfxBadge";
-import { WordContextMenu } from "./WordContextMenu";
-import { WordHandleSlot } from "./WordHandleSlot";
-import type { MarkerDragging } from "./useRangeResize";
+} from "../../../lib/active-range";
+import { isSelected } from "../../../lib/selection";
+import { wordClassName } from "../../../lib/word-classes";
+import { useSelection } from "../../../selection-store";
+import { LibraryAsset, SfxAsset, useEditor } from "../../../store";
+import { BRollBadge } from "../badge/BRollBadge";
+import { ListicleBadge } from "../badge/ListicleBadge";
+import { PunchInBadge } from "../badge/PunchInBadge";
+import { SfxBadge } from "../badge/SfxBadge";
+import type { MarkerDragging } from "../hooks/useRangeResize";
+import { WordContextMenu } from "../WordContextMenu";
+import { WordHandleSlot } from "../WordHandleSlot";
 
-import type { FlatCaption } from "../../lib/captions";
-import type { WordAnnotation } from "../../lib/word-annotations";
+import type { FlatCaption } from "../../../lib/captions";
+import type { WordAnnotation } from "../../../lib/word-annotations";
 
 type Props = {
   caption: FlatCaption;

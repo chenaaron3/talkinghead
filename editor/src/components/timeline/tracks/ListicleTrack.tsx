@@ -1,10 +1,10 @@
-import { EMPTY_CAPTIONS } from "../../lib/empty";
-import { clampRangeEdge, MIN_LISTICLE_SEC } from "../../lib/range";
-import { isSelected } from "../../lib/selection";
-import { maybeSnapTimelineSec } from "../../lib/snap";
-import { useSelection } from "../../selection-store";
-import { useEditor } from "../../store";
-import { Handle, TrackLabel, useTrackDrag } from "./shared";
+import { EMPTY_CAPTIONS } from "../../../lib/empty";
+import { clampRangeEdge, MIN_LISTICLE_SEC } from "../../../lib/range";
+import { isSelected } from "../../../lib/selection";
+import { maybeSnapTimelineSec } from "../../../lib/snap";
+import { useSelection } from "../../../selection-store";
+import { useEditor } from "../../../store";
+import { Handle, TrackLabel, useTrackDrag } from "../shared";
 
 type Props = {
   width: number;

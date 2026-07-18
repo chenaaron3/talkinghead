@@ -1,8 +1,8 @@
 import { Scissors } from 'lucide-react';
 
-import { isSelected } from '../../lib/selection';
-import { useSelection } from '../../selection-store';
-import { useEditor } from '../../store';
+import { isSelected } from '../../../lib/selection';
+import { useSelection } from '../../../selection-store';
+import { useEditor } from '../../../store';
 
 type Props = {
   id: number;

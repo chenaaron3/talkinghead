@@ -1,7 +1,7 @@
-import { GapCell } from "./GapCell";
-import { SectionCell } from "./SectionCell";
-import { TrackLabel } from "./shared";
-import type { LayoutItem } from "./useTimelineLayout";
+import { GapCell } from "../cells/GapCell";
+import { SectionCell } from "../cells/SectionCell";
+import type { LayoutItem } from "../hooks/useTimelineLayout";
+import { TrackLabel } from "../shared";
 
 type Props = {
   width: number;

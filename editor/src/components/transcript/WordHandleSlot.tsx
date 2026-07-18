@@ -1,4 +1,4 @@
-import { RangeHandle } from "./RangeHandle";
+import { RangeHandle } from "./cells/RangeHandle";
 import type { HandleConfig } from "../../lib/active-range";
 
 export type { HandleConfig } from "../../lib/active-range";

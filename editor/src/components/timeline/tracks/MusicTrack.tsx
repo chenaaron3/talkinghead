@@ -2,11 +2,11 @@ import { useMemo } from "react";
 
 import { mergeDuckRegionsSec } from "@src/lib/music-duck";
 
-import { EMPTY_CAPTIONS, EMPTY_SFX } from "../../lib/empty";
-import { isSelected } from "../../lib/selection";
-import { useSelection } from "../../selection-store";
-import { useEditor } from "../../store";
-import { TrackLabel } from "./shared";
+import { EMPTY_CAPTIONS, EMPTY_SFX } from "../../../lib/empty";
+import { isSelected } from "../../../lib/selection";
+import { useSelection } from "../../../selection-store";
+import { useEditor } from "../../../store";
+import { TrackLabel } from "../shared";
 
 type Props = {
   width: number;

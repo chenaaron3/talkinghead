@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 
-import type { RangeKind } from "../../lib/active-range";
+import type { RangeKind } from "../../../lib/active-range";
 
 type Props = {
   edge: "start" | "end";

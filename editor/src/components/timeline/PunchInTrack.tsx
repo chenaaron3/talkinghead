@@ -47,7 +47,12 @@ export function PunchInTrack({ width, sourceX }: Props) {
                 const fixedEnd = p.end;
                 startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = Math.max(0, origin + dxSec);
-                  const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+                  const snapped = maybeSnapTimelineSec(
+                    raw,
+                    captions,
+                    shiftKey,
+                    "start",
+                  );
                   const { start, end } = clampRangeEdge("start", snapped, {
                     start: origin,
                     end: fixedEnd,
@@ -64,7 +69,12 @@ export function PunchInTrack({ width, sourceX }: Props) {
                 const fixedStart = p.start;
                 startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = origin + dxSec;
-                  const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+                  const snapped = maybeSnapTimelineSec(
+                    raw,
+                    captions,
+                    shiftKey,
+                    "end",
+                  );
                   const { start, end } = clampRangeEdge("end", snapped, {
                     start: fixedStart,
                     end: origin,

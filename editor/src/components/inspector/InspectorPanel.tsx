@@ -8,6 +8,7 @@ import { useEditor } from '../../store';
 import { BRollInspector } from './BRollInspector';
 import { ListicleInspector } from './ListicleInspector';
 import { SfxInspector } from './SfxInspector';
+import { ZoomInspector } from './ZoomInspector';
 
 /**
  * Generic selection inspector overlay. Sits on the right edge of the transcript
@@ -17,6 +18,7 @@ export function InspectorPanel() {
   const editableBRoll = useEditableBRoll();
   const selection = useSelection((s) => s.selection);
   const sfx = useEditor((s) => s.config?.sfx);
+  const punchIns = useEditor((s) => s.config?.punchInSegments);
   const listicleItems = useEditor((s) => s.config?.listicleOverlay?.items);
   const clearSelection = useSelection((s) => s.clearSelection);
 
@@ -38,6 +40,14 @@ export function InspectorPanel() {
     if (clip) {
       title = "SFX";
       body = <SfxInspector clip={clip} />;
+    }
+  } else if (selection?.kind === "punchIn") {
+    const index = primaryId(selection);
+    const punchIn =
+      typeof index === "number" ? punchIns?.[index] : undefined;
+    if (punchIn != null && typeof index === "number") {
+      title = "Zoom";
+      body = <ZoomInspector index={index} punchIn={punchIn} />;
     }
   } else if (selection?.kind === "listicleItem") {
     const index = primaryId(selection);

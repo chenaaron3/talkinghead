@@ -35,6 +35,12 @@ export type PunchInSegment = {
   startFrame: number;
   endFrame: number;
   scale: number;
+  /** Default false when omitted (older generated props). */
+  wordByWord?: boolean;
+  /** Default true when omitted (older generated props). */
+  animate?: boolean;
+  /** Output-frame starts for each word when `wordByWord` is true. */
+  wordStartFrames?: number[];
 };
 
 export type BRollClip = {

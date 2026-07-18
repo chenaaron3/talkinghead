@@ -165,26 +165,6 @@ export function removeBRoll(bRolls: SourceBRoll[], id: string): SourceBRoll[] {
   return bRolls.filter((c) => c.id !== id);
 }
 
-/** Snap a source timestamp to the nearest caption boundary. */
-export function snapToCaptionBoundary(
-  sec: number,
-  captions: { start: number; end: number }[],
-  edge: "start" | "end",
-): number {
-  if (captions.length === 0) return sec;
-  let best = sec;
-  let bestDist = Infinity;
-  for (const cap of captions) {
-    const point = edge === "start" ? cap.start : cap.end;
-    const dist = Math.abs(point - sec);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = point;
-    }
-  }
-  return best;
-}
-
 /** True when playhead is inside the clip's source range. */
 export function isBRollActiveAt(
   clip: Pick<SourceBRoll, "start" | "end">,

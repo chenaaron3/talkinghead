@@ -50,6 +50,16 @@ export type SourceListicle = Range & {
 
 export type SourcePunchIn = Range & {
   scale: number;
+  /**
+   * When true, zoom ramps geometrically per word (root-damped).
+   * Default false.
+   */
+  wordByWord?: boolean;
+  /**
+   * When true, ease into (and between) zoom levels; when false, hard cut.
+   * Default true.
+   */
+  animate?: boolean;
 };
 
 /**

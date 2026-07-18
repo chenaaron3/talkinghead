@@ -38,6 +38,7 @@ import type {
   EpisodeConfig,
   EpisodeProps,
   SourceBRoll,
+  SourcePunchIn,
   SourceSfx,
   Transcript,
 } from "@src/lib/types";
@@ -164,6 +165,11 @@ type EditorActions = {
     index: number,
     start: number,
     end: number,
+    live?: boolean,
+  ) => void;
+  updatePunchIn: (
+    index: number,
+    patch: Partial<Pick<SourcePunchIn, "scale" | "wordByWord" | "animate">>,
     live?: boolean,
   ) => void;
   updateListicleOverlay: (start: number, end: number, live?: boolean) => void;
@@ -1027,6 +1033,19 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       if (nextEnd <= nextStart + MIN_RANGE_SEC) return;
       const punchInSegments = config.punchInSegments.map((p, i) =>
         i === index ? { ...p, start: nextStart, end: nextEnd } : p,
+      );
+      commit({ config: { ...config, punchInSegments }, transcript }, live);
+    },
+
+    updatePunchIn: (index, patch, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const seg = config.punchInSegments[index];
+      if (!seg) return;
+      const next: SourcePunchIn = { ...seg, ...patch };
+      if (patch.scale != null && !(patch.scale > 0)) return;
+      const punchInSegments = config.punchInSegments.map((p, i) =>
+        i === index ? next : p,
       );
       commit({ config: { ...config, punchInSegments }, transcript }, live);
     },

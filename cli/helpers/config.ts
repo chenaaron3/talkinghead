@@ -16,6 +16,7 @@ import {
   SOURCE_DIR,
 } from "./types";
 import { isVideoSrc } from "../../src/lib/media";
+import { DEFAULT_PUNCH_IN_SCALE } from "../../src/lib/punchin";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -161,13 +162,28 @@ function parsePunchInSegments(
     }
     const start = Number(entry.start);
     const end = Number(entry.end);
-    const scale = Number(entry.scale ?? 1.12);
+    const scale = Number(entry.scale ?? DEFAULT_PUNCH_IN_SCALE);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
       throw new Error(
         `"punchInSegments[${index}]" needs valid start/end in ${configPath}`,
       );
     }
-    return { start, end, scale };
+    if (!Number.isFinite(scale) || scale <= 0) {
+      throw new Error(
+        `"punchInSegments[${index}]" needs a positive scale in ${configPath}`,
+      );
+    }
+    return {
+      start,
+      end,
+      scale,
+      ...(typeof entry.wordByWord === "boolean"
+        ? { wordByWord: entry.wordByWord }
+        : {}),
+      ...(typeof entry.animate === "boolean"
+        ? { animate: entry.animate }
+        : {}),
+    };
   });
 }
 

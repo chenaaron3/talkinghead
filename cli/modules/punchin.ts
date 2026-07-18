@@ -6,6 +6,7 @@ import {
   captionIndexToSourceSec,
 } from "../helpers/cuts";
 import { getResultsOrCached } from "../helpers/transcript-cache";
+import { PUNCH_IN_STRENGTH } from "../../src/lib/punchin";
 import type { TranscriptCaption, SourcePunchIn } from "../helpers/types";
 
 const MODEL = "gpt-4.1-mini";
@@ -13,11 +14,6 @@ const MAX_PUNCH_INS = 10;
 const MIN_DURATION_SEC = 0.8;
 const MAX_DURATION_SEC = 3;
 const MIN_GAP_SEC = 2;
-
-const SCALE_BY_STRENGTH = {
-  subtle: 1.06,
-  strong: 1.12,
-} as const;
 
 export const PunchInDetectionSchema = z.object({
   punchIns: z
@@ -34,8 +30,8 @@ export const PunchInDetectionSchema = z.object({
           .nonnegative()
           .describe("Last word of the emphasized phrase"),
         strength: z
-          .enum(["subtle", "strong"])
-          .describe("subtle ≈ 1.06x zoom, strong ≈ 1.12x"),
+          .enum(["light", "medium", "strong"])
+          .describe("light ≈ 1.06x, medium ≈ 1.12x, strong ≈ 1.20x"),
         reason: z
           .string()
           .describe("Why this moment deserves emphasis, one short sentence"),
@@ -77,7 +73,7 @@ export function detectionToPunchInSegments(
     mapped.push({
       start,
       end,
-      scale: SCALE_BY_STRENGTH[item.strength],
+      scale: PUNCH_IN_STRENGTH[item.strength],
     });
   }
 

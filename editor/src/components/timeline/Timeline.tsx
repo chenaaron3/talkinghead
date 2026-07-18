@@ -139,10 +139,13 @@ export function Timeline() {
           style={{ width: totalWidth }}
           onMouseMove={(e) => onMouseMove(e.clientX)}
           onMouseLeave={onMouseLeave}
-          onClick={(e) => {
+          onClickCapture={(e) => {
+            // Seek even when track items stopPropagation (select/drag handlers).
+            onClick(e.clientX);
+          }}
+          onClick={() => {
             selectGap(null);
             selectKeepRegion(null);
-            onClick(e.clientX);
           }}
         >
           <Playhead

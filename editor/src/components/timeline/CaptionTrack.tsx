@@ -1,9 +1,10 @@
-import { useCallback, useRef } from "react";
-import { isSelected } from "../../lib/selection";
-import { useCaptionDragSelect } from "../../lib/use-caption-drag-select";
-import { useSelection } from "../../selection-store";
-import { useFlatCaptions, useCaptionIndices, useEditor } from "../../store";
-import { TrackLabel } from "./shared";
+import { useCallback, useRef } from 'react';
+
+import { isSelected } from '../../lib/selection';
+import { useCaptionDragSelect } from '../../lib/use-caption-drag-select';
+import { useSelection } from '../../selection-store';
+import { useCaptionIndices, useEditor, useFlatCaptions } from '../../store';
+import { TrackLabel } from './shared';
 
 import type { FlatCaption } from "../../lib/captions";
 
@@ -66,32 +67,32 @@ export function CaptionTrack({ width, sourceX }: Props) {
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-      {captions.map((caption) => {
-        const left = sourceX(caption.start);
-        const right = sourceX(caption.end);
-        const selected = isSelected(selection, "caption", caption.index);
-        return (
-          <CaptionBlock
-            key={caption.index}
-            caption={caption}
-            left={left}
-            width={Math.max(8, right - left)}
-            selected={selected}
-            onDragStart={(e) => onDragStart(caption.index, e)}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (e.shiftKey) {
-                selectCaptionExtend(caption.index, captionIndices);
-              } else if (e.metaKey || e.ctrlKey) {
-                selectCaption(caption.index, "toggle");
-              } else {
-                selectCaption(caption.index);
-              }
-              seekSource(caption.start);
-            }}
-          />
-        );
-      })}
+        {captions.map((caption) => {
+          const left = sourceX(caption.start);
+          const right = sourceX(caption.end);
+          const selected = isSelected(selection, "caption", caption.index);
+          return (
+            <CaptionBlock
+              key={caption.index}
+              caption={caption}
+              left={left}
+              width={Math.max(8, right - left)}
+              selected={selected}
+              onDragStart={(e) => onDragStart(caption.index, e)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (e.shiftKey) {
+                  selectCaptionExtend(caption.index, captionIndices);
+                } else if (e.metaKey || e.ctrlKey) {
+                  selectCaption(caption.index, "toggle");
+                } else {
+                  selectCaption(caption.index);
+                }
+                seekSource(caption.start);
+              }}
+            />
+          );
+        })}
       </div>
     </TrackLabel>
   );
@@ -115,15 +116,14 @@ function CaptionBlock({
   return (
     <div
       data-caption-index={caption.index}
-      className={`absolute top-1 bottom-1 z-[1] flex cursor-pointer items-center overflow-hidden rounded px-1 text-[10px] text-[#e8eaef] select-none ${
-        selected
-          ? "z-[2] bg-accent/50 outline outline-2 outline-white"
-          : caption.emphasis === "positive"
-            ? "bg-emerald-500/35"
-            : caption.emphasis === "negative"
-              ? "bg-red-500/35"
-              : "bg-accent/25"
-      }`}
+      className={`absolute top-1 bottom-1 z-[1] flex cursor-pointer items-center overflow-hidden rounded px-1 text-[10px] text-[#e8eaef] select-none ${selected
+        ? "z-[2] bg-accent/50 outline outline-2 outline-white"
+        : caption.emphasis === "positive"
+          ? "bg-emerald-500/35"
+          : caption.emphasis === "negative"
+            ? "bg-red-500/35"
+            : "bg-accent/25"
+        }`}
       style={{ left, width }}
       title={`${caption.text}  ${caption.start.toFixed(2)}–${caption.end.toFixed(2)}s`}
       onMouseDown={onDragStart}

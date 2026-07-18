@@ -44,7 +44,12 @@ export function SectionCell({ item }: Props) {
           const fixedEnd = item.end;
           startDrag(e, (dxSec, _dxPx, shiftKey) => {
             const raw = Math.max(0, origin + dxSec);
-            const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+            const snapped = maybeSnapTimelineSec(
+              raw,
+              captions,
+              shiftKey,
+              "start",
+            );
             const { start } = clampRangeEdge("start", snapped, {
               start: origin,
               end: fixedEnd,
@@ -61,7 +66,12 @@ export function SectionCell({ item }: Props) {
           const fixedStart = item.start;
           startDrag(e, (dxSec, _dxPx, shiftKey) => {
             const raw = origin + dxSec;
-            const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+            const snapped = maybeSnapTimelineSec(
+              raw,
+              captions,
+              shiftKey,
+              "end",
+            );
             const { end } = clampRangeEdge("end", snapped, {
               start: fixedStart,
               end: origin,

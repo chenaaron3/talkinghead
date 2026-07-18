@@ -7,6 +7,10 @@ import {
     mapSourceSecToOutputSec, validateCuts
 } from './source-timeline';
 
+import {
+  DEFAULT_PUNCH_IN_ANIMATE,
+  DEFAULT_PUNCH_IN_WORD_BY_WORD,
+} from "./punchin";
 import type {
   BRollClip,
   BuildPropsInput,
@@ -151,6 +155,30 @@ function buildListicle(
   };
 }
 
+function wordStartFramesForPunchIn(
+  punchIn: SourcePunchIn,
+  frames: { startFrame: number; endFrame: number },
+  captions: TranscriptCaption[],
+  segments: KeepSegment[],
+  fps: number,
+): number[] {
+  const starts: number[] = [];
+  for (const caption of captions) {
+    if (caption.end <= punchIn.start || caption.start >= punchIn.end) continue;
+    const sourceSec = Math.max(punchIn.start, caption.start);
+    const frame = mapSourceSecToOutputFrame(sourceSec, segments, fps);
+    if (frame == null) continue;
+    if (frame < frames.startFrame || frame >= frames.endFrame) continue;
+    if (starts.length === 0 || starts[starts.length - 1] !== frame) {
+      starts.push(frame);
+    }
+  }
+  if (starts.length === 0 || starts[0]! > frames.startFrame) {
+    starts.unshift(frames.startFrame);
+  }
+  return starts;
+}
+
 function buildPunchIns(
   punchIns: SourcePunchIn[],
   segments: KeepSegment[],
@@ -171,11 +199,26 @@ function buildPunchIns(
       durationSec,
     );
     if (!frames) continue;
-    result.push({
+    const wordByWord =
+      punchIn.wordByWord ?? DEFAULT_PUNCH_IN_WORD_BY_WORD;
+    const animate = punchIn.animate ?? DEFAULT_PUNCH_IN_ANIMATE;
+    const built: PunchInSegment = {
       startFrame: frames.startFrame,
       endFrame: frames.endFrame,
       scale: punchIn.scale,
-    });
+      wordByWord,
+      animate,
+    };
+    if (wordByWord) {
+      built.wordStartFrames = wordStartFramesForPunchIn(
+        punchIn,
+        frames,
+        captions,
+        segments,
+        fps,
+      );
+    }
+    result.push(built);
   }
   return result.length > 0 ? result : null;
 }

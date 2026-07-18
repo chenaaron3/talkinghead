@@ -44,7 +44,12 @@ export function SfxTrack({ width, sourceX }: Props) {
               selectSfx(clip.id);
               startDrag(e, (dxSec, _dxPx, shiftKey) => {
                 const raw = Math.max(0, origin + dxSec);
-                const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+                const snapped = maybeSnapTimelineSec(
+                  raw,
+                  captions,
+                  shiftKey,
+                  "start",
+                );
                 updateSfxRange(clip.id, "start", snapped, true);
               });
             }}
@@ -55,7 +60,12 @@ export function SfxTrack({ width, sourceX }: Props) {
                 const origin = clip.start;
                 startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = Math.max(0, origin + dxSec);
-                  const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+                  const snapped = maybeSnapTimelineSec(
+                    raw,
+                    captions,
+                    shiftKey,
+                    "start",
+                  );
                   updateSfxRange(clip.id, "start", snapped, true);
                 });
               }}
@@ -67,7 +77,12 @@ export function SfxTrack({ width, sourceX }: Props) {
                 const origin = clip.end;
                 startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = origin + dxSec;
-                  const snapped = maybeSnapTimelineSec(raw, captions, shiftKey);
+                  const snapped = maybeSnapTimelineSec(
+                    raw,
+                    captions,
+                    shiftKey,
+                    "end",
+                  );
                   updateSfxRange(clip.id, "end", snapped, true);
                 });
               }}

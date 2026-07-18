@@ -78,6 +78,37 @@ export function mergeDuckRegionsSec(
 }
 
 /**
+ * How strongly to duck at time `t` (0 = bed, 1 = fully ducked).
+ * Attack into regions, release out of them. Units match `regions` / attack / release.
+ */
+function duckAmountAt(
+  t: number,
+  regions: readonly { start: number; end: number }[],
+  attack: number,
+  release: number,
+): number {
+  let amount = 0;
+
+  for (const region of regions) {
+    if (t < region.start) {
+      const dist = region.start - t;
+      if (dist < attack) {
+        amount = Math.max(amount, 1 - dist / attack);
+      }
+    } else if (t < region.end) {
+      amount = 1;
+    } else {
+      const dist = t - region.end;
+      if (dist < release) {
+        amount = Math.max(amount, 1 - dist / release);
+      }
+    }
+    if (amount >= 1) return 1;
+  }
+  return amount;
+}
+
+/**
  * How strongly to duck at `frame` (0 = bed, 1 = fully ducked).
  * Attack into regions, release out of them.
  */
@@ -90,25 +121,27 @@ export function duckAmountAtFrame(
 ): number {
   const attack = Math.max(1, Math.round(attackSec * fps));
   const release = Math.max(1, Math.round(releaseSec * fps));
-  let amount = 0;
+  return duckAmountAt(
+    frame,
+    regions.map((r) => ({ start: r.startFrame, end: r.endFrame })),
+    attack,
+    release,
+  );
+}
 
-  for (const region of regions) {
-    if (frame < region.startFrame) {
-      const dist = region.startFrame - frame;
-      if (dist < attack) {
-        amount = Math.max(amount, 1 - dist / attack);
-      }
-    } else if (frame < region.endFrame) {
-      amount = 1;
-    } else {
-      const dist = frame - region.endFrame;
-      if (dist < release) {
-        amount = Math.max(amount, 1 - dist / release);
-      }
-    }
-    if (amount >= 1) return 1;
-  }
-  return amount;
+/** Source-timeline twin of `duckAmountAtFrame` (seconds). */
+export function duckAmountAtSec(
+  sec: number,
+  regions: readonly DuckRegionSec[],
+  attackSec = MUSIC_DUCK_ATTACK_SEC,
+  releaseSec = MUSIC_DUCK_RELEASE_SEC,
+): number {
+  return duckAmountAt(
+    sec,
+    regions,
+    Math.max(1e-6, attackSec),
+    Math.max(1e-6, releaseSec),
+  );
 }
 
 /** Linear bed volume with ducking + edge fades for the composition. */

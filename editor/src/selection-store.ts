@@ -37,6 +37,7 @@ type SelectionActions = {
   selectCaptionExtend: (index: number, orderedIndices: number[]) => void;
   selectBRoll: (id: string | null) => void;
   selectSfx: (id: string | null) => void;
+  selectMusic: (id: string | null) => void;
   selectPunchIn: (index: number | null) => void;
   selectListicleItem: (index: number | null) => void;
   selectGap: (gapId: number | null) => void;
@@ -112,6 +113,7 @@ export const useSelection = create<SelectionState & SelectionActions>(
       }
     },
     selectSfx: (id) => get().select("sfx", id),
+    selectMusic: (id) => get().select("music", id),
     selectPunchIn: (index) => get().select("punchIn", index),
     selectListicleItem: (index) => get().select("listicleItem", index),
     selectGap: (gapId) => get().select("gap", gapId),

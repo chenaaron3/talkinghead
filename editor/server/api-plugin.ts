@@ -7,7 +7,7 @@ import { findSourceVideo, loadEpisodeConfig, writeEpisodeConfig } from '../../cl
 import { createEpisodeWithVideo } from '../../cli/helpers/episode-id';
 import { rebuildAllPropsIndex } from '../../cli/helpers/props-index';
 import {
-    AUDIO_EXTENSIONS, HEIC_EXTENSIONS, IMAGE_EXTENSIONS, PUBLIC_SFX_DIR, ROOT, SOURCE_DIR,
+    AUDIO_EXTENSIONS, HEIC_EXTENSIONS, IMAGE_EXTENSIONS, PUBLIC_MUSIC_DIR, PUBLIC_SFX_DIR, ROOT, SOURCE_DIR,
     VIDEO_EXTENSIONS
 } from '../../cli/helpers/types';
 import { probeVideoFps } from '../../cli/helpers/whisper';
@@ -183,20 +183,20 @@ function listEpisodeBRollAssets(episodeId: string) {
   return out;
 }
 
-function listSfxAssets() {
-  if (!fs.existsSync(PUBLIC_SFX_DIR)) return [];
+function listAudioLibrary(dir: string, publicFolder: string) {
+  if (!fs.existsSync(dir)) return [];
   const out: Array<{
     key: string;
     label: string;
     src: string;
     durationSec: number;
   }> = [];
-  for (const entry of fs.readdirSync(PUBLIC_SFX_DIR, { withFileTypes: true })) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isFile()) continue;
     const ext = path.extname(entry.name);
     if (!AUDIO_EXTENSIONS.has(ext)) continue;
-    const abs = path.join(PUBLIC_SFX_DIR, entry.name);
-    const src = path.join("sfx", entry.name).split(path.sep).join("/");
+    const abs = path.join(dir, entry.name);
+    const src = path.join(publicFolder, entry.name).split(path.sep).join("/");
     out.push({
       key: entry.name,
       label: entry.name.replace(/\.[^.]+$/, ""),
@@ -205,6 +205,14 @@ function listSfxAssets() {
     });
   }
   return out.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function listSfxAssets() {
+  return listAudioLibrary(PUBLIC_SFX_DIR, "sfx");
+}
+
+function listMusicAssets() {
+  return listAudioLibrary(PUBLIC_MUSIC_DIR, "music");
 }
 
 function readBody(req: import("http").IncomingMessage): Promise<string> {
@@ -366,7 +374,8 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               };
             });
             const sfx = listSfxAssets();
-            return sendJson(res, 200, { assets, sfx });
+            const music = listMusicAssets();
+            return sendJson(res, 200, { assets, sfx, music });
           }
 
           if (req.method === "PUT" && pathname === "/api/episode") {
@@ -401,6 +410,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               punchInSegments: body.config.punchInSegments,
               bRolls: body.config.bRolls,
               sfx: body.config.sfx ?? [],
+              music: body.config.music ?? null,
             });
 
             const transcriptPath = path.join(
@@ -611,6 +621,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
                   punchInSegments: body.config.punchInSegments,
                   bRolls: body.config.bRolls,
                   sfx: body.config.sfx ?? [],
+                  music: body.config.music ?? null,
                 });
                 writeJson(
                   path.join(episodeDir, "generated", "transcript.json"),

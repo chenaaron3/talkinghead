@@ -2,6 +2,7 @@ export type SelectionKind =
   | "caption"
   | "broll"
   | "sfx"
+  | "music"
   | "punchIn"
   | "listicleItem"
   | "gap"
@@ -11,6 +12,7 @@ export type Selection =
   | { kind: "caption"; ids: number[] }
   | { kind: "broll"; ids: string[] }
   | { kind: "sfx"; ids: string[] }
+  | { kind: "music"; ids: string[] }
   | { kind: "punchIn"; ids: number[] }
   | { kind: "listicleItem"; ids: number[] }
   | { kind: "gap"; ids: number[] }

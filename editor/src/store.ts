@@ -19,6 +19,12 @@ import {
   withBRollVolume,
   type Transform,
 } from './lib/broll';
+import {
+  musicFromAsset,
+  withMusicOffset,
+  withMusicVolume,
+  type MusicAsset,
+} from './lib/music';
 import { removeSfx, upsertSfx, applySfxEdge, withSfxVolume } from './lib/sfx';
 import { captionIndexAt, flattenCaptions, updateCaption } from './lib/captions';
 import { captionActionRange } from './lib/caption-selection';
@@ -61,6 +67,8 @@ export type SfxAsset = {
   durationSec: number;
 };
 
+export type { MusicAsset };
+
 export type EditorMode = "default" | "scissor";
 
 type EpisodeSnapshot = {
@@ -82,6 +90,7 @@ type EditorState = {
   props: EpisodeProps | null;
   assets: LibraryAsset[];
   sfxAssets: SfxAsset[];
+  musicAssets: MusicAsset[];
   dirty: boolean;
   saving: boolean;
   /** Playhead on output timeline (for Remotion preview). */
@@ -121,6 +130,10 @@ type EditorActions = {
   ) => void;
   placeBRollOnCaption: (asset: LibraryAsset, caption: FlatCaption) => void;
   placeSfxOnCaption: (asset: SfxAsset, caption: FlatCaption) => void;
+  setMusic: (asset: MusicAsset) => void;
+  clearMusic: () => void;
+  updateMusicVolume: (volume: number, live?: boolean) => void;
+  updateMusicOffset: (mediaOffsetSec: number, live?: boolean) => void;
   addPunchInOnCaption: (caption: FlatCaption) => void;
   cutCaption: (caption: FlatCaption) => void;
   setMode: (mode: EditorMode) => void;
@@ -342,6 +355,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     props: null,
     assets: [],
     sfxAssets: [],
+    musicAssets: [],
     dirty: false,
     saving: false,
     frame: 0,
@@ -382,6 +396,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
             props: null,
             assets: [],
             sfxAssets: [],
+            musicAssets: [],
             dirty: false,
             frame: 0,
             sourceSec: 0,
@@ -415,6 +430,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         const as = (await assetsRes.json()) as {
           assets?: LibraryAsset[];
           sfx?: SfxAsset[];
+          music?: MusicAsset[];
           error?: string;
         };
         if (!epRes.ok) throw new Error(ep.error ?? "Failed to load episode");
@@ -435,6 +451,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           props: ep.props,
           assets: as.assets ?? [],
           sfxAssets: as.sfx ?? [],
+          musicAssets: as.music ?? [],
           loadState: "ready",
           dirty: false,
           frame: 0,
@@ -485,12 +502,14 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         const data = (await res.json()) as {
           assets?: LibraryAsset[];
           sfx?: SfxAsset[];
+          music?: MusicAsset[];
           error?: string;
         };
         if (!res.ok) throw new Error(data.error ?? "Failed to refresh assets");
         set({
           assets: data.assets ?? [],
           sfxAssets: data.sfx ?? [],
+          musicAssets: data.music ?? [],
         });
       } catch (err) {
         set({ error: err instanceof Error ? err.message : String(err) });
@@ -745,6 +764,16 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         return true;
       }
 
+      if (selection.kind === "music") {
+        if (!config.music) return false;
+        commit({
+          config: { ...config, music: null },
+          transcript,
+        });
+        clearSelection();
+        return true;
+      }
+
       if (selection.kind === "caption") {
         const indices = selection.ids.filter(
           (id): id is number => typeof id === "number",
@@ -847,6 +876,35 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       if ("error" in result) return;
       commit({ config: { ...config, sfx: result }, transcript });
       useSelection.getState().selectSfx(clip.id);
+    },
+
+    setMusic: (asset) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const music = musicFromAsset(asset);
+      commit({ config: { ...config, music }, transcript });
+      useSelection.getState().selectMusic(music.id);
+    },
+
+    clearMusic: () => {
+      const { config, transcript } = get();
+      if (!config || !transcript || !config.music) return;
+      commit({ config: { ...config, music: null }, transcript });
+      useSelection.getState().selectMusic(null);
+    },
+
+    updateMusicVolume: (volume, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript || !config.music) return;
+      const music = withMusicVolume(config.music, volume);
+      commit({ config: { ...config, music }, transcript }, live);
+    },
+
+    updateMusicOffset: (mediaOffsetSec, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript || !config.music) return;
+      const music = withMusicOffset(config.music, mediaOffsetSec);
+      commit({ config: { ...config, music }, transcript }, live);
     },
 
     addPunchInOnCaption: (caption) => {

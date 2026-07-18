@@ -26,6 +26,7 @@ const fallbackProps: EpisodeProps = {
   punchIns: null,
   bRolls: [],
   sfx: [],
+  music: null,
 };
 
 const propsMap = allProps as Record<string, EpisodeProps>;

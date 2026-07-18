@@ -10,7 +10,7 @@ export type MediaBase = {
   src: string;
   /**
    * Linear gain 0–1.
-   * Defaults: video b-roll `0`, SFX `0.4`. Omit identity in YAML.
+   * Defaults: video b-roll `0`, SFX `0.4`, music `0.15`. Omit identity in YAML.
    */
   volume?: number;
 };
@@ -90,6 +90,16 @@ export type SourceSfx = {
 } & Range &
   AudioAsset;
 
+/**
+ * Single looping music bed for the episode (full output duration).
+ * Not a ranged clip — always spans the keep timeline.
+ */
+export type SourceMusic = {
+  id: string;
+  /** Seconds into the music file where playback begins. Default 0. */
+  mediaOffsetSec?: number;
+} & AudioAsset;
+
 /** Episode settings stored in config.yaml (source timeline, seconds). */
 export type EpisodeConfig = {
   /**
@@ -111,4 +121,6 @@ export type EpisodeConfig = {
   punchInSegments: SourcePunchIn[];
   bRolls: SourceBRoll[];
   sfx: SourceSfx[];
+  /** One looping bed, or null when unset. */
+  music: SourceMusic | null;
 };

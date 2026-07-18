@@ -24,8 +24,10 @@ import type {
   SourceListicle,
   SourcePunchIn,
   SourceBRoll,
+  SourceMusic,
   SourceSfx,
   SfxClip,
+  MusicClip,
 } from "./types";
 
 function secToFrames(sec: number, fps: number): number {
@@ -301,6 +303,22 @@ function buildSfx(
   return result.sort((a, b) => a.startFrame - b.startFrame);
 }
 
+function buildMusic(music: SourceMusic | null | undefined): MusicClip | null {
+  if (!music) return null;
+  const clip: MusicClip = {
+    id: music.id,
+    src: music.src,
+    srcDurationSec: music.srcDurationSec,
+  };
+  if (music.volume != null) {
+    clip.volume = music.volume;
+  }
+  if (music.mediaOffsetSec != null && music.mediaOffsetSec > 0) {
+    clip.mediaOffsetSec = music.mediaOffsetSec;
+  }
+  return clip;
+}
+
 /** Deterministically derive frame-only props from config + transcript. */
 export function buildProps(input: BuildPropsInput): EpisodeProps {
   const { episodeId, title, videoSrc, fps, config, transcript } = input;
@@ -359,6 +377,8 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     transcript.duration,
   );
 
+  const music = buildMusic(config.music);
+
   return {
     episodeId,
     title,
@@ -379,6 +399,7 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     punchIns,
     bRolls,
     sfx,
+    music,
   };
 }
 

@@ -64,6 +64,13 @@ export function PlayerPanel() {
       seekTargetRef.current = null;
       return;
     }
+    // Playback lag: player advanced a few frames past a stale store frame
+    // (slow React sync). Don't pause/seek — that was causing random stalls.
+    // Larger gaps are intentional seeks (e.g. click timeline while playing).
+    const lag = current - frame;
+    if (player.isPlaying() && lag > 0 && lag <= 8) {
+      return;
+    }
     seekTargetRef.current = frame;
     if (player.isPlaying()) {
       player.pause();

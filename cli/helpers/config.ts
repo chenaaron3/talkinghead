@@ -10,6 +10,7 @@ import {
   type EpisodeConfig,
   type SourceBRoll,
   type SourceListicle,
+  type SourceMusic,
   type SourcePunchIn,
   type SourceSfx,
   type SourceCut,
@@ -299,6 +300,43 @@ function parseSfx(value: unknown, configPath: string): SourceSfx[] {
   });
 }
 
+function parseMusic(
+  value: unknown,
+  configPath: string,
+): SourceMusic | null {
+  if (value == null) return null;
+  if (!isPlainObject(value)) {
+    throw new Error(`"music" must be an object or null in ${configPath}`);
+  }
+  const id = String(value.id ?? "").trim();
+  const src = String(value.src ?? "").trim();
+  if (!id || !src) {
+    throw new Error(`"music" needs id and src in ${configPath}`);
+  }
+  const srcDurationSec = Number(value.srcDurationSec);
+  const volume = Number(value.volume);
+  const mediaOffsetSec = Number(value.mediaOffsetSec);
+  const clip: SourceMusic = {
+    id,
+    src,
+    srcDurationSec:
+      Number.isFinite(srcDurationSec) && srcDurationSec > 0
+        ? srcDurationSec
+        : 1,
+  };
+  if (value.volume != null && Number.isFinite(volume)) {
+    clip.volume = Math.min(1, Math.max(0, volume));
+  }
+  if (
+    value.mediaOffsetSec != null &&
+    Number.isFinite(mediaOffsetSec) &&
+    mediaOffsetSec > 0
+  ) {
+    clip.mediaOffsetSec = mediaOffsetSec;
+  }
+  return clip;
+}
+
 export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
   const configPath = path.join(episodeDir, "config.yaml");
   const defaults = readYaml(DEFAULT_CONFIG_PATH);
@@ -330,6 +368,7 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     punchInSegments: parsePunchInSegments(local.punchInSegments, configPath),
     bRolls: parseBRolls(local.bRolls, configPath),
     sfx: parseSfx(local.sfx, configPath),
+    music: parseMusic(local.music, configPath),
   };
 }
 

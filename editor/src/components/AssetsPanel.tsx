@@ -6,8 +6,8 @@ import { cn } from '../lib/utils';
 import { useEditor } from '../store';
 import { Dropzone } from './ui/dropzone';
 
-import type { LibraryAsset, SfxAsset } from '../store';
-type Tab = "broll" | "sfx";
+import type { LibraryAsset, MusicAsset, SfxAsset } from '../store';
+type Tab = "broll" | "sfx" | "music";
 
 function BRollThumb({ asset }: { asset: LibraryAsset }) {
   if (isVideoSrc(asset.src)) {
@@ -103,7 +103,7 @@ function BRollGrid({
   );
 }
 
-function SfxGrid({ assets }: { assets: SfxAsset[] }) {
+function useAudioPreview() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingKey, setPlayingKey] = useState<string | null>(null);
 
@@ -117,15 +117,15 @@ function SfxGrid({ assets }: { assets: SfxAsset[] }) {
     setPlayingKey(null);
   };
 
-  const preview = (asset: SfxAsset) => {
-    if (playingKey === asset.key) {
+  const preview = (key: string, src: string) => {
+    if (playingKey === key) {
       stopPreview();
       return;
     }
     stopPreview();
-    const audio = new Audio(`/${asset.src}`);
+    const audio = new Audio(`/${src}`);
     audioRef.current = audio;
-    setPlayingKey(asset.key);
+    setPlayingKey(key);
     void audio.play().catch(() => {
       setPlayingKey(null);
     });
@@ -136,6 +136,12 @@ function SfxGrid({ assets }: { assets: SfxAsset[] }) {
       }
     };
   };
+
+  return { playingKey, preview, stopPreview };
+}
+
+function SfxGrid({ assets }: { assets: SfxAsset[] }) {
+  const { playingKey, preview, stopPreview } = useAudioPreview();
 
   return (
     <div className="flex flex-col gap-1 p-2.5">
@@ -159,7 +165,7 @@ function SfxGrid({ assets }: { assets: SfxAsset[] }) {
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-sfx/25 text-sfx hover:bg-sfx/40"
             onClick={(e) => {
               e.stopPropagation();
-              preview(asset);
+              preview(asset.key, asset.src);
             }}
             title={playingKey === asset.key ? "Stop" : "Preview"}
           >
@@ -180,6 +186,67 @@ function SfxGrid({ assets }: { assets: SfxAsset[] }) {
   );
 }
 
+function MusicGrid({
+  assets,
+  activeSrc,
+  onSelect,
+}: {
+  assets: MusicAsset[];
+  activeSrc: string | null;
+  onSelect: (asset: MusicAsset) => void;
+}) {
+  const { playingKey, preview, stopPreview } = useAudioPreview();
+
+  return (
+    <div className="flex flex-col gap-1 p-2.5">
+      <p className="px-0.5 pb-1 text-[10px] leading-snug text-muted">
+        Click a preset to set the episode music bed. It loops under dialogue and
+        ducks for captions/SFX.
+      </p>
+      {assets.map((asset) => {
+        const active = asset.src === activeSrc;
+        return (
+          <div
+            key={asset.key}
+            className={cn(
+              "flex cursor-pointer items-center gap-2 rounded-lg border bg-panel-2 px-2 py-1.5 select-none",
+              active
+                ? "border-music ring-1 ring-music"
+                : "border-border hover:border-music/60",
+            )}
+            onClick={() => {
+              stopPreview();
+              onSelect(asset);
+            }}
+            title={`${asset.label} (${asset.durationSec.toFixed(1)}s)`}
+          >
+            <button
+              type="button"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-music/25 text-music hover:bg-music/40"
+              onClick={(e) => {
+                e.stopPropagation();
+                preview(asset.key, asset.src);
+              }}
+              title={playingKey === asset.key ? "Stop" : "Preview"}
+            >
+              {playingKey === asset.key ? "■" : "▶"}
+            </button>
+            <span className="min-w-0 flex-1 truncate text-[11px] text-[#e8eaef]">
+              {asset.label}
+            </span>
+            <span className="shrink-0 text-[10px] text-muted">
+              {active ? "On" : `${asset.durationSec.toFixed(0)}s`}
+            </span>
+          </div>
+        );
+      })}
+      {assets.length === 0 ? (
+        <p className="text-xs text-muted">No files in public/music.</p>
+      ) : null}
+    </div>
+  );
+}
+
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;
@@ -191,6 +258,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function AssetsPanel() {
   const assets = useEditor((s) => s.assets);
   const sfxAssets = useEditor((s) => s.sfxAssets);
+  const musicAssets = useEditor((s) => s.musicAssets);
+  const musicSrc = useEditor((s) => s.config?.music?.src ?? null);
+  const setMusic = useEditor((s) => s.setMusic);
   const episodeId = useEditor((s) => s.episodeId);
   const refreshAssets = useEditor((s) => s.refreshAssets);
   const removeBRollsBySrc = useEditor((s) => s.removeBRollsBySrc);
@@ -282,6 +352,7 @@ export function AssetsPanel() {
           [
             ["broll", "B-roll"],
             ["sfx", "SFX"],
+            ["music", "Music"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -335,9 +406,17 @@ export function AssetsPanel() {
             />
           )}
         </Dropzone>
-      ) : (
+      ) : tab === "sfx" ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <SfxGrid assets={sfxAssets} />
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <MusicGrid
+            assets={musicAssets}
+            activeSrc={musicSrc}
+            onSelect={setMusic}
+          />
         </div>
       )}
     </div>

@@ -9,6 +9,7 @@ import { LABEL_OFFSET } from "./constants";
 import { ListicleTrack } from "./ListicleTrack";
 import { Playhead } from "./Playhead";
 import { PunchInTrack } from "./PunchInTrack";
+import { MusicTrack } from "./MusicTrack";
 import { SfxTrack } from "./SfxTrack";
 import { TimelineRuler } from "./TimelineRuler";
 import { usePlayheadInteraction } from "./usePlayheadInteraction";
@@ -169,6 +170,7 @@ export function Timeline() {
             <SfxTrack width={trackWidth} sourceX={sourceX} />
             <PunchInTrack width={trackWidth} sourceX={sourceX} />
             <ListicleTrack width={trackWidth} sourceX={sourceX} />
+            <MusicTrack width={trackWidth} sourceX={sourceX} />
           </div>
         </div>
       </div>

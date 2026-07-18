@@ -68,6 +68,17 @@ export type SfxClip = {
   volume?: number;
 };
 
+export type MusicClip = {
+  id: string;
+  /** Path under public/, e.g. `music/Lofi1.mp3` */
+  src: string;
+  srcDurationSec: number;
+  /** 0–1. Default MUSIC_VOLUME_DEFAULT. */
+  volume?: number;
+  /** Seconds into the music file. Default 0. */
+  mediaOffsetSec?: number;
+};
+
 /** Derived render payload stored in props.json (output timeline, frames). */
 export type EpisodeProps = {
   episodeId: string;
@@ -85,4 +96,5 @@ export type EpisodeProps = {
   punchIns?: PunchInSegment[] | null;
   bRolls?: BRollClip[] | null;
   sfx?: SfxClip[] | null;
+  music?: MusicClip | null;
 };

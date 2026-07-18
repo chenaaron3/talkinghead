@@ -1,7 +1,7 @@
 export const PUNCH_IN_STRENGTH = {
-  light: 1.06,
-  medium: 1.12,
-  strong: 1.2,
+  light: 1.1,
+  medium: 1.25,
+  strong: 1.5,
 } as const;
 
 export type PunchInStrength = keyof typeof PUNCH_IN_STRENGTH;
@@ -26,7 +26,7 @@ export function punchInStrengthFromScale(scale: number): PunchInStrength {
 }
 
 /** < 1 softens compounding; lower = gentler late zooms. */
-const WORD_BY_WORD_TAPER = 0.7;
+const WORD_BY_WORD_TAPER = 0.4;
 
 /**
  * Root-damped geometric: strength^((index+1)^taper).

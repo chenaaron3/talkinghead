@@ -7,6 +7,7 @@ import { useSelection } from '../../selection-store';
 import { useEditor } from '../../store';
 import { BRollInspector } from './BRollInspector';
 import { ListicleInspector } from './ListicleInspector';
+import { MusicInspector } from './MusicInspector';
 import { SfxInspector } from './SfxInspector';
 import { ZoomInspector } from './ZoomInspector';
 
@@ -18,6 +19,7 @@ export function InspectorPanel() {
   const editableBRoll = useEditableBRoll();
   const selection = useSelection((s) => s.selection);
   const sfx = useEditor((s) => s.config?.sfx);
+  const music = useEditor((s) => s.config?.music);
   const punchIns = useEditor((s) => s.config?.punchInSegments);
   const listicleItems = useEditor((s) => s.config?.listicleOverlay?.items);
   const clearSelection = useSelection((s) => s.clearSelection);
@@ -40,6 +42,11 @@ export function InspectorPanel() {
     if (clip) {
       title = "SFX";
       body = <SfxInspector clip={clip} />;
+    }
+  } else if (selection?.kind === "music") {
+    if (music) {
+      title = "Music";
+      body = <MusicInspector clip={music} />;
     }
   } else if (selection?.kind === "punchIn") {
     const index = primaryId(selection);

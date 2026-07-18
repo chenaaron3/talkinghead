@@ -8,7 +8,7 @@ import { useSelection } from "../../selection-store";
 import { useEditor, useFlatCaptions, useCaptionIndices } from "../../store";
 import { InspectorPanel } from "../inspector/InspectorPanel";
 import { GhostGap } from "./GhostGap";
-import { Gap } from "./Gap";
+import { Gap, gapIntensity } from "./Gap";
 import { TranscriptToolbar } from "./TranscriptToolbar";
 import { useRangeResize, markerDraggingFromResize } from "./useRangeResize";
 import { useScissorGhosts } from "./useScissorGhosts";
@@ -32,6 +32,18 @@ export function TranscriptPanel() {
     [config],
   );
 
+  const gapDurationRange = useMemo(() => {
+    if (gapMarkers.length === 0) return { min: 0, max: 0 };
+    let min = Infinity;
+    let max = -Infinity;
+    for (const gap of gapMarkers) {
+      const duration = gap.end - gap.start;
+      if (duration < min) min = duration;
+      if (duration > max) max = duration;
+    }
+    return { min, max };
+  }, [gapMarkers]);
+
   const annotations = useMemo(
     () => buildWordAnnotations(captions, config),
     [captions, config],
@@ -51,12 +63,18 @@ export function TranscriptPanel() {
       gapMarkers[gapIdx]!.end <= caption.start
     ) {
       const gap = gapMarkers[gapIdx]!;
+      const duration = gap.end - gap.start;
       nodes.push(
         <Gap
           key={`gap-${gap.id}`}
           id={gap.id}
           start={gap.start}
           end={gap.end}
+          intensity={gapIntensity(
+            duration,
+            gapDurationRange.min,
+            gapDurationRange.max,
+          )}
         />,
       );
       gapIdx += 1;
@@ -95,8 +113,19 @@ export function TranscriptPanel() {
 
   while (gapIdx < gapMarkers.length) {
     const gap = gapMarkers[gapIdx]!;
+    const duration = gap.end - gap.start;
     nodes.push(
-      <Gap key={`gap-${gap.id}`} id={gap.id} start={gap.start} end={gap.end} />,
+      <Gap
+        key={`gap-${gap.id}`}
+        id={gap.id}
+        start={gap.start}
+        end={gap.end}
+        intensity={gapIntensity(
+          duration,
+          gapDurationRange.min,
+          gapDurationRange.max,
+        )}
+      />,
     );
     gapIdx += 1;
   }

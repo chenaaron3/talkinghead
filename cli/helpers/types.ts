@@ -40,6 +40,7 @@ export const AUDIO_EXTENSIONS = new Set([
   ".FLAC",
 ]);
 export const PUBLIC_SFX_DIR = path.join(ROOT, "public", "sfx");
+export const PUBLIC_MUSIC_DIR = path.join(ROOT, "public", "music");
 export const GENERATED_EPISODES_INDEX = path.join(
   ROOT,
   "src",

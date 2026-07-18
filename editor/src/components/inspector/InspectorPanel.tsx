@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
+import { X } from 'lucide-react';
 
-import { useEditableBRoll } from "../../lib/use-editable-broll";
-import { primaryId } from "../../lib/selection";
-import { useSelection } from "../../selection-store";
-import { useEditor } from "../../store";
-import { BRollInspector } from "./BRollInspector";
-import { SfxInspector } from "./SfxInspector";
+import { primaryId } from '../../lib/selection';
+import { useEditableBRoll } from '../../lib/use-editable-broll';
+import { useSelection } from '../../selection-store';
+import { useEditor } from '../../store';
+import { BRollInspector } from './BRollInspector';
+import { ListicleInspector } from './ListicleInspector';
+import { SfxInspector } from './SfxInspector';
 
 /**
  * Generic selection inspector overlay. Sits on the right edge of the transcript
@@ -16,6 +17,7 @@ export function InspectorPanel() {
   const editableBRoll = useEditableBRoll();
   const selection = useSelection((s) => s.selection);
   const sfx = useEditor((s) => s.config?.sfx);
+  const listicleItems = useEditor((s) => s.config?.listicleOverlay?.items);
   const clearSelection = useSelection((s) => s.clearSelection);
 
   let title: string | null = null;
@@ -36,6 +38,14 @@ export function InspectorPanel() {
     if (clip) {
       title = "SFX";
       body = <SfxInspector clip={clip} />;
+    }
+  } else if (selection?.kind === "listicleItem") {
+    const index = primaryId(selection);
+    const item =
+      typeof index === "number" ? listicleItems?.[index] : undefined;
+    if (item != null && typeof index === "number") {
+      title = "Listicle";
+      body = <ListicleInspector index={index} item={item} />;
     }
   }
 

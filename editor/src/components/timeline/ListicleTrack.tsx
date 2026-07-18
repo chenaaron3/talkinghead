@@ -1,6 +1,8 @@
 import { EMPTY_CAPTIONS } from "../../lib/empty";
 import { clampRangeEdge, MIN_LISTICLE_SEC } from "../../lib/range";
+import { isSelected } from "../../lib/selection";
 import { maybeSnapTimelineSec } from "../../lib/snap";
+import { useSelection } from "../../selection-store";
 import { useEditor } from "../../store";
 import { Handle, TrackLabel, useTrackDrag } from "./shared";
 
@@ -12,6 +14,8 @@ type Props = {
 export function ListicleTrack({ width, sourceX }: Props) {
   const listicle = useEditor((s) => s.config?.listicleOverlay);
   const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
+  const selection = useSelection((s) => s.selection);
+  const selectListicleItem = useSelection((s) => s.selectListicleItem);
   const updateListicleOverlay = useEditor((s) => s.updateListicleOverlay);
   const updateListicleItemReveal = useEditor(
     (s) => s.updateListicleItemReveal,
@@ -71,13 +75,21 @@ export function ListicleTrack({ width, sourceX }: Props) {
       {listicle.items.map((item, i) => (
         <div
           key={`li-${i}`}
-          className="absolute top-1 bottom-1 z-[1] flex w-6 cursor-ew-resize items-center justify-center rounded bg-green-500/70 text-[9px] text-white select-none hover:bg-green-400/80"
+          className={`absolute top-1 bottom-1 z-[1] flex w-6 cursor-ew-resize items-center justify-center rounded bg-green-500/70 text-[9px] text-white select-none hover:bg-green-400/80 ${
+            isSelected(selection, "listicleItem", i)
+              ? "z-[2] outline outline-2 outline-white"
+              : ""
+          }`}
           style={{ left: sourceX(item.reveal) }}
           title={`${item.label} @ ${item.reveal.toFixed(2)}s`}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            selectListicleItem(i);
+          }}
           onMouseDown={(e) => {
             if (e.button !== 0) return;
             const origin = item.reveal;
+            selectListicleItem(i);
             startDrag(e, (dxSec, _dxPx, shiftKey) => {
               const reveal = maybeSnapTimelineSec(
                 origin + dxSec,

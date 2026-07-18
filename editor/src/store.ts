@@ -172,6 +172,11 @@ type EditorActions = {
     reveal: number,
     live?: boolean,
   ) => void;
+  updateListicleItemLabel: (
+    index: number,
+    label: string,
+    live?: boolean,
+  ) => void;
 };
 
 const history: EpisodeSnapshot[] = [];
@@ -1062,6 +1067,25 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const nextReveal = Math.max(start, Math.min(end, reveal));
       const items = config.listicleOverlay.items.map((item, i) =>
         i === index ? { ...item, reveal: nextReveal } : item,
+      );
+      commit(
+        {
+          config: {
+            ...config,
+            listicleOverlay: { ...config.listicleOverlay, items },
+          },
+          transcript,
+        },
+        live,
+      );
+    },
+
+    updateListicleItemLabel: (index, label, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript || !config.listicleOverlay) return;
+      if (!config.listicleOverlay.items[index]) return;
+      const items = config.listicleOverlay.items.map((item, i) =>
+        i === index ? { ...item, label } : item,
       );
       commit(
         {

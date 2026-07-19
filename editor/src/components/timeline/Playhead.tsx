@@ -62,21 +62,23 @@ export function Playhead({
       {!scrubbing && hoverX != null && hoverSec != null ? (
         <>
           <div
-            className="pointer-events-none absolute top-0 bottom-0 z-20 w-px bg-white/30"
+            className="pointer-events-none absolute top-0 bottom-0 z-50 w-px bg-white/30"
             style={{ left: hoverX }}
           />
-          <div
-            className="pointer-events-none absolute z-30 -translate-x-1/2 rounded bg-panel-2/90 px-1 py-px text-[10px] leading-none text-[#e8eaef]"
-            style={{ left: hoverX, top: 4 }}
-          >
-            {formatTimeHover(hoverSec)}
+          <div className="pointer-events-none sticky top-1 z-50 h-0">
+            <div
+              className="absolute -translate-x-1/2 rounded bg-panel-2/90 px-1 py-px text-[10px] leading-none text-[#e8eaef]"
+              style={{ left: hoverX }}
+            >
+              {formatTimeHover(hoverSec)}
+            </div>
           </div>
         </>
       ) : null}
 
       <div
         ref={activeRef}
-        className="pointer-events-none absolute top-0 bottom-0 left-0 z-30 will-change-transform"
+        className="pointer-events-none absolute top-0 bottom-0 left-0 z-50 will-change-transform"
       >
         <div className="relative h-full w-0.5 -translate-x-1/2 bg-sky-400 pointer-events-none">
           <div

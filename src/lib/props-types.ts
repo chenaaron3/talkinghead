@@ -41,6 +41,9 @@ export type PunchInSegment = {
   animate?: boolean;
   /** Output-frame starts for each word when `wordByWord` is true. */
   wordStartFrames?: number[];
+  /** Zoom focal point as fraction of composition size (0–1). */
+  originX?: number;
+  originY?: number;
 };
 
 export type BRollClip = {

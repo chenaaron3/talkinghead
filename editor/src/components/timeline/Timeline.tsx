@@ -131,7 +131,7 @@ export function Timeline() {
   return (
     <div className="flex min-h-0 min-w-0 w-full max-w-[100vw] flex-col overflow-hidden bg-panel">
       <div
-        className="relative min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden [touch-action:pan-x]"
+        className="relative min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto [touch-action:pan-x_pan-y]"
         ref={scrollRef}
       >
         <div

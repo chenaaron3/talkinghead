@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { cn } from "./lib/utils";
 import { togglePlayback } from "./lib/player-bridge";
-import { AssetsPanel } from "./components/AssetsPanel";
+import { AssetsPanel } from "./components/assets/AssetsPanel";
 import { Navbar } from "./components/Navbar";
 import { PlayerPanel } from "./components/PlayerPanel";
 import { Timeline } from "./components/timeline/Timeline";

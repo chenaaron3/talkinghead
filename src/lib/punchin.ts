@@ -9,6 +9,23 @@ export type PunchInStrength = keyof typeof PUNCH_IN_STRENGTH;
 export const DEFAULT_PUNCH_IN_SCALE = PUNCH_IN_STRENGTH.medium;
 export const DEFAULT_PUNCH_IN_ANIMATE = true;
 export const DEFAULT_PUNCH_IN_WORD_BY_WORD = false;
+/** Faces sit above center in 9:16 talking-head framing. */
+export const DEFAULT_PUNCH_IN_ORIGIN_X = 0.5;
+export const DEFAULT_PUNCH_IN_ORIGIN_Y = 0.35;
+
+export function clampPunchInOrigin(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+export function resolvePunchInOrigin(partial: {
+  originX?: number;
+  originY?: number;
+}): { originX: number; originY: number } {
+  return {
+    originX: partial.originX ?? DEFAULT_PUNCH_IN_ORIGIN_X,
+    originY: partial.originY ?? DEFAULT_PUNCH_IN_ORIGIN_Y,
+  };
+}
 
 export function punchInStrengthFromScale(scale: number): PunchInStrength {
   let best: PunchInStrength = "medium";

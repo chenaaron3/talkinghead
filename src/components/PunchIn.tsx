@@ -4,15 +4,13 @@ import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from 'remotion';
 import {
   DEFAULT_PUNCH_IN_ANIMATE,
   DEFAULT_PUNCH_IN_WORD_BY_WORD,
+  resolvePunchInOrigin,
   wordPunchInScale,
 } from '../lib/punchin';
 import type { PunchInSegment } from '../lib/types';
 
 const ENTER_FRAMES = 4;
 const EXIT_FRAMES = 8;
-
-// Faces sit above center in 9:16 talking-head framing.
-const TRANSFORM_ORIGIN = "50% 35%";
 
 const EASING = Easing.inOut(Easing.ease);
 
@@ -100,16 +98,22 @@ function wordByWordScaleAtFrame(
   });
 }
 
-function scaleAtFrame(frame: number, punchIns: PunchInSegment[]): number {
+function punchInAtFrame(
+  frame: number,
+  punchIns: PunchInSegment[],
+): PunchInSegment | null {
   for (const punchIn of punchIns) {
     const { startFrame, endFrame } = punchIn;
     if (frame < startFrame || frame > endFrame) continue;
-
-    const wordByWord = punchIn.wordByWord ?? DEFAULT_PUNCH_IN_WORD_BY_WORD;
-    if (wordByWord) return wordByWordScaleAtFrame(frame, punchIn);
-    return singleScaleAtFrame(frame, punchIn);
+    return punchIn;
   }
-  return 1;
+  return null;
+}
+
+function scaleAtFrame(frame: number, punchIn: PunchInSegment): number {
+  const wordByWord = punchIn.wordByWord ?? DEFAULT_PUNCH_IN_WORD_BY_WORD;
+  if (wordByWord) return wordByWordScaleAtFrame(frame, punchIn);
+  return singleScaleAtFrame(frame, punchIn);
 }
 
 export const PunchIn: React.FC<{
@@ -117,14 +121,16 @@ export const PunchIn: React.FC<{
   children: React.ReactNode;
 }> = ({ punchIns, children }) => {
   const frame = useCurrentFrame();
-  const scale =
-    punchIns && punchIns.length > 0 ? scaleAtFrame(frame, punchIns) : 1;
+  const active =
+    punchIns && punchIns.length > 0 ? punchInAtFrame(frame, punchIns) : null;
+  const scale = active ? scaleAtFrame(frame, active) : 1;
+  const origin = resolvePunchInOrigin(active ?? {});
 
   return (
     <AbsoluteFill
       style={{
         transform: `scale(${scale})`,
-        transformOrigin: TRANSFORM_ORIGIN,
+        transformOrigin: `${origin.originX * 100}% ${origin.originY * 100}%`,
       }}
     >
       {children}

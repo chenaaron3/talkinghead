@@ -211,6 +211,8 @@ function buildPunchIns(
       wordByWord,
       animate,
     };
+    if (punchIn.originX != null) built.originX = punchIn.originX;
+    if (punchIn.originY != null) built.originY = punchIn.originY;
     if (wordByWord) {
       built.wordStartFrames = wordStartFramesForPunchIn(
         punchIn,

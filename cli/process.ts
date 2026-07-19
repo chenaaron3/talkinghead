@@ -24,13 +24,14 @@ import { renderEpisode } from "./render-episode";
 
 function parseArgs(argv: string[]) {
   const force = argv.includes("--force");
+  const noRender = argv.includes("--no-render");
   const positional = argv.filter((arg) => !arg.startsWith("--"));
   if (positional.length === 0) {
     throw new Error(
-      "Usage: pnpm process -- source/<episode> [--force]\nExample: pnpm process -- source/day1",
+      "Usage: pnpm process -- source/<episode> [--force] [--no-render]\nExample: pnpm process -- source/day1",
     );
   }
-  return { input: positional[0]!, force };
+  return { input: positional[0]!, force, noRender };
 }
 
 function ensureDir(dir: string) {
@@ -73,7 +74,7 @@ function linkVideo(videoPath: string, episodeId: string): string {
 }
 
 export async function runProcess(argv: string[]): Promise<{ episodeId: string }> {
-  const { input, force } = parseArgs(argv);
+  const { input, force, noRender } = parseArgs(argv);
   const { episodeId, episodeDir } = resolveEpisodeDir(input);
   let config = loadEpisodeConfig(episodeDir);
   const videoPath = findSourceVideo(episodeDir, config.aroll);
@@ -239,7 +240,11 @@ export async function runProcess(argv: string[]): Promise<{ episodeId: string }>
   );
   console.log(`[done] props → source/${episodeId}/generated/props.json`);
 
-  await renderEpisode({ episodeId, episodeDir });
+  if (noRender) {
+    console.log(`[done] skipping render (--no-render)`);
+  } else {
+    await renderEpisode({ episodeId, episodeDir });
+  }
   return { episodeId };
 }
 

@@ -174,7 +174,9 @@ function parsePunchInSegments(
         `"punchInSegments[${index}]" needs a positive scale in ${configPath}`,
       );
     }
-    return {
+    const originX = Number(entry.originX);
+    const originY = Number(entry.originY);
+    const punchIn: SourcePunchIn = {
       start,
       end,
       scale,
@@ -185,6 +187,13 @@ function parsePunchInSegments(
         ? { animate: entry.animate }
         : {}),
     };
+    if (entry.originX != null && Number.isFinite(originX)) {
+      punchIn.originX = Math.min(1, Math.max(0, originX));
+    }
+    if (entry.originY != null && Number.isFinite(originY)) {
+      punchIn.originY = Math.min(1, Math.max(0, originY));
+    }
+    return punchIn;
   });
 }
 

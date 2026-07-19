@@ -33,7 +33,7 @@ export function TimelineRuler({
 
   return (
     <div
-      className="relative shrink-0 cursor-ew-resize border-b border-border/60 bg-panel select-none"
+      className="sticky top-0 z-40 shrink-0 cursor-ew-resize border-b border-border/60 bg-panel select-none"
       style={{ height: RULER_HEIGHT, width: LABEL_OFFSET + trackWidth }}
       onMouseDown={(e) => {
         if (e.button !== 0) return;

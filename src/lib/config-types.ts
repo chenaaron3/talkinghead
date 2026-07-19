@@ -60,6 +60,12 @@ export type SourcePunchIn = Range & {
    * Default true.
    */
   animate?: boolean;
+  /**
+   * Zoom focal point as fraction of composition size (0–1).
+   * Default 0.5 / 0.35 (face bias). Omit when default.
+   */
+  originX?: number;
+  originY?: number;
 };
 
 /**

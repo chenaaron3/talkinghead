@@ -7,8 +7,8 @@ import { findSourceVideo, loadEpisodeConfig, writeEpisodeConfig } from '../../cl
 import { createEpisodeWithVideo } from '../../cli/helpers/episode-id';
 import { rebuildAllPropsIndex } from '../../cli/helpers/props-index';
 import {
-    AUDIO_EXTENSIONS, HEIC_EXTENSIONS, IMAGE_EXTENSIONS, PUBLIC_MUSIC_DIR, PUBLIC_SFX_DIR, ROOT, SOURCE_DIR,
-    VIDEO_EXTENSIONS
+    AUDIO_EXTENSIONS, HEIC_EXTENSIONS, IMAGE_EXTENSIONS, PUBLIC_MUSIC_DIR, PUBLIC_SFX_DIR, ROOT,
+    SOURCE_DIR, VIDEO_EXTENSIONS
 } from '../../cli/helpers/types';
 import { probeVideoFps } from '../../cli/helpers/whisper';
 import { runProcess } from '../../cli/process';
@@ -183,6 +183,10 @@ function listEpisodeBRollAssets(episodeId: string) {
   return out;
 }
 
+function isAudioExt(ext: string): boolean {
+  return AUDIO_EXTENSIONS.has(ext) || AUDIO_EXTENSIONS.has(ext.toLowerCase());
+}
+
 function listAudioLibrary(dir: string, publicFolder: string) {
   if (!fs.existsSync(dir)) return [];
   const out: Array<{
@@ -194,7 +198,7 @@ function listAudioLibrary(dir: string, publicFolder: string) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isFile()) continue;
     const ext = path.extname(entry.name);
-    if (!AUDIO_EXTENSIONS.has(ext)) continue;
+    if (!isAudioExt(ext)) continue;
     const abs = path.join(dir, entry.name);
     const src = path.join(publicFolder, entry.name).split(path.sep).join("/");
     out.push({
@@ -211,8 +215,55 @@ function listSfxAssets() {
   return listAudioLibrary(PUBLIC_SFX_DIR, "sfx");
 }
 
-function listMusicAssets() {
-  return listAudioLibrary(PUBLIC_MUSIC_DIR, "music");
+function listEpisodeMusicAssets(episodeId: string) {
+  const dir = path.join(SOURCE_DIR, episodeId, "music");
+  if (!fs.existsSync(dir)) return [];
+  const out: Array<{
+    key: string;
+    label: string;
+    src: string;
+    durationSec: number;
+  }> = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const ext = path.extname(entry.name);
+    if (!isAudioExt(ext)) continue;
+    const abs = path.join(dir, entry.name);
+    const key = path.join(episodeId, entry.name).split(path.sep).join("/");
+    const src = path
+      .join("music", episodeId, entry.name)
+      .split(path.sep)
+      .join("/");
+    linkIntoPublic(abs, src);
+    out.push({
+      key,
+      label: entry.name.replace(/\.[^.]+$/, ""),
+      src,
+      durationSec: probeMedia(abs).durationSec,
+    });
+  }
+  return out;
+}
+
+function listMusicAssets(episodeId: string) {
+  const shared = listAudioLibrary(PUBLIC_MUSIC_DIR, "music");
+  const episode = listEpisodeMusicAssets(episodeId);
+  return [...shared, ...episode].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function ensureMusicAsset(music: EpisodeConfig["music"]) {
+  if (!music?.src) return;
+  const absPublic = path.join(ROOT, "public", music.src);
+  if (fs.existsSync(absPublic)) return;
+  // Episode uploads: music/{episodeId}/{file} → source/{episodeId}/music/{file}
+  const parts = music.src.split("/");
+  if (parts.length !== 3 || parts[0] !== "music") return;
+  const [, episodeId, file] = parts;
+  if (!episodeId || !file || file.includes("..")) return;
+  const absSource = path.join(SOURCE_DIR, episodeId, "music", file);
+  if (fs.existsSync(absSource)) {
+    linkIntoPublic(absSource, music.src);
+  }
 }
 
 function readBody(req: import("http").IncomingMessage): Promise<string> {
@@ -267,6 +318,8 @@ function loadEpisodeData(episodeId: string) {
   const ext = path.extname(videoPath).toLowerCase();
   const videoSrc = `episodes/${episodeId}/video${ext}`;
   const title = config.title ?? episodeId;
+
+  ensureMusicAsset(config.music ?? null);
 
   const props = buildProps({
     episodeId,
@@ -374,7 +427,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               };
             });
             const sfx = listSfxAssets();
-            const music = listMusicAssets();
+            const music = listMusicAssets(episodeId);
             return sendJson(res, 200, { assets, sfx, music });
           }
 
@@ -390,6 +443,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             }
 
             ensureBRollAssets(body.config.bRolls);
+            ensureMusicAsset(body.config.music ?? null);
 
             const episodeDir = path.join(SOURCE_DIR, episodeId);
             const configPath = path.join(episodeDir, "config.yaml");
@@ -461,12 +515,60 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             }
             const { episodeId } = createEpisodeWithVideo({ filename, data });
             try {
-              await runProcess([path.join("source", episodeId)]);
+              await runProcess([path.join("source", episodeId), "--no-render"]);
               return sendJson(res, 200, { episodeId });
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err);
               return sendJson(res, 500, { error: message, episodeId });
             }
+          }
+
+          if (req.method === "POST" && pathname === "/api/import-music") {
+            const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
+            const filename = filenameFromRequest(req);
+            const mediaExt = path.extname(filename);
+            if (!isAudioExt(mediaExt)) {
+              return sendJson(res, 400, {
+                error:
+                  "Unsupported audio type. Drop .mp3 / .wav / .m4a / .ogg / .flac files.",
+              });
+            }
+            const data = await readBodyBuffer(req);
+            if (data.length === 0) {
+              return sendJson(res, 400, { error: "Empty file" });
+            }
+            const episodeDir = path.join(SOURCE_DIR, episodeId);
+            if (!fs.existsSync(episodeDir)) {
+              return sendJson(res, 404, { error: "Episode not found" });
+            }
+
+            const safeName = path.basename(filename).replace(/[/\\]/g, "");
+            const musicDir = path.join(episodeDir, "music");
+            ensureDir(musicDir);
+            const absPath = path.join(musicDir, safeName);
+            if (fs.existsSync(absPath)) {
+              return sendJson(res, 409, {
+                error: `${safeName} already exists in this episode`,
+                duplicate: true,
+              });
+            }
+
+            fs.writeFileSync(absPath, data);
+            const key = path
+              .join(episodeId, safeName)
+              .split(path.sep)
+              .join("/");
+            const src = path
+              .join("music", episodeId, safeName)
+              .split(path.sep)
+              .join("/");
+            linkIntoPublic(absPath, src);
+            return sendJson(res, 200, {
+              key,
+              label: safeName.replace(/\.[^.]+$/, ""),
+              src,
+              durationSec: probeMedia(absPath).durationSec,
+            });
           }
 
           if (req.method === "POST" && pathname === "/api/import-broll") {
@@ -496,6 +598,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             if (fs.existsSync(absPath)) {
               return sendJson(res, 409, {
                 error: `${destName} already exists in this episode`,
+                duplicate: true,
               });
             }
 
@@ -613,6 +716,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               };
               if (body.config && body.transcript) {
                 ensureBRollAssets(body.config.bRolls);
+                ensureMusicAsset(body.config.music ?? null);
                 writeEpisodeConfig(episodeDir, {
                   aroll: body.config.aroll,
                   captionsAtATime: body.config.captionsAtATime,

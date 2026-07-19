@@ -32,7 +32,11 @@ import { applySelection, primaryId } from './lib/selection';
 import { useSelection } from './selection-store';
 import { cutForCaption, cutForPause } from './lib/cuts';
 import { sourceSecToOutputFrame, outputFrameToSourceSec } from './lib/frames';
-import { punchInForCaption } from './lib/punchin';
+import {
+  punchInForCaption,
+  resolvePunchInOrigin,
+  withPunchInOrigin,
+} from './lib/punchin';
 import { MIN_LISTICLE_SEC, MIN_RANGE_SEC } from './lib/range';
 import { cutKeepRegion, restoreGap, setSectionEdge } from './lib/sections';
 import { deserializeWaveform, peakMax } from '@src/lib/waveform';
@@ -182,7 +186,12 @@ type EditorActions = {
   ) => void;
   updatePunchIn: (
     index: number,
-    patch: Partial<Pick<SourcePunchIn, "scale" | "wordByWord" | "animate">>,
+    patch: Partial<
+      Pick<
+        SourcePunchIn,
+        "scale" | "wordByWord" | "animate" | "originX" | "originY"
+      >
+    >,
     live?: boolean,
   ) => void;
   updateListicleOverlay: (start: number, end: number, live?: boolean) => void;
@@ -1100,8 +1109,17 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       if (!config || !transcript) return;
       const seg = config.punchInSegments[index];
       if (!seg) return;
-      const next: SourcePunchIn = { ...seg, ...patch };
       if (patch.scale != null && !(patch.scale > 0)) return;
+      const { originX: patchOx, originY: patchOy, ...otherPatch } = patch;
+      let next: SourcePunchIn = { ...seg, ...otherPatch };
+      if (patchOx != null || patchOy != null) {
+        const resolved = resolvePunchInOrigin(seg);
+        next = withPunchInOrigin(
+          next,
+          patchOx ?? resolved.originX,
+          patchOy ?? resolved.originY,
+        );
+      }
       const punchInSegments = config.punchInSegments.map((p, i) =>
         i === index ? next : p,
       );

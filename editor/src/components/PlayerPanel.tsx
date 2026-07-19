@@ -7,6 +7,7 @@ import { TalkingHead } from '@src/TalkingHead';
 import { setPlayer } from '../lib/player-bridge';
 import { isTimelineScrubbing, useEditor } from '../store';
 import { BRollTransformOverlay } from './player/BRollTransformOverlay';
+import { PunchInOriginOverlay } from './player/PunchInOriginOverlay';
 
 import type { PlayerRef } from '@remotion/player';
 export function PlayerPanel() {
@@ -19,6 +20,10 @@ export function PlayerPanel() {
   /** While set, ignore player→store frame sync until player catches up. */
   const seekTargetRef = useRef<number | null>(null);
   const [transformDragging, setTransformDragging] = useState(false);
+
+  const onOverlayDragging = useCallback((dragging: boolean) => {
+    setTransformDragging(dragging);
+  }, []);
 
   const setPlayerRef = useCallback((instance: PlayerRef | null) => {
     ref.current = instance;
@@ -103,7 +108,8 @@ export function PlayerPanel() {
             spaceKeyToPlayOrPause={false}
             acknowledgeRemotionLicense
           />
-          <BRollTransformOverlay onDraggingChange={setTransformDragging} />
+          <BRollTransformOverlay onDraggingChange={onOverlayDragging} />
+          <PunchInOriginOverlay onDraggingChange={onOverlayDragging} />
         </div>
       </div>
       <div className="shrink-0 border-t border-border px-2 py-1 text-center text-xs text-muted">

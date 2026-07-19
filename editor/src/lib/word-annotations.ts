@@ -4,8 +4,8 @@ import type { FlatCaption } from "./captions";
 export type RangeEdge = "start" | "end" | "middle" | "both";
 
 export type WordAnnotation = {
-  bRollId?: string;
-  bRollEdge?: RangeEdge;
+  /** B-roll clips whose play range covers this word. */
+  bRollRanges?: Array<{ id: string; edge: RangeEdge }>;
   /** B-roll markers that start on this word. */
   bRollMarkers?: Array<{ id: string; src: string }>;
   /** SFX markers that start on this word. */
@@ -102,14 +102,12 @@ export function buildWordAnnotations(
   for (const caption of captions) {
     const annotation: WordAnnotation = {};
 
+    const bRollRanges: Array<{ id: string; edge: RangeEdge }> = [];
     for (const clip of config.bRolls) {
       const edge = rangeEdge(caption, clip.start, clip.end, captions);
-      if (edge) {
-        annotation.bRollId = clip.id;
-        annotation.bRollEdge = edge;
-        break;
-      }
+      if (edge) bRollRanges.push({ id: clip.id, edge });
     }
+    if (bRollRanges.length > 0) annotation.bRollRanges = bRollRanges;
 
     const bRollMarkers = bRollMarkersAt(caption, config.bRolls);
     if (bRollMarkers.length > 0) annotation.bRollMarkers = bRollMarkers;

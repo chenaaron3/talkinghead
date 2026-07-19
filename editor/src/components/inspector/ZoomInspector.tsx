@@ -1,17 +1,15 @@
 import type { SourcePunchIn } from "@src/lib/types";
 
 import {
-  DEFAULT_PUNCH_IN_ANIMATE,
-  DEFAULT_PUNCH_IN_WORD_BY_WORD,
-  PUNCH_IN_STRENGTH,
-  punchInStrengthFromScale,
-  type PunchInStrength,
-} from "../../lib/punchin";
-import { useEditor } from "../../store";
-import { Button } from "../ui/button";
-import { Label } from "../ui/label";
-import { ToggleField } from "./field";
+    DEFAULT_PUNCH_IN_ANIMATE, DEFAULT_PUNCH_IN_WORD_BY_WORD, PUNCH_IN_STRENGTH,
+    punchInStrengthFromScale
+} from '../../lib/punchin';
+import { useEditor } from '../../store';
+import { Button } from '../ui/button';
+import { Label } from '../ui/label';
+import { ToggleField } from './field';
 
+import type { PunchInStrength } from '../../lib/punchin';
 const STRENGTH_OPTIONS: Array<{ id: PunchInStrength; label: string }> = [
   { id: "light", label: "Light" },
   { id: "medium", label: "Medium" },
@@ -65,13 +63,15 @@ export function ZoomInspector({
         }
       />
 
-      <ToggleField
-        label="Animate"
-        checked={animate}
-        onCheckedChange={(checked) =>
-          updatePunchIn(index, { animate: checked }, true)
-        }
-      />
+      {!wordByWord && (
+        <ToggleField
+          label="Ease"
+          checked={animate}
+          onCheckedChange={(checked) =>
+            updatePunchIn(index, { animate: checked }, true)
+          }
+        />
+      )}
     </div>
   );
 }

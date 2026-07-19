@@ -1,6 +1,9 @@
 import type { MouseEvent } from "react";
 
-import { isSelected, type Selection } from "./selection";
+import { isSelected } from './selection';
+
+import type { Selection } from "./selection";
+
 import type { RangeEdge, WordAnnotation } from "./word-annotations";
 
 export type RangeKind = "broll" | "sfx" | "zoom";
@@ -35,18 +38,22 @@ function isEndEdge(edge: RangeEdge): boolean {
 /**
  * Range covering this word for transcript tint.
  * Priority: b-roll > selected sfx > zoom.
- * B-roll/zoom always cover; sfx only when selected (marker-first elsewhere).
+ * B-roll/zoom always cover (prefer selected when several overlap);
+ * sfx only when selected (marker-first elsewhere).
  */
 export function resolveStyleRange(
   annotation: WordAnnotation,
   selection: Selection | null,
 ): ActiveRange | null {
-  if (annotation.bRollId != null && annotation.bRollEdge) {
+  const bRolls = annotation.bRollRanges;
+  if (bRolls && bRolls.length > 0) {
+    const selected = bRolls.find((r) => isSelected(selection, "broll", r.id));
+    const pick = selected ?? bRolls[0]!;
     return {
       kind: "broll",
-      id: annotation.bRollId,
-      edge: annotation.bRollEdge,
-      selected: isSelected(selection, "broll", annotation.bRollId),
+      id: pick.id,
+      edge: pick.edge,
+      selected: selected != null,
     };
   }
 
@@ -79,15 +86,14 @@ export function resolveSelectedRange(
   annotation: WordAnnotation,
   selection: Selection | null,
 ): ActiveRange | null {
-  if (
-    annotation.bRollId != null &&
-    annotation.bRollEdge &&
-    isSelected(selection, "broll", annotation.bRollId)
-  ) {
+  const bRoll = annotation.bRollRanges?.find((r) =>
+    isSelected(selection, "broll", r.id),
+  );
+  if (bRoll) {
     return {
       kind: "broll",
-      id: annotation.bRollId,
-      edge: annotation.bRollEdge,
+      id: bRoll.id,
+      edge: bRoll.edge,
       selected: true,
     };
   }

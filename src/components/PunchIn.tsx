@@ -9,10 +9,8 @@ import {
 } from '../lib/punchin';
 import type { PunchInSegment } from '../lib/types';
 
-const ENTER_FRAMES = 4;
-const EXIT_FRAMES = 8;
-
-const EASING = Easing.inOut(Easing.ease);
+/** Soft start/end for a full-range slow push-in. */
+const SLOW_ZOOM_EASING = Easing.inOut(Easing.ease);
 
 function singleScaleAtFrame(frame: number, punchIn: PunchInSegment): number {
   const { startFrame, endFrame, scale } = punchIn;
@@ -20,82 +18,33 @@ function singleScaleAtFrame(frame: number, punchIn: PunchInSegment): number {
 
   if (!animate) return scale;
 
-  const enterEnd = startFrame + ENTER_FRAMES;
-  const exitStart = endFrame - EXIT_FRAMES;
+  if (endFrame <= startFrame) return scale;
 
-  if (enterEnd < exitStart) {
-    return interpolate(
-      frame,
-      [startFrame, enterEnd, exitStart, endFrame],
-      [1, scale, scale, 1],
-      {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-        easing: EASING,
-      },
-    );
-  }
-
-  // Too short for a hold: ramp up to the midpoint, then straight back down.
-  const midFrame = (startFrame + endFrame) / 2;
-  return interpolate(
-    frame,
-    [startFrame, midFrame, endFrame],
-    [1, scale, 1],
-    {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-      easing: EASING,
-    },
-  );
+  return interpolate(frame, [startFrame, endFrame], [1, scale], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: SLOW_ZOOM_EASING,
+  });
 }
 
+/** Word-by-word always hard-cuts between stepped scales (no animate). */
 function wordByWordScaleAtFrame(
   frame: number,
   punchIn: PunchInSegment,
 ): number {
-  const { endFrame, scale, wordStartFrames } = punchIn;
-  const animate = punchIn.animate ?? DEFAULT_PUNCH_IN_ANIMATE;
+  const { scale, wordStartFrames } = punchIn;
   const starts = wordStartFrames;
   if (!starts || starts.length === 0) {
-    return singleScaleAtFrame(frame, punchIn);
-  }
-
-  const n = starts.length;
-  const scaleAt = (index: number) => wordPunchInScale(index, scale);
-  const lastScale = scaleAt(n - 1);
-
-  if (animate) {
-    const exitStart = endFrame - EXIT_FRAMES;
-    if (exitStart > starts[n - 1]! && frame >= exitStart) {
-      return interpolate(frame, [exitStart, endFrame], [lastScale, 1], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-        easing: EASING,
-      });
-    }
+    return punchIn.scale;
   }
 
   let index = 0;
-  for (let k = 1; k < n; k++) {
+  for (let k = 1; k < starts.length; k++) {
     if (frame >= starts[k]!) index = k;
     else break;
   }
 
-  const target = scaleAt(index);
-  if (!animate) return target;
-
-  const prev = index === 0 ? 1 : scaleAt(index - 1);
-  const segStart = starts[index]!;
-  const segEnd = index + 1 < n ? starts[index + 1]! : endFrame;
-  const enterEnd = Math.min(segStart + ENTER_FRAMES, segEnd);
-  if (enterEnd <= segStart) return target;
-
-  return interpolate(frame, [segStart, enterEnd], [prev, target], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: EASING,
-  });
+  return wordPunchInScale(index, scale);
 }
 
 function punchInAtFrame(

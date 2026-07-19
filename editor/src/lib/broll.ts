@@ -133,16 +133,6 @@ export function clampBRollRange(
   return { start, end: start + maxPlay };
 }
 
-export function bRollsOverlap(
-  clips: SourceBRoll[],
-  candidate: { start: number; end: number; id?: string },
-): boolean {
-  return clips.some((clip) => {
-    if (candidate.id && clip.id === candidate.id) return false;
-    return candidate.start < clip.end && candidate.end > clip.start;
-  });
-}
-
 export function upsertBRoll(
   bRolls: SourceBRoll[],
   clip: SourceBRoll,
@@ -154,9 +144,6 @@ export function upsertBRoll(
   const maxPlay = maxBRollPlaySec(clip);
   if (maxPlay != null && clip.end - clip.start > maxPlay + 0.001) {
     return { error: "B-roll range longer than source media" };
-  }
-  if (bRollsOverlap(others, clip)) {
-    return { error: "B-roll overlaps another clip" };
   }
   return [...others, compactBRoll(clip)].sort((a, b) => a.start - b.start);
 }

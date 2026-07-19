@@ -35,9 +35,9 @@ export type PunchInSegment = {
   startFrame: number;
   endFrame: number;
   scale: number;
-  /** Default false when omitted (older generated props). */
+  /** Default false when omitted (older generated props). Hard-cut steps; ignores animate. */
   wordByWord?: boolean;
-  /** Default true when omitted (older generated props). */
+  /** Default false when omitted. Slow 1→scale over full range (non–word-by-word only). */
   animate?: boolean;
   /** Output-frame starts for each word when `wordByWord` is true. */
   wordStartFrames?: number[];

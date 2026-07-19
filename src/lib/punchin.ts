@@ -7,7 +7,7 @@ export const PUNCH_IN_STRENGTH = {
 export type PunchInStrength = keyof typeof PUNCH_IN_STRENGTH;
 
 export const DEFAULT_PUNCH_IN_SCALE = PUNCH_IN_STRENGTH.medium;
-export const DEFAULT_PUNCH_IN_ANIMATE = true;
+export const DEFAULT_PUNCH_IN_ANIMATE = false;
 export const DEFAULT_PUNCH_IN_WORD_BY_WORD = false;
 /** Faces sit above center in 9:16 talking-head framing. */
 export const DEFAULT_PUNCH_IN_ORIGIN_X = 0.5;

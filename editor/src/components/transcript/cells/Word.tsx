@@ -194,8 +194,8 @@ export function Word({
               selectCaption(caption.index);
             }
             seekSource(caption.start);
-            if (annotation.bRollId) {
-              selectBRoll(annotation.bRollId);
+            if (annotation.bRollRanges?.[0]) {
+              selectBRoll(annotation.bRollRanges[0].id);
             } else if (annotation.punchInIndex != null) {
               selectPunchIn(annotation.punchInIndex);
             } else if (annotation.listicleItemIndex != null) {

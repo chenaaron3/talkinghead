@@ -13,10 +13,12 @@ import {
   type SourceMusic,
   type SourcePunchIn,
   type SourceSfx,
+  type SourceVfx,
   type SourceCut,
   SOURCE_DIR,
 } from "./types";
 import { isVideoSrc } from "../../src/lib/media";
+import { isVfxType } from "../../src/lib/config-types";
 import { DEFAULT_PUNCH_IN_SCALE } from "../../src/lib/punchin";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -272,6 +274,78 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
   });
 }
 
+function parseVfx(value: unknown, configPath: string): SourceVfx[] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error(`"vfx" must be a list in ${configPath}`);
+  }
+  return value.map((entry, index) => {
+    if (!isPlainObject(entry)) {
+      throw new Error(`"vfx[${index}]" must be an object in ${configPath}`);
+    }
+    const id = String(entry.id ?? "").trim();
+    const start = Number(entry.start);
+    const end = Number(entry.end);
+    if (!id || !Number.isFinite(start) || !Number.isFinite(end)) {
+      throw new Error(
+        `"vfx[${index}]" needs id, start, end in ${configPath}`,
+      );
+    }
+    if (!isVfxType(entry.type)) {
+      throw new Error(
+        `"vfx[${index}]" needs type (location | shake) in ${configPath}`,
+      );
+    }
+
+    if (entry.type === "shake") {
+      const clip: SourceVfx = { id, type: "shake", start, end };
+      const intensity = Number(entry.intensity);
+      if (entry.intensity != null && Number.isFinite(intensity) && intensity > 0) {
+        clip.intensity = intensity;
+      }
+      return clip;
+    }
+
+    const src = String(entry.src ?? "").trim();
+    const label = String(entry.label ?? "").trim();
+    const width = Number(entry.width);
+    const height = Number(entry.height);
+
+    if (src) {
+      if (
+        !Number.isFinite(width) ||
+        width <= 0 ||
+        !Number.isFinite(height) ||
+        height <= 0
+      ) {
+        throw new Error(
+          `"vfx[${index}]" with src needs positive width and height in ${configPath}`,
+        );
+      }
+    }
+
+    const scale = Number(entry.scale);
+    const offsetX = Number(entry.offsetX);
+    const offsetY = Number(entry.offsetY);
+    const rotation = Number(entry.rotation);
+
+    const clip: SourceVfx = { id, type: "location", start, end };
+    if (label) clip.label = label;
+    if (src) {
+      clip.src = src;
+      clip.width = width;
+      clip.height = height;
+    }
+    if (entry.scale != null && Number.isFinite(scale)) clip.scale = scale;
+    if (entry.offsetX != null && Number.isFinite(offsetX)) clip.offsetX = offsetX;
+    if (entry.offsetY != null && Number.isFinite(offsetY)) clip.offsetY = offsetY;
+    if (entry.rotation != null && Number.isFinite(rotation)) {
+      clip.rotation = rotation;
+    }
+    return clip;
+  });
+}
+
 function parseSfx(value: unknown, configPath: string): SourceSfx[] {
   if (value == null) return [];
   if (!Array.isArray(value)) {
@@ -376,6 +450,7 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     listicleOverlay: parseListicleOverlay(local.listicleOverlay, configPath),
     punchInSegments: parsePunchInSegments(local.punchInSegments, configPath),
     bRolls: parseBRolls(local.bRolls, configPath),
+    vfx: parseVfx(local.vfx, configPath),
     sfx: parseSfx(local.sfx, configPath),
     music: parseMusic(local.music, configPath),
   };

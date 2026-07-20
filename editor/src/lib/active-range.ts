@@ -6,7 +6,7 @@ import type { Selection } from "./selection";
 
 import type { RangeEdge, WordAnnotation } from "./word-annotations";
 
-export type RangeKind = "broll" | "sfx" | "zoom";
+export type RangeKind = "broll" | "vfx" | "sfx" | "zoom";
 
 export type HandleConfig = {
   kind: RangeKind;
@@ -37,14 +37,24 @@ function isEndEdge(edge: RangeEdge): boolean {
 
 /**
  * Range covering this word for transcript tint.
- * Priority: b-roll > selected sfx > zoom.
- * B-roll/zoom always cover (prefer selected when several overlap);
- * sfx only when selected (marker-first elsewhere).
+ * Priority: vfx > b-roll > selected sfx > zoom.
  */
 export function resolveStyleRange(
   annotation: WordAnnotation,
   selection: Selection | null,
 ): ActiveRange | null {
+  const vfx = annotation.vfxRanges;
+  if (vfx && vfx.length > 0) {
+    const selected = vfx.find((r) => isSelected(selection, "vfx", r.id));
+    const pick = selected ?? vfx[0]!;
+    return {
+      kind: "vfx",
+      id: pick.id,
+      edge: pick.edge,
+      selected: selected != null,
+    };
+  }
+
   const bRolls = annotation.bRollRanges;
   if (bRolls && bRolls.length > 0) {
     const selected = bRolls.find((r) => isSelected(selection, "broll", r.id));
@@ -86,6 +96,18 @@ export function resolveSelectedRange(
   annotation: WordAnnotation,
   selection: Selection | null,
 ): ActiveRange | null {
+  const vfx = annotation.vfxRanges?.find((r) =>
+    isSelected(selection, "vfx", r.id),
+  );
+  if (vfx) {
+    return {
+      kind: "vfx",
+      id: vfx.id,
+      edge: vfx.edge,
+      selected: true,
+    };
+  }
+
   const bRoll = annotation.bRollRanges?.find((r) =>
     isSelected(selection, "broll", r.id),
   );

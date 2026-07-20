@@ -6,7 +6,7 @@ import { TalkingHead } from '@src/TalkingHead';
 
 import { setPlayer } from '../lib/player-bridge';
 import { isTimelineScrubbing, useEditor } from '../store';
-import { BRollTransformOverlay } from './player/BRollTransformOverlay';
+import { TransformOverlay } from './player/TransformOverlay';
 import { PunchInOriginOverlay } from './player/PunchInOriginOverlay';
 
 import type { PlayerRef } from '@remotion/player';
@@ -108,7 +108,7 @@ export function PlayerPanel() {
             spaceKeyToPlayOrPause={false}
             acknowledgeRemotionLicense
           />
-          <BRollTransformOverlay onDraggingChange={onOverlayDragging} />
+          <TransformOverlay onDraggingChange={onOverlayDragging} />
           <PunchInOriginOverlay onDraggingChange={onOverlayDragging} />
         </div>
       </div>

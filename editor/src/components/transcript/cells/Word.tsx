@@ -10,11 +10,12 @@ import {
 import { isSelected } from "../../../lib/selection";
 import { wordClassName } from "../../../lib/word-classes";
 import { useSelection } from "../../../selection-store";
-import { LibraryAsset, SfxAsset, useEditor } from "../../../store";
+import { LibraryAsset, SfxAsset, VfxPreset, useEditor } from "../../../store";
 import { BRollBadge } from "../badge/BRollBadge";
 import { ListicleBadge } from "../badge/ListicleBadge";
 import { PunchInBadge } from "../badge/PunchInBadge";
 import { SfxBadge } from "../badge/SfxBadge";
+import { VfxBadge } from "../badge/VfxBadge";
 import type { MarkerDragging } from "../hooks/useRangeResize";
 import { WordContextMenu } from "../WordContextMenu";
 import { WordHandleSlot } from "../WordHandleSlot";
@@ -55,12 +56,14 @@ export function Word({
   const selectCaption = useSelection((s) => s.selectCaption);
   const selectCaptionExtend = useSelection((s) => s.selectCaptionExtend);
   const selectBRoll = useSelection((s) => s.selectBRoll);
+  const selectVfx = useSelection((s) => s.selectVfx);
   const selectSfx = useSelection((s) => s.selectSfx);
   const selectPunchIn = useSelection((s) => s.selectPunchIn);
   const selectListicleItem = useSelection((s) => s.selectListicleItem);
   const setCaptionText = useEditor((s) => s.setCaptionText);
   const setCaptionEmphasis = useEditor((s) => s.setCaptionEmphasis);
   const placeBRollOnCaption = useEditor((s) => s.placeBRollOnCaption);
+  const placeVfxOnCaption = useEditor((s) => s.placeVfxOnCaption);
   const placeSfxOnCaption = useEditor((s) => s.placeSfxOnCaption);
   const addPunchInOnCaption = useEditor((s) => s.addPunchInOnCaption);
   const cutCaption = useEditor((s) => s.cutCaption);
@@ -135,6 +138,20 @@ export function Word({
           }
         />
       ))}
+      {annotation.vfxMarkers?.map((marker) => (
+        <VfxBadge
+          key={marker.id}
+          label={marker.label}
+          kind={marker.type}
+          selected={isSelected(selection, "vfx", marker.id)}
+          dragging={
+            draggingStart?.kind === "vfx" && draggingStart.id === marker.id
+          }
+          onMouseDown={(e) =>
+            onStartRangeResize?.(e, "vfx", marker.id, "start")
+          }
+        />
+      ))}
       {annotation.punchInMarkers?.map((marker) => (
         <PunchInBadge
           key={`zoom-${marker.index}`}
@@ -194,7 +211,9 @@ export function Word({
               selectCaption(caption.index);
             }
             seekSource(caption.start);
-            if (annotation.bRollRanges?.[0]) {
+            if (annotation.vfxRanges?.[0]) {
+              selectVfx(annotation.vfxRanges[0].id);
+            } else if (annotation.bRollRanges?.[0]) {
               selectBRoll(annotation.bRollRanges[0].id);
             } else if (annotation.punchInIndex != null) {
               selectPunchIn(annotation.punchInIndex);
@@ -217,6 +236,7 @@ export function Word({
             const types = e.dataTransfer.types;
             if (
               types.includes("application/x-broll-asset") ||
+              types.includes("application/x-vfx-preset") ||
               types.includes("application/x-sfx-asset")
             ) {
               e.preventDefault();
@@ -228,6 +248,11 @@ export function Word({
             const sfxRaw = e.dataTransfer.getData("application/x-sfx-asset");
             if (sfxRaw) {
               placeSfxOnCaption(JSON.parse(sfxRaw) as SfxAsset, caption);
+              return;
+            }
+            const vfxRaw = e.dataTransfer.getData("application/x-vfx-preset");
+            if (vfxRaw) {
+              placeVfxOnCaption(JSON.parse(vfxRaw) as VfxPreset, caption);
               return;
             }
             const raw = e.dataTransfer.getData("application/x-broll-asset");

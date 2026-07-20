@@ -9,6 +9,7 @@ import { PunchIn } from './components/PunchIn';
 import { SfxOverlay } from './components/SfxOverlay';
 import { TikTokCaptions } from './components/TikTokCaptions';
 import { TikTokTitle } from './components/TikTokTitle';
+import { ScreenShake, VfxOverlay, shakesFromVfx } from './components/VfxOverlay';
 import { useListicleOverlay } from './hooks/useListicleOverlay';
 import { SAFE_AREA } from './lib/constants';
 
@@ -23,41 +24,47 @@ export const TalkingHead: React.FC<EpisodeProps> = ({
   listicle,
   punchIns,
   bRolls,
+  vfx,
   sfx,
   music,
 }) => {
   const { fps } = useVideoConfig();
   const { showTitle, node: listicleNode } = useListicleOverlay(listicle);
+  const shakes = shakesFromVfx(vfx);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
-      <PunchIn punchIns={punchIns}>
-        <Series>
-          {sections.map((section, index) => (
-            <Series.Sequence
-              key={`${section.trimBefore}-${section.trimAfter}-${index}`}
-              durationInFrames={section.durationInFrames}
-              premountFor={Math.round(1.5 * fps)}
-            >
-              <AbsoluteFill>
-                <Video
-                  src={staticFile(videoSrc)}
-                  trimBefore={section.trimBefore}
-                  trimAfter={section.trimAfter}
-                  objectFit="cover"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                  }}
-                />
-              </AbsoluteFill>
-            </Series.Sequence>
-          ))}
-        </Series>
-      </PunchIn>
+      <ScreenShake shakes={shakes}>
+        <PunchIn punchIns={punchIns}>
+          <Series>
+            {sections.map((section, index) => (
+              <Series.Sequence
+                key={`${section.trimBefore}-${section.trimAfter}-${index}`}
+                durationInFrames={section.durationInFrames}
+                premountFor={Math.round(1.5 * fps)}
+              >
+                <AbsoluteFill>
+                  <Video
+                    src={staticFile(videoSrc)}
+                    trimBefore={section.trimBefore}
+                    trimAfter={section.trimAfter}
+                    objectFit="cover"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                    }}
+                  />
+                </AbsoluteFill>
+              </Series.Sequence>
+            ))}
+          </Series>
+        </PunchIn>
 
-      {/* Below title/listicle/captions so chrome stays readable over images */}
-      <BRollOverlay bRolls={bRolls} />
+        {/* Below title/listicle/captions so chrome stays readable over images */}
+        <BRollOverlay bRolls={bRolls} />
+        <VfxOverlay vfx={vfx} />
+      </ScreenShake>
+
       <MusicOverlay music={music} captionGroups={captionGroups} sfx={sfx} />
       <SfxOverlay sfx={sfx} />
 

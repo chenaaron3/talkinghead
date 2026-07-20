@@ -1,5 +1,6 @@
-import type { EpisodeConfig } from "@src/lib/types";
+import type { EpisodeConfig, SourceVfx, VfxType } from "@src/lib/types";
 import type { FlatCaption } from "./captions";
+import { vfxClipLabel } from "./vfx";
 
 export type RangeEdge = "start" | "end" | "middle" | "both";
 
@@ -8,6 +9,14 @@ export type WordAnnotation = {
   bRollRanges?: Array<{ id: string; edge: RangeEdge }>;
   /** B-roll markers that start on this word. */
   bRollMarkers?: Array<{ id: string; src: string }>;
+  /** VFX clips whose play range covers this word. */
+  vfxRanges?: Array<{ id: string; edge: RangeEdge }>;
+  /** VFX markers that start on this word. */
+  vfxMarkers?: Array<{
+    id: string;
+    label: string;
+    type: VfxType;
+  }>;
   /** SFX markers that start on this word. */
   sfx?: Array<{ id: string; label: string }>;
   /** SFX clips whose play range covers this word (for selected-range UI). */
@@ -76,6 +85,19 @@ function bRollMarkersAt(
     .map((clip) => ({ id: clip.id, src: clip.src }));
 }
 
+function vfxMarkersAt(
+  caption: FlatCaption,
+  clips: SourceVfx[],
+): Array<{ id: string; label: string; type: VfxType }> {
+  return clips
+    .filter((clip) => clip.start >= caption.start && clip.start < caption.end)
+    .map((clip) => ({
+      id: clip.id,
+      type: clip.type,
+      label: vfxClipLabel(clip),
+    }));
+}
+
 function punchInMarkersAt(
   caption: FlatCaption,
   segments: { start: number }[],
@@ -111,6 +133,16 @@ export function buildWordAnnotations(
 
     const bRollMarkers = bRollMarkersAt(caption, config.bRolls);
     if (bRollMarkers.length > 0) annotation.bRollMarkers = bRollMarkers;
+
+    const vfxRanges: Array<{ id: string; edge: RangeEdge }> = [];
+    for (const clip of config.vfx ?? []) {
+      const edge = rangeEdge(caption, clip.start, clip.end, captions);
+      if (edge) vfxRanges.push({ id: clip.id, edge });
+    }
+    if (vfxRanges.length > 0) annotation.vfxRanges = vfxRanges;
+
+    const vfxMarkers = vfxMarkersAt(caption, config.vfx ?? []);
+    if (vfxMarkers.length > 0) annotation.vfxMarkers = vfxMarkers;
 
     const sfx = sfxAt(caption, config.sfx ?? []);
     if (sfx.length > 0) annotation.sfx = sfx;

@@ -36,6 +36,7 @@ type SelectionActions = {
   ) => void;
   selectCaptionExtend: (index: number, orderedIndices: number[]) => void;
   selectBRoll: (id: string | null) => void;
+  selectVfx: (id: string | null) => void;
   selectSfx: (id: string | null) => void;
   selectMusic: (id: string | null) => void;
   selectPunchIn: (index: number | null) => void;
@@ -107,6 +108,16 @@ export const useSelection = create<SelectionState & SelectionActions>(
       // Seek into the clip so inspector/handles can appear (selected + in range).
       const editor = useEditor.getState();
       const clip = editor.config?.bRolls.find((c) => c.id === id);
+      if (!clip) return;
+      if (editor.sourceSec < clip.start || editor.sourceSec >= clip.end) {
+        editor.seekSource(clip.start);
+      }
+    },
+    selectVfx: (id) => {
+      get().select("vfx", id);
+      if (id == null) return;
+      const editor = useEditor.getState();
+      const clip = editor.config?.vfx?.find((c) => c.id === id);
       if (!clip) return;
       if (editor.sourceSec < clip.start || editor.sourceSec >= clip.end) {
         editor.seekSource(clip.start);

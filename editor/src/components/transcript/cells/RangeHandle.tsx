@@ -12,6 +12,7 @@ type Props = {
 
 const STYLES: Record<RangeKind, string> = {
   broll: "bg-broll hover:bg-[#e4bc3a]",
+  vfx: "bg-vfx hover:bg-[#fda4af]",
   sfx: "bg-sfx hover:bg-[#5eead4]",
   zoom: "bg-purple-400 hover:bg-purple-300",
 };

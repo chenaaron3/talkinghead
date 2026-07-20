@@ -17,6 +17,13 @@ import { runSchedule } from '../../cli/schedule/run';
 import { buildProps } from '../../src/lib/build-props';
 import { normalizeBRollMedia, probeMedia } from './broll-media';
 import { getEpisodeScheduleInfo, listEditorEpisodes } from './episodes';
+import {
+  bakeLocationMap,
+  deleteVfxAsset,
+  ensureVfxAssets,
+  listEpisodeVfxAssets,
+  searchPlaces,
+} from './vfx-location';
 
 import type { Plugin } from "vite";
 import type { EpisodeConfig, Transcript } from "../../cli/helpers/types";
@@ -212,7 +219,48 @@ function listAudioLibrary(dir: string, publicFolder: string) {
 }
 
 function listSfxAssets() {
-  return listAudioLibrary(PUBLIC_SFX_DIR, "sfx");
+  if (!fs.existsSync(PUBLIC_SFX_DIR)) return [];
+  const out: Array<{
+    key: string;
+    label: string;
+    src: string;
+    durationSec: number;
+    folder: string | null;
+  }> = [];
+
+  const pushFile = (abs: string, relParts: string[]) => {
+    const ext = path.extname(abs);
+    if (!isAudioExt(ext)) return;
+    const fileName = path.basename(abs);
+    const rel = relParts.join("/");
+    const src = path.join("sfx", rel).split(path.sep).join("/");
+    out.push({
+      key: rel,
+      label: fileName.replace(/\.[^.]+$/, ""),
+      src,
+      durationSec: probeMedia(abs).durationSec,
+      folder: relParts.length > 1 ? relParts[0]! : null,
+    });
+  };
+
+  for (const entry of fs.readdirSync(PUBLIC_SFX_DIR, { withFileTypes: true })) {
+    if (entry.isFile()) {
+      pushFile(path.join(PUBLIC_SFX_DIR, entry.name), [entry.name]);
+      continue;
+    }
+    if (!entry.isDirectory()) continue;
+    const folderDir = path.join(PUBLIC_SFX_DIR, entry.name);
+    for (const child of fs.readdirSync(folderDir, { withFileTypes: true })) {
+      if (!child.isFile()) continue;
+      pushFile(path.join(folderDir, child.name), [entry.name, child.name]);
+    }
+  }
+
+  return out.sort((a, b) => {
+    const folderCmp = (a.folder ?? "").localeCompare(b.folder ?? "");
+    if (folderCmp !== 0) return folderCmp;
+    return a.label.localeCompare(b.label);
+  });
 }
 
 function listEpisodeMusicAssets(episodeId: string) {
@@ -428,7 +476,8 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             });
             const sfx = listSfxAssets();
             const music = listMusicAssets(episodeId);
-            return sendJson(res, 200, { assets, sfx, music });
+            const vfx = listEpisodeVfxAssets(episodeId);
+            return sendJson(res, 200, { assets, sfx, music, vfx });
           }
 
           if (req.method === "PUT" && pathname === "/api/episode") {
@@ -443,6 +492,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             }
 
             ensureBRollAssets(body.config.bRolls);
+            ensureVfxAssets(body.config.vfx ?? []);
             ensureMusicAsset(body.config.music ?? null);
 
             const episodeDir = path.join(SOURCE_DIR, episodeId);
@@ -463,6 +513,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               listicleOverlay: body.config.listicleOverlay,
               punchInSegments: body.config.punchInSegments,
               bRolls: body.config.bRolls,
+              vfx: body.config.vfx ?? [],
               sfx: body.config.sfx ?? [],
               music: body.config.music ?? null,
             });
@@ -705,6 +756,61 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             });
           }
 
+          if (req.method === "GET" && pathname === "/api/vfx/geocode") {
+            requireEpisodeId(req, url, defaultEpisodeId);
+            const q = String(url.searchParams.get("q") ?? "").trim();
+            try {
+              const results = await searchPlaces(q);
+              return sendJson(res, 200, { results });
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              return sendJson(res, 502, { error: message });
+            }
+          }
+
+          if (req.method === "POST" && pathname === "/api/vfx/location-map") {
+            const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
+            const raw = await readBody(req);
+            const body = JSON.parse(raw) as {
+              label?: string;
+              lat?: number;
+              lon?: number;
+            };
+            const label = String(body.label ?? "").trim();
+            const lat = Number(body.lat);
+            const lon = Number(body.lon);
+            if (!label || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+              return sendJson(res, 400, {
+                error: "label, lat, and lon are required",
+              });
+            }
+            try {
+              const asset = await bakeLocationMap({
+                episodeId,
+                label,
+                lat,
+                lon,
+              });
+              return sendJson(res, 200, { asset });
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              return sendJson(res, 502, { error: message });
+            }
+          }
+
+          if (req.method === "DELETE" && pathname === "/api/vfx-asset") {
+            const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
+            const key = String(url.searchParams.get("key") ?? "").trim();
+            if (!key) {
+              return sendJson(res, 400, { error: "key is required" });
+            }
+            const src = deleteVfxAsset(episodeId, key);
+            if (!src) {
+              return sendJson(res, 404, { error: "Asset not found" });
+            }
+            return sendJson(res, 200, { ok: true, src });
+          }
+
           if (req.method === "POST" && pathname === "/api/export") {
             const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
             const episodeDir = path.join(SOURCE_DIR, episodeId);
@@ -716,6 +822,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               };
               if (body.config && body.transcript) {
                 ensureBRollAssets(body.config.bRolls);
+                ensureVfxAssets(body.config.vfx ?? []);
                 ensureMusicAsset(body.config.music ?? null);
                 writeEpisodeConfig(episodeDir, {
                   aroll: body.config.aroll,
@@ -724,6 +831,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
                   listicleOverlay: body.config.listicleOverlay,
                   punchInSegments: body.config.punchInSegments,
                   bRolls: body.config.bRolls,
+                  vfx: body.config.vfx ?? [],
                   sfx: body.config.sfx ?? [],
                   music: body.config.music ?? null,
                 });

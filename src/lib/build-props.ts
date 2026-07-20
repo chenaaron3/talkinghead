@@ -13,6 +13,7 @@ import {
 } from "./punchin";
 import type {
   BRollClip,
+  VfxClip,
   BuildPropsInput,
   TranscriptCaption,
   CaptionGroup,
@@ -24,11 +25,13 @@ import type {
   SourceListicle,
   SourcePunchIn,
   SourceBRoll,
+  SourceVfx,
   SourceMusic,
   SourceSfx,
   SfxClip,
   MusicClip,
 } from "./types";
+import { DEFAULT_SHAKE_INTENSITY } from "./config-types";
 
 function secToFrames(sec: number, fps: number): number {
   return Math.max(0, Math.round(sec * fps));
@@ -270,6 +273,57 @@ function buildBRolls(
   return result.sort((a, b) => a.startFrame - b.startFrame);
 }
 
+function buildVfx(
+  vfx: SourceVfx[],
+  segments: KeepSegment[],
+  fps: number,
+  captions: TranscriptCaption[],
+  cuts: BuildPropsInput["config"]["cuts"],
+  durationSec: number,
+): VfxClip[] {
+  const result: VfxClip[] = [];
+  for (const clip of vfx) {
+    const frames = mapSourceRangeToOutputFrames(
+      clip.start,
+      clip.end,
+      segments,
+      fps,
+      captions,
+      cuts,
+      durationSec,
+    );
+    if (!frames) continue;
+
+    if (clip.type === "shake") {
+      result.push({
+        id: clip.id,
+        type: "shake",
+        startFrame: frames.startFrame,
+        endFrame: frames.endFrame,
+        intensity: clip.intensity ?? DEFAULT_SHAKE_INTENSITY,
+      });
+      continue;
+    }
+
+    // Location (and future media VFX): skip until media is baked.
+    if (!clip.src || !(clip.width && clip.height)) continue;
+    result.push({
+      id: clip.id,
+      type: "location",
+      src: clip.src,
+      width: clip.width,
+      height: clip.height,
+      startFrame: frames.startFrame,
+      endFrame: frames.endFrame,
+      scale: clip.scale ?? 1,
+      offsetX: clip.offsetX ?? 0,
+      offsetY: clip.offsetY ?? 0,
+      rotation: clip.rotation ?? 0,
+    });
+  }
+  return result.sort((a, b) => a.startFrame - b.startFrame);
+}
+
 function buildSfx(
   sfx: SourceSfx[],
   segments: KeepSegment[],
@@ -370,6 +424,15 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     transcript.duration,
   );
 
+  const vfx = buildVfx(
+    config.vfx ?? [],
+    keepSegments,
+    fps,
+    transcript.captions,
+    config.cuts,
+    transcript.duration,
+  );
+
   const sfx = buildSfx(
     config.sfx ?? [],
     keepSegments,
@@ -400,6 +463,7 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     listicle,
     punchIns,
     bRolls,
+    vfx,
     sfx,
     music,
   };

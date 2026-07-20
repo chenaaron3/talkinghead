@@ -20,6 +20,15 @@ import {
   type Transform,
 } from './lib/broll';
 import {
+  createVfxFromPreset,
+  removeVfx,
+  upsertVfx,
+  withVfxIntensity,
+  withVfxMedia,
+  withVfxTransform,
+  type VfxPreset,
+} from './lib/vfx';
+import {
   musicFromAsset,
   withMusicOffset,
   withMusicVolume,
@@ -64,11 +73,15 @@ export type LibraryAsset = {
   durationSec?: number;
 };
 
+export type { VfxPreset };
+
 export type SfxAsset = {
   key: string;
   label: string;
   src: string;
   durationSec: number;
+  /** Subfolder under public/sfx/, e.g. `meme`. Null for root files. */
+  folder?: string | null;
 };
 
 export type { MusicAsset };
@@ -133,6 +146,11 @@ type EditorActions = {
     emphasis: CaptionEmphasis | undefined,
   ) => void;
   placeBRollOnCaption: (asset: LibraryAsset, caption: FlatCaption) => void;
+  placeVfxOnCaption: (preset: VfxPreset, caption: FlatCaption) => void;
+  setVfxLocation: (
+    id: string,
+    place: { label: string; lat: number; lon: number },
+  ) => Promise<void>;
   placeSfxOnCaption: (asset: SfxAsset, caption: FlatCaption) => void;
   setMusic: (asset: MusicAsset) => void;
   clearMusic: () => void;
@@ -165,6 +183,18 @@ type EditorActions = {
     live?: boolean,
   ) => void;
   updateBRollVolume: (id: string, volume: number, live?: boolean) => void;
+  updateVfxRange: (
+    id: string,
+    start: number,
+    end: number,
+    live?: boolean,
+  ) => void;
+  updateVfxTransform: (
+    id: string,
+    patch: Partial<Transform>,
+    live?: boolean,
+  ) => void;
+  updateVfxIntensity: (id: string, intensity: number, live?: boolean) => void;
   updateSfxRange: (
     id: string,
     edge: "start" | "end",
@@ -759,6 +789,20 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         return true;
       }
 
+      if (selection.kind === "vfx") {
+        const id = selection.ids[0];
+        if (!id) return false;
+        commit({
+          config: {
+            ...config,
+            vfx: removeVfx(config.vfx ?? [], id),
+          },
+          transcript,
+        });
+        clearSelection();
+        return true;
+      }
+
       if (selection.kind === "sfx") {
         const id = selection.ids[0];
         if (!id) return false;
@@ -868,6 +912,76 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript });
       useSelection.getState().selectBRoll(clip.id);
+    },
+
+    placeVfxOnCaption: (preset, caption) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const { selection } = useSelection.getState();
+      const range = captionActionRange(transcript, selection, caption);
+      const end = Math.max(range.start + MIN_RANGE_SEC, range.end);
+      const clip = createVfxFromPreset(
+        preset,
+        { start: range.start, end },
+        newId("vfx"),
+      );
+      const result = upsertVfx(config.vfx ?? [], clip);
+      if ("error" in result) return;
+      commit({ config: { ...config, vfx: result }, transcript });
+      useSelection.getState().selectVfx(clip.id);
+    },
+
+    setVfxLocation: async (id, place) => {
+      const { episodeId, config, transcript } = get();
+      if (!episodeId || !config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip || clip.type !== "location") return;
+
+      const res = await fetch("/api/vfx/location-map", {
+        method: "POST",
+        headers: {
+          ...episodeHeaders(episodeId),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          label: place.label,
+          lat: place.lat,
+          lon: place.lon,
+        }),
+      });
+      const data = (await res.json()) as {
+        asset?: {
+          src: string;
+          width: number;
+          height: number;
+          label: string;
+        };
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to bake location map");
+      }
+      if (!data.asset) {
+        throw new Error("Location map response missing asset");
+      }
+
+      // Re-read in case state changed during bake.
+      const latest = get();
+      if (!latest.config || !latest.transcript) return;
+      const current = (latest.config.vfx ?? []).find((c) => c.id === id);
+      if (!current) return;
+      const next = withVfxMedia(current, {
+        src: data.asset.src,
+        width: data.asset.width,
+        height: data.asset.height,
+        label: data.asset.label || place.label,
+      });
+      const result = upsertVfx(latest.config.vfx ?? [], next);
+      if ("error" in result) return;
+      commit({
+        config: { ...latest.config, vfx: result },
+        transcript: latest.transcript,
+      });
     },
 
     placeSfxOnCaption: (asset, caption) => {
@@ -1045,6 +1159,43 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const result = upsertBRoll(config.bRolls, next);
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript }, live);
+    },
+
+    updateVfxRange: (id, start, end, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip) return;
+      if (end <= start + MIN_RANGE_SEC) return;
+      const result = upsertVfx(config.vfx ?? [], {
+        ...clip,
+        start,
+        end,
+      });
+      if ("error" in result) return;
+      commit({ config: { ...config, vfx: result }, transcript }, live);
+    },
+
+    updateVfxTransform: (id, patch, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip) return;
+      const next = withVfxTransform(clip, patch);
+      const result = upsertVfx(config.vfx ?? [], next);
+      if ("error" in result) return;
+      commit({ config: { ...config, vfx: result }, transcript }, live);
+    },
+
+    updateVfxIntensity: (id, intensity, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip) return;
+      const next = withVfxIntensity(clip, intensity);
+      const result = upsertVfx(config.vfx ?? [], next);
+      if ("error" in result) return;
+      commit({ config: { ...config, vfx: result }, transcript }, live);
     },
 
     updateSfxRange: (id, edge, value, live = false) => {

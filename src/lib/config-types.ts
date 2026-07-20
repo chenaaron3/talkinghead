@@ -6,7 +6,7 @@ export type Range = {
 
 /** Shared fields for any media file under public/. */
 export type MediaBase = {
-  /** Path under public/, e.g. `b-roll/glowup/clip.mp4` or `sfx/ding.wav` */
+  /** Path under public/, e.g. `b-roll/glowup/clip.mp4` or `sfx/beep-bop/ding_light.wav` */
   src: string;
   /**
    * Linear gain 0–1.
@@ -92,6 +92,108 @@ export type SourceBRoll = {
   VisualAsset &
   Partial<Transform>;
 
+/**
+ * Visual effect kinds. Expand this union as new effects land.
+ */
+export const VFX_TYPES = ["location", "shake"] as const;
+export type VfxType = (typeof VFX_TYPES)[number];
+
+export function isVfxType(value: unknown): value is VfxType {
+  return (
+    typeof value === "string" &&
+    (VFX_TYPES as readonly string[]).includes(value)
+  );
+}
+
+/** Peak screen offset as a fraction of composition size. */
+export const DEFAULT_SHAKE_INTENSITY = 0.014;
+
+type SourceVfxBase = {
+  id: string;
+} & Range;
+
+/** Baked map overlay — media optional until an address is set. */
+export type SourceLocationVfx = SourceVfxBase & {
+  type: "location";
+  /** Place name for UI. */
+  label?: string;
+} & Partial<ImageAsset> &
+  Partial<Transform>;
+
+/** Camera shake applied to the visual plane for the clip range. */
+export type SourceShakeVfx = SourceVfxBase & {
+  type: "shake";
+  /**
+   * Peak offset as fraction of composition size.
+   * Default `DEFAULT_SHAKE_INTENSITY`. Omit identity in YAML.
+   */
+  intensity?: number;
+};
+
+export type SourceVfx = SourceLocationVfx | SourceShakeVfx;
+
+/**
+ * Distribute over `SourceVfx`, keeping members whose declared keys include all of `K`
+ * (so `Partial<Transform>` / `Partial<ImageAsset>` intersections are detected).
+ */
+type SourceVfxHavingKeys<K extends PropertyKey> = SourceVfx extends infer C
+  ? C extends SourceVfx
+    ? [K] extends [keyof C]
+      ? C
+      : never
+    : never
+  : never;
+
+/** VFX clips whose type includes transform fields. */
+export type SourceVfxWithTransform = SourceVfxHavingKeys<keyof Transform>;
+/** VFX clips whose type includes image media fields. */
+export type SourceVfxWithImageAsset = SourceVfxHavingKeys<keyof ImageAsset>;
+
+export type VfxTypeWithTransform = SourceVfxWithTransform["type"];
+export type VfxTypeWithImageAsset = SourceVfxWithImageAsset["type"];
+
+type ExhaustiveVfxTypes<
+  Actual extends readonly string[],
+  Expected extends string,
+> = [Exclude<Expected, Actual[number]>] extends [never]
+  ? [Exclude<Actual[number], Expected>] extends [never]
+    ? true
+    : never
+  : never;
+
+/**
+ * Runtime mirrors of the inferred capability types.
+ * When a SourceVfx variant gains/loses Transform or ImageAsset, update these
+ * lists — the asserts below will fail until they match.
+ */
+export const VFX_TYPES_WITH_TRANSFORM = [
+  "location",
+] as const satisfies readonly VfxTypeWithTransform[];
+
+export const VFX_TYPES_WITH_IMAGE_ASSET = [
+  "location",
+] as const satisfies readonly VfxTypeWithImageAsset[];
+
+true satisfies ExhaustiveVfxTypes<
+  typeof VFX_TYPES_WITH_TRANSFORM,
+  VfxTypeWithTransform
+>;
+true satisfies ExhaustiveVfxTypes<
+  typeof VFX_TYPES_WITH_IMAGE_ASSET,
+  VfxTypeWithImageAsset
+>;
+
+export function vfxSupportsTransform(
+  clip: SourceVfx,
+): clip is SourceVfxWithTransform {
+  return (VFX_TYPES_WITH_TRANSFORM as readonly VfxType[]).includes(clip.type);
+}
+
+export function vfxSupportsImageAsset(
+  clip: SourceVfx,
+): clip is SourceVfxWithImageAsset {
+  return (VFX_TYPES_WITH_IMAGE_ASSET as readonly VfxType[]).includes(clip.type);
+}
 export type SourceSfx = {
   id: string;
 } & Range &
@@ -127,6 +229,7 @@ export type EpisodeConfig = {
   listicleOverlay: SourceListicle | null;
   punchInSegments: SourcePunchIn[];
   bRolls: SourceBRoll[];
+  vfx: SourceVfx[];
   sfx: SourceSfx[];
   /** One looping bed, or null when unset. */
   music: SourceMusic | null;

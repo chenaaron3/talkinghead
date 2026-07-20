@@ -8,6 +8,7 @@ export const BULK_DIR = path.join(SOURCE_DIR, "_bulk");
 export const DEFAULT_CONFIG_PATH = path.join(ROOT, "config.default.yaml");
 export const PUBLIC_EPISODES_DIR = path.join(ROOT, "public", "episodes");
 export const PUBLIC_BROLL_DIR = path.join(ROOT, "public", "b-roll");
+export const PUBLIC_VFX_DIR = path.join(ROOT, "public", "vfx");
 export const IMAGE_EXTENSIONS = new Set([
   ".jpg",
   ".jpeg",

@@ -165,7 +165,7 @@ export const TikTokListicle: React.FC<{
     <SfxOverlay
       sfx={listicle.items.map((item, index) => ({
         id: `listicle-${item.revealFrame}-${index}`,
-        src: "sfx/mouse_click.wav",
+        src: "sfx/realistic/mouse_click.wav",
         startFrame: item.revealFrame,
         endFrame: item.revealFrame + Math.max(1, Math.ceil(0.2 * fps)),
       }))}

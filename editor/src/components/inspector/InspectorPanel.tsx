@@ -1,15 +1,18 @@
 import type { ReactNode } from "react";
-import { X } from 'lucide-react';
+import { X } from "lucide-react";
 
-import { primaryId } from '../../lib/selection';
-import { useEditableBRoll } from '../../lib/use-editable-broll';
-import { useSelection } from '../../selection-store';
-import { useEditor } from '../../store';
-import { BRollInspector } from './BRollInspector';
-import { ListicleInspector } from './ListicleInspector';
-import { MusicInspector } from './MusicInspector';
-import { SfxInspector } from './SfxInspector';
-import { ZoomInspector } from './ZoomInspector';
+import { primaryId } from "../../lib/selection";
+import { useEditableBRoll } from "../../lib/use-editable-broll";
+import { vfxTypeLabel } from "../../lib/vfx";
+import { useSelection } from "../../selection-store";
+import { useEditor } from "../../store";
+import { BRollInspector } from "./BRollInspector";
+import { ListicleInspector } from "./ListicleInspector";
+import { LocationVfxInspector } from "./LocationVfxInspector";
+import { MusicInspector } from "./MusicInspector";
+import { SfxInspector } from "./SfxInspector";
+import { ShakeVfxInspector } from "./ShakeVfxInspector";
+import { ZoomInspector } from "./ZoomInspector";
 
 /**
  * Generic selection inspector overlay. Sits on the right edge of the transcript
@@ -18,6 +21,7 @@ import { ZoomInspector } from './ZoomInspector';
 export function InspectorPanel() {
   const editableBRoll = useEditableBRoll();
   const selection = useSelection((s) => s.selection);
+  const vfx = useEditor((s) => s.config?.vfx);
   const sfx = useEditor((s) => s.config?.sfx);
   const music = useEditor((s) => s.config?.music);
   const punchIns = useEditor((s) => s.config?.punchInSegments);
@@ -27,7 +31,18 @@ export function InspectorPanel() {
   let title: string | null = null;
   let body: ReactNode = null;
 
-  if (editableBRoll) {
+  if (selection?.kind === "vfx") {
+    const id = primaryId(selection);
+    const clip =
+      typeof id === "string" ? vfx?.find((c) => c.id === id) : undefined;
+    if (clip?.type === "location") {
+      title = vfxTypeLabel(clip.type);
+      body = <LocationVfxInspector clip={clip} />;
+    } else if (clip?.type === "shake") {
+      title = vfxTypeLabel(clip.type);
+      body = <ShakeVfxInspector clip={clip} />;
+    }
+  } else if (editableBRoll) {
     title = "B-roll";
     body = (
       <BRollInspector

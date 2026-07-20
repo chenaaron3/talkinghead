@@ -14,7 +14,7 @@ import {
   resolveTransform,
   type Transform,
 } from "../../lib/broll";
-import { useEditableBRoll } from "../../lib/use-editable-broll";
+import { useEditableTransformTarget } from "../../lib/use-editable-transform";
 import { useEditor } from "../../store";
 
 type DragMode =
@@ -35,28 +35,27 @@ function clientToComp(
 
 /**
  * HTML overlay on the Remotion player for drag move / scale / rotate.
- * Only mounts when a b-roll is selected and visible under the playhead.
+ * Works with any selection exposed by `useEditableTransformTarget`.
  */
-export function BRollTransformOverlay({
+export function TransformOverlay({
   onDraggingChange,
 }: {
   onDraggingChange?: (dragging: boolean) => void;
 }) {
-  const editable = useEditableBRoll();
-  const updateBRollTransform = useEditor((s) => s.updateBRollTransform);
+  const target = useEditableTransformTarget();
   const beginGesture = useEditor((s) => s.beginGesture);
   const rootRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragMode | null>(null);
-  const clipIdRef = useRef<string | null>(null);
+  const targetRef = useRef(target);
   const boxRef = useRef<{ w: number; h: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [guides, setGuides] = useState<SnapGuide[]>([]);
 
-  clipIdRef.current = editable?.clip.id ?? null;
-  const base = editable
+  targetRef.current = target;
+  const base = target
     ? containSize(
-        editable.clip.width,
-        editable.clip.height,
+        target.width,
+        target.height,
         COMPOSITION_WIDTH,
         COMPOSITION_HEIGHT,
       )
@@ -76,9 +75,9 @@ export function BRollTransformOverlay({
     const onMove = (e: PointerEvent) => {
       const drag = dragRef.current;
       const root = rootRef.current;
-      const clipId = clipIdRef.current;
+      const current = targetRef.current;
       const box = boxRef.current;
-      if (!drag || !root || !clipId || !box) return;
+      if (!drag || !root || !current || !box) return;
       const rect = root.getBoundingClientRect();
       const { x, y } = clientToComp(e.clientX, e.clientY, rect);
       const cx =
@@ -101,8 +100,7 @@ export function BRollTransformOverlay({
           compH: COMPOSITION_HEIGHT,
         });
         setGuides(snapped.guides);
-        updateBRollTransform(
-          clipId,
+        current.updateTransform(
           { offsetX: snapped.offsetX, offsetY: snapped.offsetY },
           true,
         );
@@ -125,7 +123,7 @@ export function BRollTransformOverlay({
           }),
         );
         setGuides([]);
-        updateBRollTransform(clipId, { scale }, true);
+        current.updateTransform({ scale }, true);
         return;
       }
 
@@ -139,7 +137,7 @@ export function BRollTransformOverlay({
       const nearest = Math.round(rotation / rotSnap) * rotSnap;
       if (Math.abs(rotation - nearest) <= 8) rotation = nearest;
       setGuides([]);
-      updateBRollTransform(clipId, { rotation }, true);
+      current.updateTransform({ rotation }, true);
     };
 
     const onUp = () => {
@@ -156,11 +154,11 @@ export function BRollTransformOverlay({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [dragging, updateBRollTransform]);
+  }, [dragging]);
 
-  if (!editable || !base) return null;
+  if (!target || !base) return null;
 
-  const t = editable.transform;
+  const t = target.transform;
   const boxW = (base.w / COMPOSITION_WIDTH) * 100;
   const boxH = (base.h / COMPOSITION_HEIGHT) * 100;
   const left = 50 + t.offsetX * 100;
@@ -173,7 +171,7 @@ export function BRollTransformOverlay({
     if (!root) return;
     const rect = root.getBoundingClientRect();
     const { x, y } = clientToComp(e.clientX, e.clientY, rect);
-    const origin = resolveTransform(editable.clip);
+    const origin = resolveTransform(target.transformSource);
     const cx = COMPOSITION_WIDTH / 2 + origin.offsetX * COMPOSITION_WIDTH;
     const cy = COMPOSITION_HEIGHT / 2 + origin.offsetY * COMPOSITION_HEIGHT;
     beginGesture();

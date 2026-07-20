@@ -1,6 +1,7 @@
 export type SelectionKind =
   | "caption"
   | "broll"
+  | "vfx"
   | "sfx"
   | "music"
   | "punchIn"
@@ -11,6 +12,7 @@ export type SelectionKind =
 export type Selection =
   | { kind: "caption"; ids: number[] }
   | { kind: "broll"; ids: string[] }
+  | { kind: "vfx"; ids: string[] }
   | { kind: "sfx"; ids: string[] }
   | { kind: "music"; ids: string[] }
   | { kind: "punchIn"; ids: number[] }

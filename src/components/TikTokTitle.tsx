@@ -69,7 +69,7 @@ export const TikTokTitle: React.FC<{
       sfx={[
         {
           id: "title-enter",
-          src: "sfx/title-enter.wav",
+          src: "sfx/beep-bop/title-enter.wav",
           startFrame: 0,
           endFrame: Math.max(1, Math.ceil(0.35 * fps)),
         },

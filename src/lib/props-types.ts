@@ -61,9 +61,32 @@ export type BRollClip = {
   volume?: number;
 } & Partial<Transform>;
 
+type VfxClipBase = {
+  id: string;
+  startFrame: number;
+  endFrame: number;
+};
+
+/** Location map overlay — only present once media is baked. */
+export type LocationVfxClip = VfxClipBase & {
+  type: "location";
+  src: string;
+  width: number;
+  height: number;
+} & Partial<Transform>;
+
+/** Screen shake for the clip range. */
+export type ShakeVfxClip = VfxClipBase & {
+  type: "shake";
+  /** Peak offset as fraction of composition size. */
+  intensity: number;
+};
+
+export type VfxClip = LocationVfxClip | ShakeVfxClip;
+
 export type SfxClip = {
   id: string;
-  /** Path under public/, e.g. `sfx/ding_light.wav` */
+  /** Path under public/, e.g. `sfx/beep-bop/ding_light.wav` */
   src: string;
   startFrame: number;
   endFrame: number;
@@ -98,6 +121,7 @@ export type EpisodeProps = {
   listicle: ListicleOverlay | null;
   punchIns?: PunchInSegment[] | null;
   bRolls?: BRollClip[] | null;
+  vfx?: VfxClip[] | null;
   sfx?: SfxClip[] | null;
   music?: MusicClip | null;
 };

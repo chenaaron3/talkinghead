@@ -1,7 +1,4 @@
 import {
-  BROLL_SCALE_MAX,
-  BROLL_SCALE_MIN,
-  TRANSFORM_DEFAULTS,
   bRollSrcDurationSec,
   isVideoSrc,
   type Transform,
@@ -11,8 +8,7 @@ import { useEditor } from "../../store";
 import { VIDEO_BROLL_VOLUME_DEFAULT } from "@src/lib/media";
 import type { SourceBRoll } from "@src/lib/types";
 
-import { Button } from "../ui/button";
-import { NumberField, SliderField } from "./field";
+import { SliderField, TransformFields } from "./field";
 
 export function BRollInspector({
   clip,
@@ -67,54 +63,7 @@ export function BRollInspector({
         </>
       ) : null}
 
-      <SliderField
-        label="Scale"
-        value={transform.scale}
-        min={BROLL_SCALE_MIN}
-        max={BROLL_SCALE_MAX}
-        step={0.01}
-        display={`${transform.scale.toFixed(2)}×`}
-        onLiveChange={(scale) => patch({ scale }, true)}
-        onCommit={(scale) => patch({ scale }, true)}
-      />
-
-      <NumberField
-        label="Offset X"
-        value={transform.offsetX}
-        step={0.01}
-        onLiveChange={(offsetX) => patch({ offsetX }, true)}
-      />
-
-      <NumberField
-        label="Offset Y"
-        value={transform.offsetY}
-        step={0.01}
-        onLiveChange={(offsetY) => patch({ offsetY }, true)}
-      />
-
-      <SliderField
-        label="Rotation"
-        value={((transform.rotation % 360) + 360 + 180) % 360 - 180}
-        min={-180}
-        max={180}
-        step={1}
-        display={`${Math.round(transform.rotation)}°`}
-        onLiveChange={(rotation) => patch({ rotation }, true)}
-        onCommit={(rotation) => patch({ rotation }, true)}
-      />
-
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="mt-1 w-full"
-        onClick={() => {
-          useEditor.getState().beginGesture();
-          patch({ ...TRANSFORM_DEFAULTS }, false);
-        }}
-      >
-        Reset transform
-      </Button>
+      <TransformFields transform={transform} onPatch={patch} />
     </div>
   );
 }

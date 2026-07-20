@@ -15,6 +15,7 @@ import { MusicTrack } from "./tracks/MusicTrack";
 import { PunchInTrack } from "./tracks/PunchInTrack";
 import { SfxTrack } from "./tracks/SfxTrack";
 import { VideoTrack } from "./tracks/VideoTrack";
+import { VfxTrack } from "./tracks/VfxTrack";
 
 function playheadContentX(sourceSec: number, pxPerSec: number): number {
   return LABEL_OFFSET + sourceSec * pxPerSec;
@@ -167,6 +168,7 @@ export function Timeline() {
             <VideoTrack width={trackWidth} items={items} />
             <CaptionTrack width={trackWidth} sourceX={sourceX} />
             <BRollTrack width={trackWidth} sourceX={sourceX} />
+            <VfxTrack width={trackWidth} sourceX={sourceX} />
             <SfxTrack width={trackWidth} sourceX={sourceX} />
             <PunchInTrack width={trackWidth} sourceX={sourceX} />
             <ListicleTrack width={trackWidth} sourceX={sourceX} />

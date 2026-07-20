@@ -25,6 +25,7 @@ const fallbackProps: EpisodeProps = {
   listicle: null,
   punchIns: null,
   bRolls: [],
+  vfx: [],
   sfx: [],
   music: null,
 };

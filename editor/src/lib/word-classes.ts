@@ -7,20 +7,25 @@ const BASE =
 
 const COLOR_VAR: Record<ActiveRange["kind"], string> = {
   broll: "var(--color-broll)",
+  vfx: "var(--color-vfx)",
   sfx: "var(--color-sfx)",
   zoom: "var(--color-purple-400)",
 };
 
-const UNDERLINE: Record<"broll" | "zoom", string> = {
+const UNDERLINE: Record<"broll" | "vfx" | "zoom", string> = {
   broll: "border-broll/70",
+  vfx: "border-vfx/70",
   zoom: "border-purple-400/70",
 };
 
-const HIGHLIGHT: Record<"broll" | "zoom", { idle: string; playhead: string }> =
-  {
-    broll: { idle: "bg-broll/45", playhead: "bg-broll/50" },
-    zoom: { idle: "bg-purple-500/15", playhead: "bg-purple-500/20" },
-  };
+const HIGHLIGHT: Record<
+  "broll" | "vfx" | "zoom",
+  { idle: string; playhead: string }
+> = {
+  broll: { idle: "bg-broll/45", playhead: "bg-broll/50" },
+  vfx: { idle: "bg-vfx/45", playhead: "bg-vfx/50" },
+  zoom: { idle: "bg-purple-500/15", playhead: "bg-purple-500/20" },
+};
 
 function roundEdge(edge: RangeEdge | undefined): string {
   if (edge === "both") return "rounded-sm";
@@ -51,13 +56,14 @@ type Input = {
   isResizing: boolean;
 };
 
-/** B-roll / zoom: inactive = underline, active = highlight; word selected = both. */
+/** B-roll / vfx / zoom: inactive = underline, active = highlight; word selected = both. */
 function overlayRangeTint(
   range: ActiveRange,
   playheadActive: boolean,
   captionSelected: boolean,
 ): string[] {
-  const kind = range.kind === "zoom" ? "zoom" : "broll";
+  const kind =
+    range.kind === "zoom" ? "zoom" : range.kind === "vfx" ? "vfx" : "broll";
   const showHighlight = range.selected || captionSelected;
   const showUnderline = !range.selected || captionSelected;
 

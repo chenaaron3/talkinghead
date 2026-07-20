@@ -8,12 +8,14 @@ import {
   EMPTY_CAPTIONS,
   EMPTY_PUNCH_INS,
   EMPTY_SFX,
+  EMPTY_VFX,
 } from "../../../lib/empty";
 import { useSelection } from "../../../selection-store";
 import { useEditor } from "../../../store";
 
 export type RangeResize =
   | { kind: "broll"; id: string; edge: "start" | "end" }
+  | { kind: "vfx"; id: string; edge: "start" | "end" }
   | { kind: "sfx"; id: string; edge: "start" | "end" }
   | { kind: "zoom"; id: number; edge: "start" | "end" }
   | { kind: "listicle"; id: number };
@@ -39,15 +41,18 @@ export function markerDraggingFromResize(
 
 export function useRangeResize() {
   const bRolls = useEditor((s) => s.config?.bRolls ?? EMPTY_BROLLS);
+  const vfx = useEditor((s) => s.config?.vfx ?? EMPTY_VFX);
   const sfx = useEditor((s) => s.config?.sfx ?? EMPTY_SFX);
   const punchIns = useEditor((s) => s.config?.punchInSegments ?? EMPTY_PUNCH_INS);
   const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
   const seekSource = useEditor((s) => s.seekSource);
   const selectBRoll = useSelection((s) => s.selectBRoll);
+  const selectVfx = useSelection((s) => s.selectVfx);
   const selectSfx = useSelection((s) => s.selectSfx);
   const selectPunchIn = useSelection((s) => s.selectPunchIn);
   const selectListicleItem = useSelection((s) => s.selectListicleItem);
   const updateBRollRange = useEditor((s) => s.updateBRollRange);
+  const updateVfxRange = useEditor((s) => s.updateVfxRange);
   const updateSfxRange = useEditor((s) => s.updateSfxRange);
   const updatePunchInRange = useEditor((s) => s.updatePunchInRange);
   const updateListicleItemReveal = useEditor(
@@ -85,6 +90,17 @@ export function useRangeResize() {
         resize.edge === "start" ? caption.start : caption.end;
       const { start, end } = clampRangeEdge(resize.edge, value, clip);
       updateBRollRange(clip.id, start, end, true);
+      seekSource(resize.edge === "start" ? start : end);
+      return;
+    }
+
+    if (resize.kind === "vfx") {
+      const clip = vfx.find((c) => c.id === resize.id);
+      if (!clip) return;
+      const value =
+        resize.edge === "start" ? caption.start : caption.end;
+      const { start, end } = clampRangeEdge(resize.edge, value, clip);
+      updateVfxRange(clip.id, start, end, true);
       seekSource(resize.edge === "start" ? start : end);
       return;
     }
@@ -128,6 +144,16 @@ export function useRangeResize() {
       if (!clip) return;
       selectBRoll(clipId);
       setResize({ kind: "broll", id: clipId, edge });
+      seekSource(edge === "start" ? clip.start : clip.end);
+      return;
+    }
+
+    if (kind === "vfx") {
+      const clipId = String(id);
+      const clip = vfx.find((c) => c.id === clipId);
+      if (!clip) return;
+      selectVfx(clipId);
+      setResize({ kind: "vfx", id: clipId, edge });
       seekSource(edge === "start" ? clip.start : clip.end);
       return;
     }

@@ -3,8 +3,9 @@ import { useState } from "react";
 import { BRollTab } from "./BRollTab";
 import { MusicTab } from "./MusicTab";
 import { SfxTab } from "./SfxTab";
+import { VfxTab } from "./VfxTab";
 
-type Tab = "broll" | "sfx" | "music";
+type Tab = "broll" | "vfx" | "sfx" | "music";
 
 export function AssetsPanel() {
   const [tab, setTab] = useState<Tab>("broll");
@@ -15,6 +16,7 @@ export function AssetsPanel() {
         {(
           [
             ["broll", "B-roll"],
+            ["vfx", "VFX"],
             ["sfx", "SFX"],
             ["music", "Music"],
           ] as const
@@ -22,7 +24,7 @@ export function AssetsPanel() {
           <button
             key={id}
             type="button"
-            className={`flex-1 px-2 py-1.5 text-[11px] ${
+            className={`flex-1 px-1 py-1.5 text-[11px] ${
               tab === id
                 ? "border-b-2 border-accent text-[#e8eaef]"
                 : "text-muted hover:text-[#e8eaef]"
@@ -35,6 +37,8 @@ export function AssetsPanel() {
       </div>
       {tab === "broll" ? (
         <BRollTab />
+      ) : tab === "vfx" ? (
+        <VfxTab />
       ) : tab === "sfx" ? (
         <SfxTab />
       ) : (

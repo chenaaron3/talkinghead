@@ -1,8 +1,9 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { cutsToKeepRegions } from "@src/lib/source-timeline";
 import type { FlatCaption } from "../../../lib/captions";
 import type { RangeKind } from "../../../lib/active-range";
 import { clampRangeEdge } from "../../../lib/range";
-import { maybeSnapTimelineSec } from "../../../lib/snap";
+import { snapTranscriptCaptionEdge } from "../../../lib/snap";
 import {
   EMPTY_BROLLS,
   EMPTY_CAPTIONS,
@@ -45,6 +46,16 @@ export function useRangeResize() {
   const sfx = useEditor((s) => s.config?.sfx ?? EMPTY_SFX);
   const punchIns = useEditor((s) => s.config?.punchInSegments ?? EMPTY_PUNCH_INS);
   const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
+  const cuts = useEditor((s) => s.config?.cuts ?? []);
+  const duration = useEditor((s) => s.transcript?.duration ?? 0);
+  const keeps = useMemo(
+    () => cutsToKeepRegions(cuts, duration),
+    [cuts, duration],
+  );
+  const indexedCaptions = useMemo(
+    () => captions.map((c, index) => ({ ...c, index })),
+    [captions],
+  );
   const seekSource = useEditor((s) => s.seekSource);
   const selectBRoll = useSelection((s) => s.selectBRoll);
   const selectVfx = useSelection((s) => s.selectVfx);
@@ -72,12 +83,15 @@ export function useRangeResize() {
   const snapToCaption = (caption: FlatCaption, shiftKey = false) => {
     if (!resize) return;
 
+    const edgeSec = (edge: "start" | "end") =>
+      shiftKey
+        ? edge === "start"
+          ? caption.start
+          : caption.end
+        : snapTranscriptCaptionEdge(caption, edge, indexedCaptions, keeps);
+
     if (resize.kind === "listicle") {
-      const reveal = maybeSnapTimelineSec(
-        caption.start,
-        captions,
-        shiftKey,
-      );
+      const reveal = edgeSec("start");
       updateListicleItemReveal(resize.id, reveal, true);
       seekSource(reveal);
       return;
@@ -86,8 +100,7 @@ export function useRangeResize() {
     if (resize.kind === "broll") {
       const clip = bRolls.find((c) => c.id === resize.id);
       if (!clip) return;
-      const value =
-        resize.edge === "start" ? caption.start : caption.end;
+      const value = edgeSec(resize.edge);
       const { start, end } = clampRangeEdge(resize.edge, value, clip);
       updateBRollRange(clip.id, start, end, true);
       seekSource(resize.edge === "start" ? start : end);
@@ -97,8 +110,7 @@ export function useRangeResize() {
     if (resize.kind === "vfx") {
       const clip = vfx.find((c) => c.id === resize.id);
       if (!clip) return;
-      const value =
-        resize.edge === "start" ? caption.start : caption.end;
+      const value = edgeSec(resize.edge);
       const { start, end } = clampRangeEdge(resize.edge, value, clip);
       updateVfxRange(clip.id, start, end, true);
       seekSource(resize.edge === "start" ? start : end);
@@ -106,10 +118,7 @@ export function useRangeResize() {
     }
 
     if (resize.kind === "sfx") {
-      const value =
-        resize.edge === "start"
-          ? maybeSnapTimelineSec(caption.start, captions, shiftKey)
-          : caption.end;
+      const value = edgeSec(resize.edge);
       updateSfxRange(resize.id, resize.edge, value, true);
       const next = useEditor
         .getState()
@@ -122,7 +131,7 @@ export function useRangeResize() {
 
     const seg = punchIns[resize.id];
     if (!seg) return;
-    const value = resize.edge === "start" ? caption.start : caption.end;
+    const value = edgeSec(resize.edge);
     const { start, end } = clampRangeEdge(resize.edge, value, seg);
     updatePunchInRange(resize.id, start, end, true);
     seekSource(resize.edge === "start" ? start : end);

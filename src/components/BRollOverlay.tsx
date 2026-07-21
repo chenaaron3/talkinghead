@@ -77,11 +77,9 @@ const Clip: React.FC<{ clip: BRollClip }> = ({ clip }) => {
         opacity,
       }}
     >
-      <AbsoluteFill style={{ backgroundColor: "rgba(0,0,0,0.55)" }} />
       <div
         style={{
           position: "relative",
-          zIndex: 1,
           width: fitted.w,
           height: fitted.h,
           transform: `translate(${offsetX * width}px, ${offsetY * height}px) rotate(${rotation}deg) scale(${scale})`,

@@ -1,7 +1,7 @@
-import { EMPTY_BROLLS, EMPTY_CAPTIONS } from "../../../lib/empty";
+import { EMPTY_BROLLS } from "../../../lib/empty";
 import { isSelected } from "../../../lib/selection";
 import { clampRangeEdge } from "../../../lib/range";
-import { maybeSnapTimelineSec } from "../../../lib/snap";
+import { useTimelineSnap } from "../../../lib/use-timeline-snap";
 import { useSelection } from "../../../selection-store";
 import { useEditor } from "../../../store";
 import { Handle, TrackLabel, useTrackDrag } from "../shared";
@@ -13,10 +13,10 @@ type Props = {
 
 export function BRollTrack({ width, sourceX }: Props) {
   const bRolls = useEditor((s) => s.config?.bRolls ?? EMPTY_BROLLS);
-  const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
   const selection = useSelection((s) => s.selection);
   const selectBRoll = useSelection((s) => s.selectBRoll);
   const updateBRollRange = useEditor((s) => s.updateBRollRange);
+  const snap = useTimelineSnap();
   const { startDrag } = useTrackDrag();
 
   if (bRolls.length === 0) return null;
@@ -47,12 +47,7 @@ export function BRollTrack({ width, sourceX }: Props) {
                 const fixedEnd = clip.end;
                 startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = Math.max(0, origin + dxSec);
-                  const snapped = maybeSnapTimelineSec(
-                    raw,
-                    captions,
-                    shiftKey,
-                    "start",
-                  );
+                  const snapped = snap(raw, shiftKey, "start");
                   const { start, end } = clampRangeEdge("start", snapped, {
                     start: origin,
                     end: fixedEnd,
@@ -69,12 +64,7 @@ export function BRollTrack({ width, sourceX }: Props) {
                 const fixedStart = clip.start;
                 startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = origin + dxSec;
-                  const snapped = maybeSnapTimelineSec(
-                    raw,
-                    captions,
-                    shiftKey,
-                    "end",
-                  );
+                  const snapped = snap(raw, shiftKey, "end");
                   const { start, end } = clampRangeEdge("end", snapped, {
                     start: fixedStart,
                     end: origin,

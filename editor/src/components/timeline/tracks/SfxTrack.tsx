@@ -1,6 +1,6 @@
-import { EMPTY_CAPTIONS, EMPTY_SFX } from "../../../lib/empty";
+import { EMPTY_SFX } from "../../../lib/empty";
 import { isSelected } from "../../../lib/selection";
-import { maybeSnapTimelineSec } from "../../../lib/snap";
+import { useTimelineSnap } from "../../../lib/use-timeline-snap";
 import { useSelection } from "../../../selection-store";
 import { useEditor } from "../../../store";
 import { Handle, TrackLabel, useTrackDrag } from "../shared";
@@ -12,10 +12,10 @@ type Props = {
 
 export function SfxTrack({ width, sourceX }: Props) {
   const sfx = useEditor((s) => s.config?.sfx ?? EMPTY_SFX);
-  const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
   const selection = useSelection((s) => s.selection);
   const selectSfx = useSelection((s) => s.selectSfx);
   const updateSfxRange = useEditor((s) => s.updateSfxRange);
+  const snap = useTimelineSnap();
   const { startDrag } = useTrackDrag();
 
   if (sfx.length === 0) return null;
@@ -44,12 +44,7 @@ export function SfxTrack({ width, sourceX }: Props) {
               selectSfx(clip.id);
               startDrag(e, (dxSec, _dxPx, shiftKey) => {
                 const raw = Math.max(0, origin + dxSec);
-                const snapped = maybeSnapTimelineSec(
-                  raw,
-                  captions,
-                  shiftKey,
-                  "start",
-                );
+                const snapped = snap(raw, shiftKey, "start");
                 updateSfxRange(clip.id, "start", snapped, true);
               });
             }}
@@ -60,12 +55,7 @@ export function SfxTrack({ width, sourceX }: Props) {
                 const origin = clip.start;
                 startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = Math.max(0, origin + dxSec);
-                  const snapped = maybeSnapTimelineSec(
-                    raw,
-                    captions,
-                    shiftKey,
-                    "start",
-                  );
+                  const snapped = snap(raw, shiftKey, "start");
                   updateSfxRange(clip.id, "start", snapped, true);
                 });
               }}
@@ -77,12 +67,7 @@ export function SfxTrack({ width, sourceX }: Props) {
                 const origin = clip.end;
                 startDrag(e, (dxSec, _dxPx, shiftKey) => {
                   const raw = origin + dxSec;
-                  const snapped = maybeSnapTimelineSec(
-                    raw,
-                    captions,
-                    shiftKey,
-                    "end",
-                  );
+                  const snapped = snap(raw, shiftKey, "end");
                   updateSfxRange(clip.id, "end", snapped, true);
                 });
               }}

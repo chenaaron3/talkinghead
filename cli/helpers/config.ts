@@ -236,6 +236,7 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
     const srcDurationSec = Number(entry.srcDurationSec);
     const mediaOffsetSec = Number(entry.mediaOffsetSec);
     const volume = Number(entry.volume);
+    const kenBurns = Number(entry.kenBurns);
 
     const isVideo = isVideoSrc(src);
     let clip: SourceBRoll;
@@ -269,6 +270,9 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
     }
     if (entry.volume != null && Number.isFinite(volume)) {
       clip.volume = Math.min(1, Math.max(0, volume));
+    }
+    if (entry.kenBurns != null && Number.isFinite(kenBurns) && kenBurns > 0) {
+      clip.kenBurns = kenBurns;
     }
     return clip;
   });

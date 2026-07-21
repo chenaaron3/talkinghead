@@ -1,7 +1,6 @@
-import { EMPTY_CAPTIONS } from "../../../lib/empty";
 import { clampRangeEdge, MIN_LISTICLE_SEC } from "../../../lib/range";
 import { isSelected } from "../../../lib/selection";
-import { maybeSnapTimelineSec } from "../../../lib/snap";
+import { useTimelineSnap } from "../../../lib/use-timeline-snap";
 import { useSelection } from "../../../selection-store";
 import { useEditor } from "../../../store";
 import { Handle, TrackLabel, useTrackDrag } from "../shared";
@@ -13,13 +12,13 @@ type Props = {
 
 export function ListicleTrack({ width, sourceX }: Props) {
   const listicle = useEditor((s) => s.config?.listicleOverlay);
-  const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
   const selection = useSelection((s) => s.selection);
   const selectListicleItem = useSelection((s) => s.selectListicleItem);
   const updateListicleOverlay = useEditor((s) => s.updateListicleOverlay);
   const updateListicleItemReveal = useEditor(
     (s) => s.updateListicleItemReveal,
   );
+  const snap = useTimelineSnap();
   const { startDrag } = useTrackDrag();
 
   if (!listicle) return null;
@@ -42,12 +41,7 @@ export function ListicleTrack({ width, sourceX }: Props) {
             const fixedEnd = listicle.end;
             startDrag(e, (dxSec, _dxPx, shiftKey) => {
               const raw = Math.max(0, origin + dxSec);
-              const snapped = maybeSnapTimelineSec(
-                raw,
-                captions,
-                shiftKey,
-                "start",
-              );
+              const snapped = snap(raw, shiftKey, "start");
               const { start, end } = clampRangeEdge(
                 "start",
                 snapped,
@@ -65,12 +59,7 @@ export function ListicleTrack({ width, sourceX }: Props) {
             const fixedStart = listicle.start;
             startDrag(e, (dxSec, _dxPx, shiftKey) => {
               const raw = origin + dxSec;
-              const snapped = maybeSnapTimelineSec(
-                raw,
-                captions,
-                shiftKey,
-                "end",
-              );
+              const snapped = snap(raw, shiftKey, "end");
               const { start, end } = clampRangeEdge(
                 "end",
                 snapped,
@@ -101,11 +90,7 @@ export function ListicleTrack({ width, sourceX }: Props) {
             const origin = item.reveal;
             selectListicleItem(i);
             startDrag(e, (dxSec, _dxPx, shiftKey) => {
-              const reveal = maybeSnapTimelineSec(
-                origin + dxSec,
-                captions,
-                shiftKey,
-              );
+              const reveal = snap(origin + dxSec, shiftKey, "start");
               updateListicleItemReveal(i, reveal, true);
             });
           }}

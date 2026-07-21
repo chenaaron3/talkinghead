@@ -137,19 +137,21 @@ export function TranscriptPanel() {
   }
 
   return (
-    <div className="relative flex min-h-0 flex-col border-r border-border bg-panel">
+    <div className="flex min-h-0 flex-col border-r border-border bg-panel">
       <TranscriptToolbar />
-      <div
-        className="min-h-0 flex-1 overflow-auto"
-        onClick={() => {
-          if (!resize) clearSelection();
-        }}
-      >
-        <div className="max-w-[52rem] px-6 py-5 text-[18px] leading-[1.85] tracking-wide text-[#e8eaef]">
-          {nodes}
+      <div className="flex min-h-0 flex-1">
+        <div
+          className="min-h-0 min-w-0 flex-[3] overflow-auto"
+          onClick={() => {
+            if (!resize) clearSelection();
+          }}
+        >
+          <div className="px-6 py-5 text-[18px] leading-[1.85] tracking-wide text-[#e8eaef]">
+            {nodes}
+          </div>
         </div>
+        <InspectorPanel />
       </div>
-      <InspectorPanel />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import {
   SCISSOR_GAP_THRESHOLD_SEC,
   SCISSOR_MARGIN_SEC,
 } from "./editing-constants";
-import { normalizeCuts } from "./source-timeline";
+import { captionFullyInCuts, normalizeCuts } from "./source-timeline";
 import type { SourceCut, TranscriptCaption } from "./types";
 
 export type InterWordPause = {
@@ -19,15 +19,6 @@ export type InterWordPause = {
   isProcessLevel: boolean;
 };
 
-function captionOverlapsCut(
-  caption: { start: number; end: number },
-  cuts: SourceCut[],
-): boolean {
-  return normalizeCuts(cuts).some(
-    (cut) => caption.start < cut.end && caption.end > cut.start,
-  );
-}
-
 function intervalHasCut(
   start: number,
   end: number,
@@ -42,7 +33,7 @@ function visibleCaptions(
 ): Array<TranscriptCaption & { index: number }> {
   return captions
     .map((caption, index) => ({ ...caption, index }))
-    .filter((caption) => !captionOverlapsCut(caption, cuts));
+    .filter((caption) => !captionFullyInCuts(caption, cuts));
 }
 
 function buildPause(options: {

@@ -59,6 +59,8 @@ export type BRollClip = {
   mediaOffsetSec?: number;
   /** Video only; 0–1. Default 0 (muted). */
   volume?: number;
+  /** End-scale multiplier on `scale`; presence enables Ken Burns. */
+  kenBurns?: number;
 } & Partial<Transform>;
 
 type VfxClipBase = {

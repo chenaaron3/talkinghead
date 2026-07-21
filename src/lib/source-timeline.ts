@@ -1,6 +1,5 @@
 import type { SourceCut } from "./config-types";
 import type { KeepSegment } from "./pipeline-types";
-import type { TranscriptCaption } from "./transcript-types";
 
 const MIN_REGION_SEC = 0.1;
 
@@ -40,7 +39,8 @@ function captionFullyInCut(
   );
 }
 
-function captionFullyInCuts(
+/** True when the caption lies entirely inside a cut (no kept audio remains). */
+export function captionFullyInCuts(
   caption: { start: number; end: number },
   cuts: SourceCut[],
 ): boolean {
@@ -257,20 +257,6 @@ export function intersectWithKeepRegions(
     }
   }
   return out;
-}
-
-/** Clip a source range to caption boundaries inside the range. */
-export function clipRangeToCaptions(
-  start: number,
-  end: number,
-  captions: TranscriptCaption[],
-): { start: number; end: number } | null {
-  const overlapping = captions.filter((c) => c.end > start && c.start < end);
-  if (overlapping.length === 0) return null;
-  const clipStart = Math.max(start, overlapping[0]!.start);
-  const clipEnd = Math.min(end, overlapping[overlapping.length - 1]!.end);
-  if (clipEnd <= clipStart) return null;
-  return { start: clipStart, end: clipEnd };
 }
 
 export type SourceGap = {

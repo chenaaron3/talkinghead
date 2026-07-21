@@ -1,4 +1,5 @@
 import {
+  captionFullyInCuts,
   mergeCutsOverRemovedCaptions,
   normalizeCuts,
 } from "@src/lib/source-timeline";
@@ -25,11 +26,10 @@ export function cutForCaption(
   return mergeCutsOverRemovedCaptions(next, captions);
 }
 
+/** True when no portion of the caption remains in the kept video. */
 export function captionInCut(
   caption: { start: number; end: number },
   cuts: SourceCut[],
 ): boolean {
-  return normalizeCuts(cuts).some(
-    (cut) => caption.start < cut.end && caption.end > cut.start,
-  );
+  return captionFullyInCuts(caption, cuts);
 }

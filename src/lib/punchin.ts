@@ -1,7 +1,7 @@
 export const PUNCH_IN_STRENGTH = {
-  light: 1.1,
-  medium: 1.25,
-  strong: 1.5,
+  light: 1.05,
+  medium: 1.1,
+  strong: 1.15,
 } as const;
 
 export type PunchInStrength = keyof typeof PUNCH_IN_STRENGTH;

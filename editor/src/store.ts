@@ -17,6 +17,7 @@ import {
   withBRollMediaOffset,
   withBRollTransform,
   withBRollVolume,
+  withBRollKenBurns,
   type Transform,
 } from './lib/broll';
 import {
@@ -183,6 +184,11 @@ type EditorActions = {
     live?: boolean,
   ) => void;
   updateBRollVolume: (id: string, volume: number, live?: boolean) => void;
+  updateBRollKenBurns: (
+    id: string,
+    kenBurns: number | null,
+    live?: boolean,
+  ) => void;
   updateVfxRange: (
     id: string,
     start: number,
@@ -1156,6 +1162,17 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const clip = config.bRolls.find((c) => c.id === id);
       if (!clip) return;
       const next = withBRollVolume(clip, volume);
+      const result = upsertBRoll(config.bRolls, next);
+      if ("error" in result) return;
+      commit({ config: { ...config, bRolls: result }, transcript }, live);
+    },
+
+    updateBRollKenBurns: (id, kenBurns, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = config.bRolls.find((c) => c.id === id);
+      if (!clip) return;
+      const next = withBRollKenBurns(clip, kenBurns);
       const result = upsertBRoll(config.bRolls, next);
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript }, live);

@@ -1,4 +1,7 @@
 import {
+  DEFAULT_KEN_BURNS,
+  KEN_BURNS_MAX,
+  KEN_BURNS_MIN,
   bRollSrcDurationSec,
   isVideoSrc,
   type Transform,
@@ -8,7 +11,7 @@ import { useEditor } from "../../store";
 import { VIDEO_BROLL_VOLUME_DEFAULT } from "@src/lib/media";
 import type { SourceBRoll } from "@src/lib/types";
 
-import { SliderField, TransformFields } from "./field";
+import { SliderField, ToggleField, TransformFields } from "./field";
 
 export function BRollInspector({
   clip,
@@ -20,6 +23,7 @@ export function BRollInspector({
   const updateBRollTransform = useEditor((s) => s.updateBRollTransform);
   const updateBRollMediaOffset = useEditor((s) => s.updateBRollMediaOffset);
   const updateBRollVolume = useEditor((s) => s.updateBRollVolume);
+  const updateBRollKenBurns = useEditor((s) => s.updateBRollKenBurns);
   const isVideo = isVideoSrc(clip.src);
 
   const patch = (partial: Partial<Transform>, live: boolean) => {
@@ -31,6 +35,8 @@ export function BRollInspector({
   const srcDur = bRollSrcDurationSec(clip);
   const maxOffset =
     srcDur != null ? Math.max(0, srcDur - MIN_RANGE_SEC) : 0;
+  const kenBurnsOn = clip.kenBurns != null;
+  const kenBurns = clip.kenBurns ?? DEFAULT_KEN_BURNS;
 
   return (
     <div className="flex flex-col gap-4">
@@ -62,6 +68,33 @@ export function BRollInspector({
           />
         </>
       ) : null}
+
+      <div className="flex flex-col gap-1.5">
+        <ToggleField
+          label="Ken Burns"
+          checked={kenBurnsOn}
+          onCheckedChange={(checked) =>
+            updateBRollKenBurns(
+              clip.id,
+              checked ? DEFAULT_KEN_BURNS : null,
+              true,
+            )
+          }
+        />
+
+        {kenBurnsOn ? (
+          <SliderField
+            label="End zoom"
+            value={kenBurns}
+            min={KEN_BURNS_MIN}
+            max={KEN_BURNS_MAX}
+            step={0.01}
+            display={`${kenBurns.toFixed(2)}×`}
+            onLiveChange={(v) => updateBRollKenBurns(clip.id, v, true)}
+            onCommit={(v) => updateBRollKenBurns(clip.id, v, true)}
+          />
+        ) : null}
+      </div>
 
       <TransformFields transform={transform} onPatch={patch} />
     </div>

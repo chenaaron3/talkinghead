@@ -1,14 +1,14 @@
-/** Snap a source timestamp to the nearest caption start or end. */
-export function snapToNearestCaptionBoundary(
+/** Snap a source timestamp to the nearest range start or end. */
+export function snapToNearestBoundary(
   sec: number,
-  captions: { start: number; end: number }[],
+  ranges: { start: number; end: number }[],
   edge: "start" | "end",
 ): number {
-  if (captions.length === 0) return sec;
-  let best = edge === "start" ? captions[0]!.start : captions[0]!.end;
+  if (ranges.length === 0) return sec;
+  let best = edge === "start" ? ranges[0]!.start : ranges[0]!.end;
   let bestDist = Math.abs(best - sec);
-  for (const cap of captions) {
-    const point = edge === "start" ? cap.start : cap.end;
+  for (const range of ranges) {
+    const point = edge === "start" ? range.start : range.end;
     const dist = Math.abs(point - sec);
     if (dist < bestDist) {
       bestDist = dist;
@@ -18,12 +18,20 @@ export function snapToNearestCaptionBoundary(
   return best;
 }
 
-/** Timeline drags snap by default; hold Shift for fine adjustment. */
+/**
+ * Timeline drags snap by default; hold Shift for fine adjustment.
+ * Start handles prefer starts (captions + keep regions); end handles prefer ends.
+ */
 export function maybeSnapTimelineSec(
   sec: number,
   captions: { start: number; end: number }[],
   shiftKey: boolean,
   edge: "start" | "end" = "start",
+  keeps: { start: number; end: number }[] = [],
 ): number {
-  return shiftKey ? sec : snapToNearestCaptionBoundary(sec, captions, edge);
+  if (shiftKey) return sec;
+  if (keeps.length === 0) {
+    return snapToNearestBoundary(sec, captions, edge);
+  }
+  return snapToNearestBoundary(sec, [...captions, ...keeps], edge);
 }

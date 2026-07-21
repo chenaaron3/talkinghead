@@ -19,6 +19,11 @@ export const TRANSFORM_DEFAULTS: Transform = {
 export const BROLL_SCALE_MIN = 0.2;
 export const BROLL_SCALE_MAX = 3;
 
+/** End-scale multiplier when Ken Burns is first enabled. */
+export const DEFAULT_KEN_BURNS = 1.15;
+export const KEN_BURNS_MIN = 0.5;
+export const KEN_BURNS_MAX = 2;
+
 export function resolveTransform(partial: Partial<Transform>): Transform {
   return {
     scale: partial.scale ?? TRANSFORM_DEFAULTS.scale,
@@ -30,6 +35,10 @@ export function resolveTransform(partial: Partial<Transform>): Transform {
 
 export function clampBRollScale(scale: number): number {
   return Math.min(BROLL_SCALE_MAX, Math.max(BROLL_SCALE_MIN, scale));
+}
+
+export function clampKenBurns(multiplier: number): number {
+  return Math.min(KEN_BURNS_MAX, Math.max(KEN_BURNS_MIN, multiplier));
 }
 
 /** Max playable seconds given media offset (null = unlimited, e.g. images). */
@@ -77,6 +86,9 @@ export function compactBRoll(clip: SourceBRoll): SourceBRoll {
   if (next.rotation !== TRANSFORM_DEFAULTS.rotation) {
     out.rotation = next.rotation;
   }
+  if (clip.kenBurns != null) {
+    out.kenBurns = clampKenBurns(clip.kenBurns);
+  }
   return out;
 }
 
@@ -114,6 +126,18 @@ export function withBRollMediaOffset(
 export function withBRollVolume(clip: SourceBRoll, volume: number): SourceBRoll {
   const v = Math.min(1, Math.max(0, volume));
   return compactBRoll({ ...clip, volume: v });
+}
+
+/** `null` disables Ken Burns (field omitted from config). */
+export function withBRollKenBurns(
+  clip: SourceBRoll,
+  kenBurns: number | null,
+): SourceBRoll {
+  if (kenBurns == null) {
+    const { kenBurns: _removed, ...rest } = clip;
+    return compactBRoll(rest);
+  }
+  return compactBRoll({ ...clip, kenBurns: clampKenBurns(kenBurns) });
 }
 
 export function clampBRollRange(

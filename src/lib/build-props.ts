@@ -3,7 +3,7 @@ import {
 } from './caption-words';
 import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from './constants';
 import {
-    clipRangeToCaptions, cutsToKeepSegments, intersectWithKeepRegions, mapSourceSecToOutputFrame,
+    cutsToKeepSegments, intersectWithKeepRegions, mapSourceSecToOutputFrame,
     mapSourceSecToOutputSec, validateCuts
 } from './source-timeline';
 
@@ -90,23 +90,14 @@ function mapSourceRangeToOutputFrames(
   end: number,
   segments: KeepSegment[],
   fps: number,
-  captions: TranscriptCaption[],
   cuts: BuildPropsInput["config"]["cuts"],
   durationSec: number,
-  options: { clipToCaptions?: boolean } = {},
 ): { startFrame: number; endFrame: number } | null {
-  const clipToCaptions = options.clipToCaptions ?? true;
   const kept = intersectWithKeepRegions(start, end, cuts, durationSec);
   if (kept.length === 0) return null;
 
-  let clipStart = kept[0]!.start;
-  let clipEnd = kept[kept.length - 1]!.end;
-  if (clipToCaptions) {
-    const captionClip = clipRangeToCaptions(clipStart, clipEnd, captions);
-    if (!captionClip) return null;
-    clipStart = captionClip.start;
-    clipEnd = captionClip.end;
-  }
+  const clipStart = kept[0]!.start;
+  const clipEnd = kept[kept.length - 1]!.end;
 
   const startFrame = mapSourceSecToOutputFrame(clipStart, segments, fps);
   const endFrameRaw = mapSourceSecToOutputFrame(clipEnd, segments, fps);
@@ -120,7 +111,6 @@ function buildListicle(
   overlay: SourceListicle | null,
   segments: KeepSegment[],
   fps: number,
-  captions: TranscriptCaption[],
   cuts: BuildPropsInput["config"]["cuts"],
   durationSec: number,
 ): ListicleOverlay | null {
@@ -144,7 +134,6 @@ function buildListicle(
     overlay.end,
     segments,
     fps,
-    captions,
     cuts,
     durationSec,
   );
@@ -199,7 +188,6 @@ function buildPunchIns(
       punchIn.end,
       segments,
       fps,
-      captions,
       cuts,
       durationSec,
     );
@@ -234,7 +222,6 @@ function buildBRolls(
   bRolls: SourceBRoll[],
   segments: KeepSegment[],
   fps: number,
-  captions: TranscriptCaption[],
   cuts: BuildPropsInput["config"]["cuts"],
   durationSec: number,
 ): BRollClip[] {
@@ -245,7 +232,6 @@ function buildBRolls(
       clip.end,
       segments,
       fps,
-      captions,
       cuts,
       durationSec,
     );
@@ -268,6 +254,9 @@ function buildBRolls(
     if (clip.volume != null) {
       built.volume = clip.volume;
     }
+    if (clip.kenBurns != null) {
+      built.kenBurns = clip.kenBurns;
+    }
     result.push(built);
   }
   return result.sort((a, b) => a.startFrame - b.startFrame);
@@ -277,7 +266,6 @@ function buildVfx(
   vfx: SourceVfx[],
   segments: KeepSegment[],
   fps: number,
-  captions: TranscriptCaption[],
   cuts: BuildPropsInput["config"]["cuts"],
   durationSec: number,
 ): VfxClip[] {
@@ -288,7 +276,6 @@ function buildVfx(
       clip.end,
       segments,
       fps,
-      captions,
       cuts,
       durationSec,
     );
@@ -328,7 +315,6 @@ function buildSfx(
   sfx: SourceSfx[],
   segments: KeepSegment[],
   fps: number,
-  captions: TranscriptCaption[],
   cuts: BuildPropsInput["config"]["cuts"],
   durationSec: number,
 ): SfxClip[] {
@@ -339,10 +325,8 @@ function buildSfx(
       clip.end,
       segments,
       fps,
-      captions,
       cuts,
       durationSec,
-      { clipToCaptions: false },
     );
     if (!frames) continue;
     const built: SfxClip = {
@@ -401,7 +385,6 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     config.listicleOverlay,
     keepSegments,
     fps,
-    transcript.captions,
     config.cuts,
     transcript.duration,
   );
@@ -419,7 +402,6 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     config.bRolls,
     keepSegments,
     fps,
-    transcript.captions,
     config.cuts,
     transcript.duration,
   );
@@ -428,7 +410,6 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     config.vfx ?? [],
     keepSegments,
     fps,
-    transcript.captions,
     config.cuts,
     transcript.duration,
   );
@@ -437,7 +418,6 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     config.sfx ?? [],
     keepSegments,
     fps,
-    transcript.captions,
     config.cuts,
     transcript.duration,
   );

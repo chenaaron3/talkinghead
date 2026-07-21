@@ -1,6 +1,7 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Easing,
   Img,
   Sequence,
   interpolate,
@@ -18,6 +19,23 @@ import {
 import type { BRollClip } from "../lib/types";
 
 const FADE_SEC = 0.12;
+const KEN_BURNS_EASING = Easing.inOut(Easing.ease);
+
+function scaleAtFrame(
+  frame: number,
+  duration: number,
+  startScale: number,
+  kenBurns: number | undefined,
+): number {
+  if (kenBurns == null) return startScale;
+  const endScale = startScale * kenBurns;
+  if (duration <= 1) return endScale;
+  return interpolate(frame, [0, duration - 1], [startScale, endScale], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: KEN_BURNS_EASING,
+  });
+}
 
 const Clip: React.FC<{ clip: BRollClip }> = ({ clip }) => {
   const frame = useCurrentFrame();
@@ -34,7 +52,8 @@ const Clip: React.FC<{ clip: BRollClip }> = ({ clip }) => {
           { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
         );
 
-  const scale = clip.scale ?? 1;
+  const startScale = clip.scale ?? 1;
+  const scale = scaleAtFrame(frame, duration, startScale, clip.kenBurns);
   const offsetX = clip.offsetX ?? 0;
   const offsetY = clip.offsetY ?? 0;
   const rotation = clip.rotation ?? 0;

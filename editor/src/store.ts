@@ -18,6 +18,7 @@ import {
   withBRollTransform,
   withBRollVolume,
   withBRollKenBurns,
+  DEFAULT_KEN_BURNS,
   type Transform,
 } from './lib/broll';
 import {
@@ -899,6 +900,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         end,
         width: asset.width,
         height: asset.height,
+        kenBurns: DEFAULT_KEN_BURNS,
       };
       let clip: SourceBRoll;
       if (asset.durationSec != null && asset.durationSec > 0) {

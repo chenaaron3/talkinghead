@@ -11,6 +11,7 @@ import {
   DEFAULT_PUNCH_IN_ANIMATE,
   DEFAULT_PUNCH_IN_WORD_BY_WORD,
 } from "./punchin";
+import { resolveKenBurns } from "./ken-burns";
 import type {
   BRollClip,
   VfxClip,
@@ -254,8 +255,9 @@ function buildBRolls(
     if (clip.volume != null) {
       built.volume = clip.volume;
     }
-    if (clip.kenBurns != null) {
-      built.kenBurns = clip.kenBurns;
+    const kenBurns = resolveKenBurns(clip.kenBurns);
+    if (kenBurns != null) {
+      built.kenBurns = kenBurns;
     }
     result.push(built);
   }

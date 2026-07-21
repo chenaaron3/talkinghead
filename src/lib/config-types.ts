@@ -89,8 +89,8 @@ export type SourceBRoll = {
   /** Video only; seconds into source where playback begins. Default 0. */
   mediaOffsetSec?: number;
   /**
-   * Ken Burns end-scale multiplier on `scale` (start). Presence enables
-   * the effect; omit when off. Default when enabled: 1.15.
+   * Ken Burns end-scale multiplier on `scale` (start).
+   * Presence enables the effect; omit when off. Default when enabled: 1.15.
    */
   kenBurns?: number;
 } & Range &

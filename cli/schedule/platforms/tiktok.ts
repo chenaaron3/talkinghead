@@ -35,6 +35,66 @@ function dateParts(publishAt: Date, timeZone: string) {
   };
 }
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+function parseMonthHeader(text: string): { year: number; month: number } | null {
+  // Header is "July / 2026" (may use NBSP).
+  const match = text
+    .replace(/\u00a0/g, " ")
+    .match(
+      /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s*\/\s*(\d{4})\b/i,
+    );
+  if (!match) return null;
+  const month = MONTH_NAMES.findIndex(
+    (name) => name.toLowerCase() === match[1]!.toLowerCase(),
+  );
+  if (month < 0) return null;
+  return { year: Number(match[2]), month: month + 1 };
+}
+
+/** Advance/rewind the open calendar until the header matches year/month. */
+async function navigateCalendarToMonth(
+  page: Page,
+  year: number,
+  month: number,
+): Promise<void> {
+  const header = page.locator(".scheduled-picker .month-header-wrapper");
+  await header.waitFor({ state: "visible", timeout: TIMEOUTS.dateTime });
+  const arrows = header.locator("span.arrow");
+  const targetKey = year * 12 + month;
+
+  for (let i = 0; i < 24; i++) {
+    const raw = (await header.innerText()).trim();
+    const current = parseMonthHeader(raw);
+    if (!current) {
+      throw new Error(`TikTok calendar header unreadable: "${raw}"`);
+    }
+    const currentKey = current.year * 12 + current.month;
+    if (currentKey === targetKey) return;
+
+    const arrow = currentKey < targetKey ? arrows.last() : arrows.first();
+    await arrow.click({ timeout: TIMEOUTS.dateTime });
+    await settle(page, 300);
+  }
+
+  throw new Error(
+    `TikTok calendar did not reach ${MONTH_NAMES[month - 1]} / ${year}`,
+  );
+}
+
 async function setScheduleDateTime(
   page: Page,
   schedule: ReturnType<Page["locator"]>,
@@ -63,13 +123,19 @@ async function setScheduleDateTime(
   await fields.nth(1).click({ timeout: TIMEOUTS.dateTime });
   await settle(page, 500);
 
-  // Calendar is .scheduled-picker with span.day cells (probe-verified).
-  // .last() picks the current month when prev-month spillover days duplicate.
-  const day = String(Number(when.date.split("-")[2]));
+  const [year, month, dayNum] = when.date.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  await navigateCalendarToMonth(page, year, month);
+
+  // Selectable cells are span.day.valid (probe-verified). Next-month spillover
+  // days reuse the same number without .valid — never use .last() here.
   await page
-    .locator(".scheduled-picker span.day")
-    .filter({ hasText: new RegExp(`^${day}$`) })
-    .last()
+    .locator(".scheduled-picker span.day.valid")
+    .filter({ hasText: new RegExp(`^${dayNum}$`) })
+    .first()
     .click({ timeout: TIMEOUTS.dateTime });
   await settle(page, 500);
 

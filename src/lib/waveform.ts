@@ -65,7 +65,59 @@ export function computePeaksFromSamples(
   return peaks;
 }
 
-/** Sample normalized peak amplitudes for a source-time range. */
+export type WaveformBar = {
+  /** Position within the range as a fraction 0–1 (bar center). */
+  x: number;
+  /** Normalized amplitude 0–1. */
+  amp: number;
+};
+
+/**
+ * Sample peak bars on an absolute time grid.
+ * Bar times are locked to `secondsPerBar` buckets so resizing a visible
+ * range only reveals/hides edge bars — interior shape stays stable.
+ * Density should change only when zoom (`secondsPerBar`) changes.
+ */
+export function sampleWaveformGrid(
+  waveform: WaveformData,
+  startSec: number,
+  endSec: number,
+  secondsPerBar: number,
+  globalMax?: number,
+): WaveformBar[] {
+  const { peaks, peaksPerSec } = waveform;
+  if (secondsPerBar <= 0 || endSec <= startSec) return [];
+
+  const maxAmp = globalMax ?? peakMax(peaks);
+  const duration = endSec - startSec;
+  const out: WaveformBar[] = [];
+
+  const first = Math.floor(startSec / secondsPerBar);
+  const last = Math.ceil(endSec / secondsPerBar) - 1;
+
+  for (let i = first; i <= last; i++) {
+    const t0 = i * secondsPerBar;
+    const t1 = t0 + secondsPerBar;
+    const tCenter = t0 + secondsPerBar / 2;
+    if (tCenter < startSec || tCenter > endSec) continue;
+
+    const i0 = Math.max(0, Math.floor(t0 * peaksPerSec));
+    const i1 = Math.min(peaks.length, Math.ceil(t1 * peaksPerSec));
+    let peak = 0;
+    for (let j = i0; j < i1; j++) {
+      if (peaks[j]! > peak) peak = peaks[j]!;
+    }
+
+    out.push({
+      x: (tCenter - startSec) / duration,
+      amp: maxAmp > 0 ? peak / maxAmp : 0,
+    });
+  }
+
+  return out;
+}
+
+/** Sample normalized peak amplitudes for a source-time range (even spacing). */
 export function sampleWaveformRange(
   waveform: WaveformData,
   startSec: number,

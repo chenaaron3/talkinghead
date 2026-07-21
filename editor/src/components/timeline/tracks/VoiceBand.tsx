@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { FlatCaption } from "../../../lib/captions";
-import { sampleWaveformRange } from "@src/lib/waveform";
+import { sampleWaveformGrid } from "@src/lib/waveform";
+import type { WaveformBar } from "@src/lib/waveform";
 import { useEditor } from "../../../store";
 
 type Props = {
@@ -13,33 +14,36 @@ const CENTER = 50;
 const MAX_HALF = 46;
 const MIN_HALF = 3;
 const CENTER_GAP = 1.2;
+/** One bar every BAR_PX pixels — density only changes with zoom. */
 const BAR_PX = 2.2;
 
-/** One bar every BAR_PX pixels — density stays even across section cells. */
-function barCountForDuration(
-  durationSec: number,
-  pxPerSec: number,
-): number {
-  if (durationSec <= 0 || pxPerSec <= 0) return 0;
-  return Math.max(2, Math.ceil((durationSec * pxPerSec) / BAR_PX));
-}
-
 /** Fallback envelope from caption timing when audio peaks are not loaded yet. */
-function buildCaptionEnvelope(
+function buildCaptionEnvelopeGrid(
   start: number,
   end: number,
   captions: FlatCaption[],
-  samples: number,
-): number[] {
+  secondsPerBar: number,
+): WaveformBar[] {
   const duration = end - start;
-  if (duration <= 0) return [];
+  if (duration <= 0 || secondsPerBar <= 0) return [];
 
   const words = captions.filter((c) => c.start < end && c.end > start);
-  return Array.from({ length: samples }, (_, i) => {
-    const t = start + (i / Math.max(1, samples - 1)) * duration;
-    const active = words.some((w) => t >= w.start && t < w.end);
-    return active ? 0.7 : 0.04;
-  });
+  const out: WaveformBar[] = [];
+  const first = Math.floor(start / secondsPerBar);
+  const last = Math.ceil(end / secondsPerBar) - 1;
+
+  for (let i = first; i <= last; i++) {
+    const t0 = i * secondsPerBar;
+    const tCenter = t0 + secondsPerBar / 2;
+    if (tCenter < start || tCenter > end) continue;
+    const active = words.some((w) => tCenter >= w.start && tCenter < w.end);
+    out.push({
+      x: (tCenter - start) / duration,
+      amp: active ? 0.7 : 0.04,
+    });
+  }
+
+  return out;
 }
 
 export function VoiceBand({ start, end, captions }: Props) {
@@ -47,27 +51,24 @@ export function VoiceBand({ start, end, captions }: Props) {
   const waveformMax = useEditor((s) => s.waveformMax);
   const pxPerSec = useEditor((s) => s.pxPerSec);
 
-  const { envelope, slot } = useMemo(() => {
-    const samples = barCountForDuration(end - start, pxPerSec);
+  const bars = useMemo(() => {
+    if (pxPerSec <= 0 || end <= start) return [];
+    const secondsPerBar = BAR_PX / pxPerSec;
 
-    const env =
-      waveform && waveformMax > 0
-        ? sampleWaveformRange(
-            waveform,
-            start,
-            end,
-            samples,
-            waveformMax,
-          )
-        : buildCaptionEnvelope(start, end, captions, samples);
+    if (waveform && waveformMax > 0) {
+      return sampleWaveformGrid(
+        waveform,
+        start,
+        end,
+        secondsPerBar,
+        waveformMax,
+      );
+    }
 
-    return {
-      envelope: env,
-      slot: 100 / samples,
-    };
+    return buildCaptionEnvelopeGrid(start, end, captions, secondsPerBar);
   }, [start, end, captions, pxPerSec, waveform, waveformMax]);
 
-  if (envelope.length < 2) return null;
+  if (bars.length < 2) return null;
 
   const topEnd = CENTER - CENTER_GAP / 2;
   const bottomStart = CENTER + CENTER_GAP / 2;
@@ -79,11 +80,11 @@ export function VoiceBand({ start, end, captions }: Props) {
       preserveAspectRatio="none"
       aria-hidden
     >
-      {envelope.map((amp, i) => {
-        const x = (i + 0.5) * slot;
+      {bars.map((bar, i) => {
+        const x = bar.x * 100;
         const half =
-          amp > 0.02
-            ? Math.max(MIN_HALF, amp * MAX_HALF)
+          bar.amp > 0.02
+            ? Math.max(MIN_HALF, bar.amp * MAX_HALF)
             : MIN_HALF;
 
         return (

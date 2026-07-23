@@ -6,6 +6,7 @@ import { TalkingHead } from "./TalkingHead";
 import allProps from "./generated/all-props.json";
 import episodesIndex from "./generated/episodes.json";
 import type { EpisodeProps } from "./lib/types";
+import { DEFAULT_TEXT_ENTRANCE_SFX } from "./lib/types";
 
 const WIDTH = 1080;
 const HEIGHT = 1920;
@@ -31,6 +32,10 @@ const fallbackProps: EpisodeProps = {
       startFrame: 0,
       endFrame: 30 * 5,
       text: "Retardmaxxing Day 1",
+      sfx: {
+        src: DEFAULT_TEXT_ENTRANCE_SFX,
+        srcDurationSec: 5,
+      },
       style: {
         fontFamily: "montserrat",
         fontSize: 68,

@@ -1,6 +1,6 @@
 import type { CaptionStyle } from "../captions/style";
 import type { CaptionEmphasis } from "./transcript-types";
-import type { Transform } from "./config-types";
+import type { HasSFX, Transform } from "./config-types";
 
 export type OutputSection = {
   trimBefore: number;
@@ -69,7 +69,8 @@ export type BRollClip = {
   kenBurns?: number;
   /** Under person cutout when cutoutSrc is set. Default false. */
   behind?: boolean;
-} & Partial<Transform>;
+} & HasSFX &
+  Partial<Transform>;
 
 type VfxClipBase = {
   id: string;
@@ -97,7 +98,7 @@ export type TextVfxClip = VfxClipBase & {
   type: "text";
   text: string;
   style: CaptionStyle;
-};
+} & HasSFX;
 
 export type VfxClip = LocationVfxClip | ShakeVfxClip | TextVfxClip;
 

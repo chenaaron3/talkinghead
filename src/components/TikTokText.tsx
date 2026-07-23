@@ -7,11 +7,12 @@ import {
 } from "remotion";
 
 import { FADE_DURATION_SEC } from "../lib/episode/constants";
+import type { AudioAsset } from "../lib/types";
 import type { CaptionStyle } from "../lib/captions/style";
 import { DEFAULT_TEXT_STYLE } from "../lib/text/templates";
 import { CaptionGroupView } from "./captions/CaptionGroupView";
 import { buildTextCaptionGroup } from "./captions/text-caption-group";
-import { SfxOverlay } from "./SfxOverlay";
+import { SfxInsert } from "./SfxOverlay";
 
 function fadeOpacity(
   localFrame: number,
@@ -40,7 +41,9 @@ export const TikTokText: React.FC<{
   text: string;
   durationSec: number;
   style?: CaptionStyle;
-}> = ({ text, durationSec, style: styleProp }) => {
+  /** Omit / null = silent. */
+  sfx?: AudioAsset | null;
+}> = ({ text, durationSec, style: styleProp, sfx: sfxProp }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const style = styleProp ?? DEFAULT_TEXT_STYLE;
@@ -52,18 +55,7 @@ export const TikTokText: React.FC<{
     [text, style, fps, durationFrames],
   );
 
-  const sfx = (
-    <SfxOverlay
-      sfx={[
-        {
-          id: "text-enter",
-          src: "sfx/beep-bop/title-enter.wav",
-          startFrame: 0,
-          endFrame: Math.max(1, Math.ceil(0.35 * fps)),
-        },
-      ]}
-    />
-  );
+  const sfx = <SfxInsert sfx={sfxProp} />;
 
   if (frame >= durationFrames) {
     return sfx;

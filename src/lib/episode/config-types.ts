@@ -89,6 +89,17 @@ export type Transform = {
 /** Default entrance SFX src for new b-roll placements. */
 export const DEFAULT_BROLL_ENTRANCE_SFX = "sfx/realistic/mouse_click.wav";
 
+/** Default entrance SFX for text VFX when `sfx` is omitted. */
+export const DEFAULT_TEXT_ENTRANCE_SFX = "sfx/beep-bop/title-enter.wav";
+
+/**
+ * Clip that can bake an entrance SFX at its start.
+ * Omit / null = silent. Seed defaults only at creation time.
+ */
+export type HasSFX = {
+  sfx?: AudioAsset | null;
+};
+
 export type SourceBRoll = {
   id: string;
   /** Video only; seconds into source where playback begins. Default 0. */
@@ -103,7 +114,8 @@ export type SourceBRoll = {
    * Omit / false = normal overlay on top. Default false in YAML.
    */
   behind?: boolean;
-} & Range &
+} & HasSFX &
+  Range &
   VisualAsset &
   Partial<Transform>;
 
@@ -199,6 +211,7 @@ export type SourceQuoteVfx = SourceVfxBase & {
 /**
  * On-screen text overlay for a source range.
  * Owns its own `text`, timing, and look (text templates).
+ * Entrance SFX seeded at creation ({@link DEFAULT_TEXT_ENTRANCE_SFX}); omit / null = silent.
  */
 export type SourceTextVfx = SourceVfxBase & {
   type: "text";
@@ -208,7 +221,7 @@ export type SourceTextVfx = SourceVfxBase & {
   templateId: string;
   /** Full caption style for this instance (copied from template on pick). */
   style: CaptionStyle;
-};
+} & HasSFX;
 
 export type SourceVfx =
   | SourceLocationVfx
@@ -321,7 +334,7 @@ export type EpisodeConfig = {
   /** One looping bed, or null when unset. */
   music: SourceMusic | null;
   /**
-   * SFX `src` inserted (independently) at each new b-roll start.
+   * SFX `src` baked onto each new b-roll at place time (`SourceBRoll.sfx`).
    * `null` disables. Default: {@link DEFAULT_BROLL_ENTRANCE_SFX}.
    */
   defaultBRollSfx: string | null;

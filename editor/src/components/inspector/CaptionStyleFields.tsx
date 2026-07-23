@@ -1,29 +1,45 @@
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Plus } from "lucide-react";
 
 import {
-  CAPTION_ANIMATIONS, CAPTION_BACKDROPS, CAPTION_FONT_IDS, CAPTION_TEXT_TRANSFORMS
-} from '@src/lib/captions/style';
+  CAPTION_ANIMATIONS,
+  CAPTION_BACKDROPS,
+  CAPTION_FONT_IDS,
+  CAPTION_TEXT_TRANSFORMS,
+} from "@src/lib/captions/style";
 
-import { useEditor } from '../../store';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { NumberField, SliderField, ToggleField } from './field';
+import { useEditor } from "../../store";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  InspectorCollapsible,
+  NumberField,
+  SliderField,
+  ToggleField,
+} from "./field";
 
-import type { CaptionAnimation, CaptionBackdrop, CaptionFontId, CaptionStyle, CaptionTextTransform } from '@src/lib/captions/style';
+import type {
+  CaptionAnimation,
+  CaptionBackdrop,
+  CaptionFontId,
+  CaptionStyle,
+  CaptionTextTransform,
+} from "@src/lib/captions/style";
 
-/** Shared editable caption style controls (episode default + Quote VFX). */
+/** Shared editable caption style controls (episode default + Quote / Text VFX). */
 export function CaptionStyleFields({
   style,
   onPatch,
+  defaultOpen = false,
 }: {
   style: CaptionStyle;
   onPatch: (partial: Partial<CaptionStyle>, live?: boolean) => void;
+  defaultOpen?: boolean;
 }) {
   const words = style.captionsAtATime;
 
   return (
-    <div className="flex w-full min-w-0 max-w-full flex-col gap-4">
+    <InspectorCollapsible title="Style" defaultOpen={defaultOpen}>
       <div className="flex flex-col gap-1">
         <Label>Font</Label>
         <select
@@ -231,6 +247,6 @@ export function CaptionStyleFields({
           </div>
         </div>
       ) : null}
-    </div>
+    </InspectorCollapsible>
   );
 }

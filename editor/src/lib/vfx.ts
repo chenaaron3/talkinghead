@@ -16,7 +16,14 @@ import {
   VFX_TYPES,
   vfxSupportsImageAsset,
   vfxSupportsTransform,
+  type AudioAsset,
 } from "@src/lib/episode/config-types";
+import {
+  compactEntranceSfx,
+  defaultTextEntranceSfx,
+  withSfx,
+  withSfxVolume,
+} from "@src/lib/episode/vfx";
 import type { CaptionStyle } from "@src/lib/captions/style";
 import {
   DEFAULT_QUOTE_TEMPLATE_ID,
@@ -205,7 +212,7 @@ export function compactVfx(clip: SourceVfx): SourceVfx {
 
   if (clip.type === "text") {
     const templateId = resolveTextTemplateId(clip);
-    return {
+    const out: SourceTextVfx = {
       id: clip.id,
       type: "text",
       start: clip.start,
@@ -214,6 +221,10 @@ export function compactVfx(clip: SourceVfx): SourceVfx {
       templateId,
       style: resolveTextStyle(clip),
     };
+    if (clip.sfx) {
+      out.sfx = compactEntranceSfx(clip.sfx);
+    }
+    return out;
   }
 
   const next = resolveTransform(clip);
@@ -336,6 +347,21 @@ export function withTextContent(clip: SourceVfx, text: string): SourceVfx {
   return compactVfx({ ...clip, text });
 }
 
+/** `null` clears entrance SFX (omit = silent). */
+export function withTextSfx(
+  clip: SourceTextVfx,
+  sfx: AudioAsset | null,
+): SourceTextVfx {
+  return compactVfx(withSfx(clip, sfx)) as SourceTextVfx;
+}
+
+export function withTextSfxVolume(
+  clip: SourceTextVfx,
+  volume: number,
+): SourceTextVfx {
+  return compactVfx(withSfxVolume(clip, volume)) as SourceTextVfx;
+}
+
 export function createVfxFromPreset(
   preset: VfxPreset,
   range: { start: number; end: number },
@@ -368,6 +394,7 @@ export function createVfxFromPreset(
       text: "",
       templateId: DEFAULT_TEXT_TEMPLATE_ID,
       style: { ...resolveTextTemplateStyle(DEFAULT_TEXT_TEMPLATE_ID) },
+      sfx: defaultTextEntranceSfx(range.end - range.start),
     };
   }
   return {

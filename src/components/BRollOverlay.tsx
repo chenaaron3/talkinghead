@@ -17,6 +17,7 @@ import {
   isVideoSrc,
 } from "../lib/episode/media";
 import type { BRollClip } from "../lib/types";
+import { SfxInsert } from "./SfxOverlay";
 
 const FADE_SEC = 0.12;
 const KEN_BURNS_EASING = Easing.inOut(Easing.ease);
@@ -77,6 +78,7 @@ const Clip: React.FC<{ clip: BRollClip }> = ({ clip }) => {
         opacity,
       }}
     >
+      <SfxInsert sfx={clip.sfx} />
       <div
         style={{
           position: "relative",

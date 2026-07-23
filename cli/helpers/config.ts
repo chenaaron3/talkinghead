@@ -12,9 +12,11 @@ import { defaultEpisodeCaptionStyle } from "../../src/lib/captions/templates";
 import {
   DEFAULT_BROLL_ENTRANCE_SFX,
   isVfxType,
+  type AudioAsset,
 } from "../../src/lib/episode/config-types";
 import { isVideoSrc } from "../../src/lib/episode/media";
 import { findIntroTextVfx } from "../../src/lib/episode/text-vfx";
+import { defaultTextEntranceSfx } from "../../src/lib/episode/vfx";
 import {
   DEFAULT_TEXT_TEMPLATE_ID,
   isTextTemplateId,
@@ -39,6 +41,38 @@ import {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Baked entrance SFX on b-roll / text VFX. `null` = silent; omit = unset. */
+function parseEntranceSfx(
+  value: unknown,
+  pathLabel: string,
+  configPath: string,
+): AudioAsset | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value === "string") {
+    const src = value.trim();
+    if (!src) return null;
+    // Legacy shorthand (src only) — duration rewritten when re-saved from editor.
+    return { src, srcDurationSec: 1 };
+  }
+  if (!isPlainObject(value)) {
+    throw new Error(`"${pathLabel}" must be an object, string, or null in ${configPath}`);
+  }
+  const src = String(value.src ?? "").trim();
+  const srcDurationSec = Number(value.srcDurationSec);
+  if (!src || !Number.isFinite(srcDurationSec) || srcDurationSec <= 0) {
+    throw new Error(
+      `"${pathLabel}" needs src and positive srcDurationSec in ${configPath}`,
+    );
+  }
+  const sfx: AudioAsset = { src, srcDurationSec };
+  const volume = Number(value.volume);
+  if (value.volume != null && Number.isFinite(volume)) {
+    sfx.volume = Math.min(1, Math.max(0, volume));
+  }
+  return sfx;
 }
 
 function deepMerge<T extends Record<string, unknown>>(
@@ -293,6 +327,8 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
     if (entry.behind === true) {
       clip.behind = true;
     }
+    const sfx = parseEntranceSfx(entry.sfx, `bRolls[${index}].sfx`, configPath);
+    if (sfx !== undefined) clip.sfx = sfx;
     return clip;
   });
 }
@@ -407,7 +443,7 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
         entry.style,
         resolveTextTemplateStyle(templateId),
       );
-      return {
+      const clip: SourceTextVfx = {
         id,
         type: "text",
         start,
@@ -416,6 +452,9 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
         templateId,
         style,
       };
+      const sfx = parseEntranceSfx(entry.sfx, `vfx[${index}].sfx`, configPath);
+      if (sfx !== undefined) clip.sfx = sfx;
+      return clip;
     }
 
     const src = String(entry.src ?? "").trim();
@@ -546,6 +585,7 @@ function ensureDefaultTextVfx(
     text: opts.title ?? "",
     templateId,
     style: { ...resolveTextTemplateStyle(templateId) },
+    sfx: defaultTextEntranceSfx(DEFAULT_TEXT_VFX_DURATION_SEC),
   };
   return [...vfx, clip].sort((a, b) => a.start - b.start);
 }

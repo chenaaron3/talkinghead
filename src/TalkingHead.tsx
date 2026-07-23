@@ -146,6 +146,7 @@ export const TalkingHead: React.FC<EpisodeProps> = ({
                 text={clip.text}
                 durationSec={durationFrames / fps}
                 style={clip.style}
+                sfx={clip.sfx}
               />
             </Sequence>
           );

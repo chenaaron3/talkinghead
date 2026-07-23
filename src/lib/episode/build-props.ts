@@ -26,10 +26,12 @@ import {
 } from "../visual/punchin";
 import { arollBgSrcForCutout, DEFAULT_SHAKE_INTENSITY } from "./config-types";
 import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from "./constants";
+import { compactEntranceSfx } from "./vfx";
 
 import type {
   BRollClip,
   VfxClip,
+  TextVfxClip,
   BuildPropsInput,
   TranscriptCaption,
   CaptionGroup,
@@ -324,6 +326,9 @@ function buildBRolls(
     if (clip.behind) {
       built.behind = true;
     }
+    if (clip.sfx) {
+      built.sfx = compactEntranceSfx(clip.sfx);
+    }
     result.push(built);
   }
   return result.sort((a, b) => a.startFrame - b.startFrame);
@@ -370,14 +375,18 @@ function buildVfx(
     }
 
     if (clip.type === "text") {
-      result.push({
+      const built: TextVfxClip = {
         id: clip.id,
         type: "text",
         startFrame: frames.startFrame,
         endFrame: frames.endFrame,
         text: clip.text,
         style: resolveClipTextStyle(clip),
-      });
+      };
+      if (clip.sfx) {
+        built.sfx = compactEntranceSfx(clip.sfx);
+      }
+      result.push(built);
       continue;
     }
 

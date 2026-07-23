@@ -11,6 +11,7 @@ import { useEditor } from "../../store";
 import { VIDEO_BROLL_VOLUME_DEFAULT } from "@src/lib/episode/media";
 import type { SourceBRoll } from "@src/lib/types";
 
+import { EntranceSfxField } from "./EntranceSfxField";
 import { SliderField, ToggleField, TransformFields } from "./field";
 
 export function BRollInspector({
@@ -25,6 +26,8 @@ export function BRollInspector({
   const updateBRollVolume = useEditor((s) => s.updateBRollVolume);
   const updateBRollKenBurns = useEditor((s) => s.updateBRollKenBurns);
   const updateBRollBehind = useEditor((s) => s.updateBRollBehind);
+  const updateBRollSfx = useEditor((s) => s.updateBRollSfx);
+  const updateBRollSfxVolume = useEditor((s) => s.updateBRollSfxVolume);
   const hasCutout = useEditor((s) => Boolean(s.config?.cutout));
   const isVideo = isVideoSrc(clip.src);
 
@@ -107,6 +110,12 @@ export function BRollInspector({
           />
         ) : null}
       </div>
+
+      <EntranceSfxField
+        value={clip.sfx}
+        onChange={(sfx) => updateBRollSfx(clip.id, sfx, true)}
+        onVolumeChange={(v) => updateBRollSfxVolume(clip.id, v, true)}
+      />
 
       <TransformFields transform={transform} onPatch={patch} />
     </div>

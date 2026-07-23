@@ -231,7 +231,7 @@ export function BRollTab() {
             const value = e.target.value;
             setDefaultBRollSfx(value.length > 0 ? value : null);
           }}
-          title="SFX added at the start of each new b-roll"
+          title="Default entrance SFX baked into each new b-roll"
         >
           <option value="">None</option>
           {!defaultStillListed && defaultBRollSfx ? (

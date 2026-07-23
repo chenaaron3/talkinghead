@@ -19,6 +19,8 @@ import {
   withBRollVolume,
   withBRollKenBurns,
   withBRollBehind,
+  withBRollSfx,
+  withBRollSfxVolume,
   DEFAULT_KEN_BURNS,
   type Transform,
 } from './lib/broll';
@@ -34,6 +36,9 @@ import {
   withTextTemplate,
   withTextStyle,
   withTextContent,
+  withTextSfx,
+  withTextSfxVolume,
+  isTextVfx,
   type VfxPreset,
 } from './lib/vfx';
 import { normalizeCaptionStyle } from '@src/lib/captions/parse-style';
@@ -66,6 +71,7 @@ import type { SerializedWaveform, WaveformData } from "@src/lib/audio/waveform";
 
 import type { FlatCaption } from "./lib/captions";
 import type {
+  AudioAsset,
   CaptionEmphasis,
   EpisodeConfig,
   EpisodeProps,
@@ -190,6 +196,8 @@ type EditorActions = {
     live?: boolean,
   ) => void;
   updateTextVfxContent: (id: string, text: string, live?: boolean) => void;
+  updateTextVfxSfx: (id: string, sfx: AudioAsset | null, live?: boolean) => void;
+  updateTextVfxSfxVolume: (id: string, volume: number, live?: boolean) => void;
   setTitle: (title: string) => void;
   cutInterWordPause: (pause: {
     cutStart: number;
@@ -218,6 +226,8 @@ type EditorActions = {
     live?: boolean,
   ) => void;
   updateBRollBehind: (id: string, behind: boolean, live?: boolean) => void;
+  updateBRollSfx: (id: string, sfx: AudioAsset | null, live?: boolean) => void;
+  updateBRollSfxVolume: (id: string, volume: number, live?: boolean) => void;
   updateVfxRange: (
     id: string,
     start: number,
@@ -923,6 +933,16 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const { selection } = useSelection.getState();
       const range = captionActionRange(transcript, selection, caption);
       let end = Math.max(range.start + MIN_RANGE_SEC, range.end);
+      const defaultSrc = config.defaultBRollSfx;
+      const sfxAsset = defaultSrc
+        ? sfxAssets.find((a) => a.src === defaultSrc)
+        : undefined;
+      const entranceSfx: AudioAsset | undefined = sfxAsset
+        ? {
+            src: sfxAsset.src,
+            srcDurationSec: Math.max(MIN_RANGE_SEC, sfxAsset.durationSec),
+          }
+        : undefined;
       const base = {
         id: newId("broll"),
         src: asset.src,
@@ -932,6 +952,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         height: asset.height,
         kenBurns: DEFAULT_KEN_BURNS,
         ...(config.cutout ? { behind: true as const } : {}),
+        ...(entranceSfx ? { sfx: entranceSfx } : {}),
       };
       let clip: SourceBRoll;
       if (asset.durationSec != null && asset.durationSec > 0) {
@@ -948,28 +969,10 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         clip = base;
       }
 
-      let nextSfx = config.sfx ?? [];
-      const defaultSrc = config.defaultBRollSfx;
-      if (defaultSrc) {
-        const sfxAsset = sfxAssets.find((a) => a.src === defaultSrc);
-        if (sfxAsset) {
-          const srcDurationSec = Math.max(MIN_RANGE_SEC, sfxAsset.durationSec);
-          const entrance: SourceSfx = {
-            id: newId("sfx"),
-            src: sfxAsset.src,
-            start: clip.start,
-            end: Math.min(transcript.duration, clip.start + srcDurationSec),
-            srcDurationSec,
-          };
-          const sfxResult = upsertSfx(nextSfx, entrance);
-          if (!("error" in sfxResult)) nextSfx = sfxResult;
-        }
-      }
-
       const result = upsertBRoll(config.bRolls, clip);
       if ("error" in result) return;
       commit({
-        config: { ...config, bRolls: result, sfx: nextSfx },
+        config: { ...config, bRolls: result },
         transcript,
       });
       useSelection.getState().selectBRoll(clip.id);
@@ -1287,6 +1290,28 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       commit({ config: { ...config, bRolls: result }, transcript }, live);
     },
 
+    updateBRollSfx: (id, sfx, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = config.bRolls.find((c) => c.id === id);
+      if (!clip) return;
+      const next = withBRollSfx(clip, sfx);
+      const result = upsertBRoll(config.bRolls, next);
+      if ("error" in result) return;
+      commit({ config: { ...config, bRolls: result }, transcript }, live);
+    },
+
+    updateBRollSfxVolume: (id, volume, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = config.bRolls.find((c) => c.id === id);
+      if (!clip) return;
+      const next = withBRollSfxVolume(clip, volume);
+      const result = upsertBRoll(config.bRolls, next);
+      if ("error" in result) return;
+      commit({ config: { ...config, bRolls: result }, transcript }, live);
+    },
+
     updateVfxRange: (id, start, end, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
@@ -1380,6 +1405,34 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const clip = (config.vfx ?? []).find((c) => c.id === id);
       if (!clip) return;
       const next = withTextContent(clip, text);
+      const result = upsertVfx(config.vfx ?? [], next);
+      if ("error" in result) return;
+      commit(
+        { config: { ...config, vfx: result }, transcript },
+        live,
+      );
+    },
+
+    updateTextVfxSfx: (id, sfx, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip || !isTextVfx(clip)) return;
+      const next = withTextSfx(clip, sfx);
+      const result = upsertVfx(config.vfx ?? [], next);
+      if ("error" in result) return;
+      commit(
+        { config: { ...config, vfx: result }, transcript },
+        live,
+      );
+    },
+
+    updateTextVfxSfxVolume: (id, volume, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip || !isTextVfx(clip)) return;
+      const next = withTextSfxVolume(clip, volume);
       const result = upsertVfx(config.vfx ?? [], next);
       if ("error" in result) return;
       commit(

@@ -1,8 +1,13 @@
-import type { SourceBRoll, Transform } from "@src/lib/types";
+import type { AudioAsset, SourceBRoll, Transform } from "@src/lib/types";
 import {
   VIDEO_BROLL_VOLUME_DEFAULT,
   isVideoSrc,
 } from "@src/lib/episode/media";
+import {
+  compactEntranceSfx,
+  withSfx,
+  withSfxVolume,
+} from "@src/lib/episode/vfx";
 import {
   DEFAULT_KEN_BURNS,
   KEN_BURNS_MAX,
@@ -97,6 +102,9 @@ export function compactBRoll(clip: SourceBRoll): SourceBRoll {
   if (clip.behind) {
     out.behind = true;
   }
+  if (clip.sfx) {
+    out.sfx = compactEntranceSfx(clip.sfx);
+  }
   return out;
 }
 
@@ -159,6 +167,21 @@ export function withBRollKenBurns(
     return compactBRoll(rest);
   }
   return compactBRoll({ ...clip, kenBurns: clampKenBurns(kenBurns) });
+}
+
+/** `null` clears entrance SFX (field omitted from config). */
+export function withBRollSfx(
+  clip: SourceBRoll,
+  sfx: AudioAsset | null,
+): SourceBRoll {
+  return compactBRoll(withSfx(clip, sfx));
+}
+
+export function withBRollSfxVolume(
+  clip: SourceBRoll,
+  volume: number,
+): SourceBRoll {
+  return compactBRoll(withSfxVolume(clip, volume));
 }
 
 export function clampBRollRange(

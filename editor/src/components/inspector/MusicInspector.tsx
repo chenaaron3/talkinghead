@@ -1,4 +1,4 @@
-import { MUSIC_VOLUME_DEFAULT } from "@src/lib/media";
+import { MUSIC_VOLUME_DEFAULT } from "@src/lib/episode/media";
 import type { SourceMusic } from "@src/lib/types";
 
 import { useEditor } from "../../store";

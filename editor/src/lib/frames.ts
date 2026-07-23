@@ -1,9 +1,9 @@
 import {
     cutsToKeepSegments, mapSourceSecToOutputFrame, snapSourceSecToKeep
-} from '@src/lib/source-timeline';
+} from '@src/lib/timeline/source-timeline';
 
 import type { EpisodeConfig } from "@src/lib/types";
-import type { EpisodeProps } from "@src/lib/props-types";
+import type { EpisodeProps } from "@src/lib/episode/props-types";
 
 /** Convert source seconds to output frame for preview (snaps to keep regions). */
 export function sourceSecToOutputFrame(

@@ -137,9 +137,9 @@ export function TranscriptPanel() {
   }
 
   return (
-    <div className="flex min-h-0 flex-col border-r border-border bg-panel">
+    <div className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-border bg-panel">
       <TranscriptToolbar />
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div
           className="min-h-0 min-w-0 flex-[3] overflow-auto"
           onClick={() => {

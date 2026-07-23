@@ -1,7 +1,8 @@
-import { MapPin, Vibrate, type LucideIcon } from "lucide-react";
+import { MapPin, Quote, Vibrate, type LucideIcon } from "lucide-react";
 import type {
   ImageAsset,
   SourceLocationVfx,
+  SourceQuoteVfx,
   SourceShakeVfx,
   SourceVfx,
   SourceVfxWithImageAsset,
@@ -14,7 +15,16 @@ import {
   VFX_TYPES,
   vfxSupportsImageAsset,
   vfxSupportsTransform,
-} from "@src/lib/config-types";
+} from "@src/lib/episode/config-types";
+import type { CaptionStyle } from "@src/lib/captions/style";
+import {
+  DEFAULT_QUOTE_TEMPLATE_ID,
+  QUOTE_TEMPLATES,
+  isQuoteTemplateId,
+  resolveQuoteTemplateStyle,
+  type QuoteTemplateId,
+} from "@src/lib/captions/quote-templates";
+import { normalizeCaptionStyle } from "@src/lib/captions/parse-style";
 
 import {
   BROLL_SCALE_MAX,
@@ -46,6 +56,7 @@ export type VfxMeta = {
 export const VFX_META: Record<VfxType, VfxMeta> = {
   location: { label: "Location", Icon: MapPin },
   shake: { label: "Shake", Icon: Vibrate },
+  quote: { label: "Quote", Icon: Quote },
 };
 
 export type VfxPreset = {
@@ -66,6 +77,10 @@ export function vfxTypeLabel(type: VfxType): string {
 
 /** Clip label for badges/track — custom label when set, else type label. */
 export function vfxClipLabel(clip: SourceVfx): string {
+  if (clip.type === "quote") {
+    const id = resolveQuoteTemplateId(clip);
+    return QUOTE_TEMPLATES[id]?.label ?? VFX_META.quote.label;
+  }
   if ("label" in clip && clip.label) return clip.label;
   return VFX_META[clip.type].label;
 }
@@ -76,6 +91,10 @@ export function isLocationVfx(clip: SourceVfx): clip is SourceLocationVfx {
 
 export function isShakeVfx(clip: SourceVfx): clip is SourceShakeVfx {
   return clip.type === "shake";
+}
+
+export function isQuoteVfx(clip: SourceVfx): clip is SourceQuoteVfx {
+  return clip.type === "quote";
 }
 
 /** True when image media is fully present (baked). */
@@ -98,6 +117,30 @@ export function resolveShakeIntensity(clip: SourceShakeVfx): number {
   return clip.intensity ?? DEFAULT_SHAKE_INTENSITY;
 }
 
+export function resolveQuoteTemplateId(clip: SourceQuoteVfx): QuoteTemplateId {
+  return isQuoteTemplateId(clip.templateId)
+    ? clip.templateId
+    : DEFAULT_QUOTE_TEMPLATE_ID;
+}
+
+/** Resolved editable style on a Quote clip (falls back to template). */
+export function resolveQuoteStyle(clip: SourceQuoteVfx): CaptionStyle {
+  if (clip.style) {
+    return normalizeCaptionStyle(
+      clip.style,
+      resolveQuoteTemplateStyle(resolveQuoteTemplateId(clip)),
+    );
+  }
+  return resolveQuoteTemplateStyle(resolveQuoteTemplateId(clip));
+}
+
+function rangesOverlap(
+  a: { start: number; end: number },
+  b: { start: number; end: number },
+): boolean {
+  return a.start < b.end && b.start < a.end;
+}
+
 /** Write only non-default fields (omit identity in config.yaml). */
 export function compactVfx(clip: SourceVfx): SourceVfx {
   if (clip.type === "shake") {
@@ -112,6 +155,18 @@ export function compactVfx(clip: SourceVfx): SourceVfx {
       out.intensity = intensity;
     }
     return out;
+  }
+
+  if (clip.type === "quote") {
+    const templateId = resolveQuoteTemplateId(clip);
+    return {
+      id: clip.id,
+      type: "quote",
+      start: clip.start,
+      end: clip.end,
+      templateId,
+      style: resolveQuoteStyle(clip),
+    };
   }
 
   const next = resolveTransform(clip);
@@ -181,6 +236,30 @@ export function withVfxIntensity(
   return compactVfx({ ...clip, intensity: clamped });
 }
 
+export function withQuoteTemplate(
+  clip: SourceVfx,
+  templateId: QuoteTemplateId,
+): SourceVfx {
+  if (!isQuoteVfx(clip)) return clip;
+  return compactVfx({
+    ...clip,
+    templateId,
+    style: { ...resolveQuoteTemplateStyle(templateId) },
+  });
+}
+
+export function withQuoteStyle(
+  clip: SourceVfx,
+  patch: Partial<CaptionStyle>,
+): SourceVfx {
+  if (!isQuoteVfx(clip)) return clip;
+  const style = normalizeCaptionStyle(
+    { ...resolveQuoteStyle(clip), ...patch },
+    resolveQuoteStyle(clip),
+  );
+  return compactVfx({ ...clip, style });
+}
+
 export function createVfxFromPreset(
   preset: VfxPreset,
   range: { start: number; end: number },
@@ -192,6 +271,16 @@ export function createVfxFromPreset(
       type: "shake",
       start: range.start,
       end: range.end,
+    };
+  }
+  if (preset.type === "quote") {
+    return {
+      id,
+      type: "quote",
+      start: range.start,
+      end: range.end,
+      templateId: DEFAULT_QUOTE_TEMPLATE_ID,
+      style: { ...resolveQuoteTemplateStyle(DEFAULT_QUOTE_TEMPLATE_ID) },
     };
   }
   return {
@@ -213,6 +302,14 @@ export function upsertVfx(
   }
   if (clip.end - clip.start < MIN_RANGE_SEC) {
     return { error: "VFX range too short" };
+  }
+  if (clip.type === "quote") {
+    const overlap = others.find(
+      (c) => c.type === "quote" && rangesOverlap(c, clip),
+    );
+    if (overlap) {
+      return { error: "Quote VFX ranges cannot overlap" };
+    }
   }
   return [...others, compactVfx(clip)].sort((a, b) => a.start - b.start);
 }

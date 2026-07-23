@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import {
   COMPOSITION_HEIGHT,
   COMPOSITION_WIDTH,
-} from "@src/lib/constants";
+} from "@src/lib/episode/constants";
 import {
   containSize,
   snapBRollOffset,
   snapBRollScale,
   type SnapGuide,
-} from "@src/lib/broll-layout";
+} from "@src/lib/visual/broll-layout";
 import {
   clampBRollScale,
   resolveTransform,

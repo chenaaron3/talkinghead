@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { cutsToKeepRegions } from "@src/lib/source-timeline";
+import { cutsToKeepRegions } from "@src/lib/timeline/source-timeline";
 
 import { EMPTY_CAPTIONS } from "./empty";
 import { maybeSnapTimelineSec } from "./snap";

@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import {
-  DEFAULT_CAPTIONS_AT_A_TIME,
   DEFAULT_TITLE_DURATION_SEC,
 } from "./constants";
 import {
@@ -17,9 +16,19 @@ import {
   type SourceCut,
   SOURCE_DIR,
 } from "./types";
-import { isVideoSrc } from "../../src/lib/media";
-import { isVfxType } from "../../src/lib/config-types";
-import { DEFAULT_PUNCH_IN_SCALE } from "../../src/lib/punchin";
+import { isVideoSrc } from "../../src/lib/episode/media";
+import {
+  DEFAULT_BROLL_ENTRANCE_SFX,
+  isVfxType,
+} from "../../src/lib/episode/config-types";
+import { DEFAULT_PUNCH_IN_SCALE } from "../../src/lib/visual/punchin";
+import { normalizeCaptionStyle } from "../../src/lib/captions/parse-style";
+import { defaultEpisodeCaptionStyle } from "../../src/lib/captions/templates";
+import {
+  DEFAULT_QUOTE_TEMPLATE_ID,
+  isQuoteTemplateId,
+  resolveQuoteTemplateStyle,
+} from "../../src/lib/captions/quote-templates";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -278,6 +287,21 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
   });
 }
 
+function parseDefaultBRollSfx(
+  value: unknown,
+  configPath: string,
+): string | null {
+  if (value === null) return null;
+  if (value === undefined) return DEFAULT_BROLL_ENTRANCE_SFX;
+  if (typeof value !== "string") {
+    throw new Error(
+      `"defaultBRollSfx" must be a string or null in ${configPath}`,
+    );
+  }
+  const src = value.trim();
+  return src.length > 0 ? src : null;
+}
+
 function parseVfx(value: unknown, configPath: string): SourceVfx[] {
   if (value == null) return [];
   if (!Array.isArray(value)) {
@@ -297,7 +321,7 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
     }
     if (!isVfxType(entry.type)) {
       throw new Error(
-        `"vfx[${index}]" needs type (location | shake) in ${configPath}`,
+        `"vfx[${index}]" needs type (location | shake | quote) in ${configPath}`,
       );
     }
 
@@ -308,6 +332,18 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
         clip.intensity = intensity;
       }
       return clip;
+    }
+
+    if (entry.type === "quote") {
+      const rawTemplate = String(entry.templateId ?? "").trim();
+      const templateId = isQuoteTemplateId(rawTemplate)
+        ? rawTemplate
+        : DEFAULT_QUOTE_TEMPLATE_ID;
+      const style = normalizeCaptionStyle(
+        entry.style,
+        resolveQuoteTemplateStyle(templateId),
+      );
+      return { id, type: "quote", start, end, templateId, style };
     }
 
     const src = String(entry.src ?? "").trim();
@@ -437,13 +473,15 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     throw new Error(`Missing required "aroll" in ${configPath}`);
   }
 
+  const captionStyle = normalizeCaptionStyle(
+    merged.captionStyle,
+    defaultEpisodeCaptionStyle(),
+  );
+
   return {
     aroll,
     title,
-    captionsAtATime: Math.max(
-      1,
-      Number(merged.captionsAtATime ?? DEFAULT_CAPTIONS_AT_A_TIME),
-    ),
+    captionStyle,
     titleDurationSec: Number(
       merged.titleDurationSec ?? DEFAULT_TITLE_DURATION_SEC,
     ),
@@ -457,6 +495,7 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     vfx: parseVfx(local.vfx, configPath),
     sfx: parseSfx(local.sfx, configPath),
     music: parseMusic(local.music, configPath),
+    defaultBRollSfx: parseDefaultBRollSfx(merged.defaultBRollSfx, configPath),
   };
 }
 

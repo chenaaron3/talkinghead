@@ -1,8 +1,8 @@
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
-import { buildProps } from "../src/lib/build-props";
-import type { SerializedWaveform } from "../src/lib/waveform";
+import { buildProps } from "../src/lib/episode/build-props";
+import type { SerializedWaveform } from "../src/lib/audio/waveform";
 import {
   findSourceVideo,
   loadEpisodeConfig,

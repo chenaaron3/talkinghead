@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { AbsoluteFill, staticFile, useVideoConfig } from "remotion";
 import { Video } from "@remotion/media";
-import { SAFE_AREA } from "./lib/constants";
+import { SAFE_AREA } from "./lib/episode/constants";
 import type { EpisodeProps } from "./lib/types";
 
 const FONT_FAMILY = '"Montserrat", "Arial Black", Impact, sans-serif';

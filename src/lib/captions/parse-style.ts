@@ -1,0 +1,82 @@
+import {
+  DEFAULT_CAPTION_STYLE,
+  clampCaptionY,
+  clampCaptionsAtATime,
+  isCaptionAnimation,
+  isCaptionBackdrop,
+  isCaptionFontId,
+  isCaptionTextTransform,
+  type CaptionStyle,
+  type CaptionStroke,
+} from "./style";
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseStroke(value: unknown): CaptionStroke | null {
+  if (value == null) return null;
+  if (!isPlainObject(value)) return null;
+  const width = Number(value.width);
+  const color = String(value.color ?? "").trim();
+  if (!Number.isFinite(width) || width <= 0 || !color) return null;
+  return { width, color };
+}
+
+/**
+ * Normalize a partial/unknown caption style against defaults.
+ * Used by config loaders and editor patches.
+ */
+export function normalizeCaptionStyle(
+  raw: unknown,
+  fallback: CaptionStyle = DEFAULT_CAPTION_STYLE,
+): CaptionStyle {
+  const src = isPlainObject(raw) ? raw : {};
+  const fontFamily = isCaptionFontId(src.fontFamily)
+    ? src.fontFamily
+    : fallback.fontFamily;
+  const fontSize = Number(src.fontSize);
+  const color = String(src.color ?? "").trim();
+  const y = Number(src.y);
+  const animation = isCaptionAnimation(src.animation)
+    ? src.animation
+    : fallback.animation;
+  const textTransform = isCaptionTextTransform(src.textTransform)
+    ? src.textTransform
+    : fallback.textTransform;
+  const captionsAtATime = Number(src.captionsAtATime);
+  const shadow =
+    typeof src.shadow === "boolean" ? src.shadow : fallback.shadow;
+  const stack = typeof src.stack === "boolean" ? src.stack : (fallback.stack ?? false);
+  const backdrop = isCaptionBackdrop(src.backdrop)
+    ? src.backdrop
+    : (fallback.backdrop ?? "none");
+
+  let stroke: CaptionStroke | null;
+  if ("stroke" in src) {
+    stroke = parseStroke(src.stroke);
+  } else {
+    stroke = fallback.stroke;
+  }
+
+  return {
+    fontFamily,
+    fontSize:
+      Number.isFinite(fontSize) && fontSize > 0
+        ? fontSize
+        : fallback.fontSize,
+    color: color || fallback.color,
+    y: clampCaptionY(Number.isFinite(y) ? y : fallback.y),
+    animation,
+    stroke,
+    shadow,
+    textTransform,
+    captionsAtATime: clampCaptionsAtATime(
+      Number.isFinite(captionsAtATime)
+        ? captionsAtATime
+        : fallback.captionsAtATime,
+    ),
+    stack,
+    backdrop,
+  };
+}

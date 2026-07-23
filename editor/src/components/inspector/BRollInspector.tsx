@@ -8,7 +8,7 @@ import {
 } from "../../lib/broll";
 import { MIN_RANGE_SEC } from "../../lib/range";
 import { useEditor } from "../../store";
-import { VIDEO_BROLL_VOLUME_DEFAULT } from "@src/lib/media";
+import { VIDEO_BROLL_VOLUME_DEFAULT } from "@src/lib/episode/media";
 import type { SourceBRoll } from "@src/lib/types";
 
 import { SliderField, ToggleField, TransformFields } from "./field";

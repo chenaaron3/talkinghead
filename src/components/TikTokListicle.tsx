@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 
-import { FADE_DURATION_SEC } from '../lib/constants';
+import { FADE_DURATION_SEC } from '../lib/episode/constants';
 import { SfxOverlay } from './SfxOverlay';
 
 import type { ListicleItem, ListicleOverlay } from "../lib/types";

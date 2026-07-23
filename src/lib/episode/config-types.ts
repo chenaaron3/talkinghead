@@ -1,3 +1,5 @@
+import type { CaptionStyle } from "../captions/style";
+
 /** Inclusive-exclusive style time range on the source timeline (seconds). */
 export type Range = {
   start: number;
@@ -84,6 +86,9 @@ export type Transform = {
   rotation: number;
 };
 
+/** Default entrance SFX src for new b-roll placements. */
+export const DEFAULT_BROLL_ENTRANCE_SFX = "sfx/realistic/mouse_click.wav";
+
 export type SourceBRoll = {
   id: string;
   /** Video only; seconds into source where playback begins. Default 0. */
@@ -99,8 +104,9 @@ export type SourceBRoll = {
 
 /**
  * Visual effect kinds. Expand this union as new effects land.
+ * `quote` restyles captions for a range (see quote-templates).
  */
-export const VFX_TYPES = ["location", "shake"] as const;
+export const VFX_TYPES = ["location", "shake", "quote"] as const;
 export type VfxType = (typeof VFX_TYPES)[number];
 
 export function isVfxType(value: unknown): value is VfxType {
@@ -135,7 +141,21 @@ export type SourceShakeVfx = SourceVfxBase & {
   intensity?: number;
 };
 
-export type SourceVfx = SourceLocationVfx | SourceShakeVfx;
+/**
+ * Caption style highlight — applies a curated Quote look while active.
+ * Does not render its own overlay; consumed when building caption groups.
+ * `style` is the editable instance look; `templateId` tracks the last
+ * template applied from the catalog (sidescroll).
+ */
+export type SourceQuoteVfx = SourceVfxBase & {
+  type: "quote";
+  /** Key into the curated Quote template catalog. */
+  templateId: string;
+  /** Full caption style for this instance (copied from template on pick). */
+  style: CaptionStyle;
+};
+
+export type SourceVfx = SourceLocationVfx | SourceShakeVfx | SourceQuoteVfx;
 
 /**
  * Distribute over `SourceVfx`, keeping members whose declared keys include all of `K`
@@ -224,7 +244,11 @@ export type EpisodeConfig = {
   /** Null when omitted — process generates via OpenAI and writes config.yaml. */
   title: string | null;
   titleDurationSec: number;
-  captionsAtATime: number;
+  /**
+   * Default on-screen caption look (editable).
+   * Quote VFX overrides with a curated template for their range.
+   */
+  captionStyle: CaptionStyle;
   /** Feature flags — whether process runs LLM detection steps. */
   listicle: boolean;
   punchIns: boolean;
@@ -238,4 +262,9 @@ export type EpisodeConfig = {
   sfx: SourceSfx[];
   /** One looping bed, or null when unset. */
   music: SourceMusic | null;
+  /**
+   * SFX `src` inserted (independently) at each new b-roll start.
+   * `null` disables. Default: {@link DEFAULT_BROLL_ENTRANCE_SFX}.
+   */
+  defaultBRollSfx: string | null;
 };

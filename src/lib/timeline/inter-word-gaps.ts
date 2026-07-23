@@ -4,7 +4,7 @@ import {
   SCISSOR_MARGIN_SEC,
 } from "./editing-constants";
 import { captionFullyInCuts, normalizeCuts } from "./source-timeline";
-import type { SourceCut, TranscriptCaption } from "./types";
+import type { SourceCut, TranscriptCaption } from "../types";
 
 export type InterWordPause = {
   key: string;

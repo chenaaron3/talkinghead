@@ -3,7 +3,8 @@ import { Sequence, staticFile } from "remotion";
 
 import { Audio } from "@remotion/media";
 
-import { SFX_VOLUME_DEFAULT } from "../lib/media";
+import { loudnessGainFor } from "../lib/audio/loudness";
+import { SFX_VOLUME_DEFAULT } from "../lib/episode/media";
 import type { SfxClip } from "../lib/types";
 
 export const SfxOverlay: React.FC<{ sfx?: SfxClip[] | null }> = ({ sfx }) => {
@@ -13,7 +14,8 @@ export const SfxOverlay: React.FC<{ sfx?: SfxClip[] | null }> = ({ sfx }) => {
     <>
       {sfx.map((clip) => {
         const durationInFrames = Math.max(1, clip.endFrame - clip.startFrame);
-        const volume = clip.volume ?? SFX_VOLUME_DEFAULT;
+        const volume =
+          (clip.volume ?? SFX_VOLUME_DEFAULT) * loudnessGainFor(clip.src);
         return (
           <Sequence
             key={clip.id}

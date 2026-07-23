@@ -1,5 +1,5 @@
-import type { SourceCut } from "./config-types";
-import type { KeepSegment } from "./pipeline-types";
+import type { SourceCut } from "../episode/config-types";
+import type { KeepSegment } from "../episode/pipeline-types";
 
 const MIN_REGION_SEC = 0.1;
 

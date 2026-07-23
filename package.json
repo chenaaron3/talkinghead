@@ -58,6 +58,7 @@
     "schedule": "tsx cli/schedule/index.ts",
     "schedule:auth-youtube": "tsx cli/schedule/auth-youtube.ts",
     "schedule:login": "tsx cli/schedule/login.ts",
+    "audio:loudness": "tsx cli/audio-loudness.ts",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src cli && tsc"

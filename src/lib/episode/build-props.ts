@@ -1,17 +1,24 @@
 import {
-    groupCaptionWords, padLastWordInGroups, prepareRenderCaptions, stripPunctuationForDisplay
-} from './caption-words';
+    groupStyledCaptionWords, padLastWordInGroups, prepareRenderCaptions, stripPunctuationForDisplay
+} from '../captions/words';
 import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from './constants';
 import {
     cutsToKeepSegments, intersectWithKeepRegions, mapSourceSecToOutputFrame,
     mapSourceSecToOutputSec, validateCuts
-} from './source-timeline';
+} from '../timeline/source-timeline';
 
 import {
   DEFAULT_PUNCH_IN_ANIMATE,
   DEFAULT_PUNCH_IN_WORD_BY_WORD,
-} from "./punchin";
-import { resolveKenBurns } from "./ken-burns";
+} from "../visual/punchin";
+import { resolveKenBurns } from "../visual/ken-burns";
+import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from "../captions/style";
+import {
+  DEFAULT_QUOTE_TEMPLATE_ID,
+  isQuoteTemplateId,
+  resolveQuoteTemplateStyle,
+} from "../captions/quote-templates";
+import { normalizeCaptionStyle } from "../captions/parse-style";
 import type {
   BRollClip,
   VfxClip,
@@ -26,28 +33,62 @@ import type {
   SourceListicle,
   SourcePunchIn,
   SourceBRoll,
+  SourceQuoteVfx,
   SourceVfx,
   SourceMusic,
   SourceSfx,
   SfxClip,
   MusicClip,
-} from "./types";
+} from "../types";
 import { DEFAULT_SHAKE_INTENSITY } from "./config-types";
 
 function secToFrames(sec: number, fps: number): number {
   return Math.max(0, Math.round(sec * fps));
 }
 
+function quoteVfxClips(vfx: SourceVfx[]): SourceQuoteVfx[] {
+  return vfx.filter((clip): clip is SourceQuoteVfx => clip.type === "quote");
+}
+
+function resolveClipQuoteStyle(quote: SourceQuoteVfx): CaptionStyle {
+  const templateId = isQuoteTemplateId(quote.templateId)
+    ? quote.templateId
+    : DEFAULT_QUOTE_TEMPLATE_ID;
+  return normalizeCaptionStyle(
+    quote.style,
+    resolveQuoteTemplateStyle(templateId),
+  );
+}
+
+/** First Quote whose range overlaps the caption word (start inclusive, end exclusive). */
+function quoteForCaption(
+  cap: TranscriptCaption,
+  quotes: SourceQuoteVfx[],
+): SourceQuoteVfx | null {
+  for (const quote of quotes) {
+    if (cap.start < quote.end && cap.end > quote.start) return quote;
+  }
+  return null;
+}
+
 function buildCaptionGroups(options: {
   captions: TranscriptCaption[];
   segments: KeepSegment[];
   fps: number;
-  captionsAtATime: number;
+  captionStyle: CaptionStyle;
+  vfx: SourceVfx[];
 }): CaptionGroup[] {
-  const { captions, segments, fps, captionsAtATime } = options;
+  const { captions, segments, fps, captionStyle, vfx } = options;
   const renderCaptions = prepareRenderCaptions(captions);
+  const quotes = quoteVfxClips(vfx);
 
-  const captionWords: CaptionWord[] = [];
+  type StyledWord = CaptionWord & {
+    styleKey: string;
+    captionsAtATime: number;
+    style: CaptionStyle;
+  };
+
+  const styledWords: StyledWord[] = [];
   for (const cap of renderCaptions) {
     const outStart = mapSourceSecToOutputFrame(cap.start, segments, fps);
     const outEnd = mapSourceSecToOutputFrame(cap.end, segments, fps);
@@ -57,33 +98,48 @@ function buildCaptionGroups(options: {
     const rawEnd = Math.round(Math.max(outEnd, outStart + 1));
     const endFrame = Math.max(startFrame + 3, rawEnd);
 
-    captionWords.push({
+    const quote = quoteForCaption(cap, quotes);
+    const style = quote ? resolveClipQuoteStyle(quote) : captionStyle;
+    const styleKey = quote ? `quote:${quote.id}` : "default";
+
+    styledWords.push({
       text: cap.text,
       startFrame,
       endFrame,
-      ...(cap.emphasis ? { emphasis: cap.emphasis } : {}),
+      styleKey,
+      captionsAtATime: style.captionsAtATime,
+      style,
+      emphasis: cap.emphasis,
     });
   }
 
-  return padLastWordInGroups(
-    groupCaptionWords(captionWords, captionsAtATime)
-      .map((group) => {
-        const words = group.words
-          .map((word) => ({
-            ...word,
-            text: stripPunctuationForDisplay(word.text),
-          }))
-          .filter((word) => word.text.length > 0);
-        if (words.length === 0) return null;
-        return {
-          words,
-          startFrame: words[0]!.startFrame,
-          endFrame: words[words.length - 1]!.endFrame,
-        };
-      })
-      .filter((group): group is CaptionGroup => group != null),
-    fps,
-  );
+  const styleByKey = new Map<string, CaptionStyle>();
+  for (const word of styledWords) {
+    styleByKey.set(word.styleKey, word.style);
+  }
+
+  const groups = groupStyledCaptionWords(styledWords)
+    .map((group) => {
+      const words = group.words
+        .map((word) => ({
+          ...word,
+          text: stripPunctuationForDisplay(word.text),
+        }))
+        .filter((word) => word.text.length > 0);
+      if (words.length === 0) return null;
+      const style =
+        styleByKey.get(group.styleKey) ?? captionStyle ?? DEFAULT_CAPTION_STYLE;
+      const built: CaptionGroup = {
+        words,
+        startFrame: words[0]!.startFrame,
+        endFrame: words[words.length - 1]!.endFrame,
+        style,
+      };
+      return built;
+    })
+    .filter((group): group is CaptionGroup => group != null);
+
+  return padLastWordInGroups(groups, fps);
 }
 
 function mapSourceRangeToOutputFrames(
@@ -294,6 +350,9 @@ function buildVfx(
       continue;
     }
 
+    // Quote is caption-only — no visual overlay clip.
+    if (clip.type === "quote") continue;
+
     // Location (and future media VFX): skip until media is baked.
     if (!clip.src || !(clip.width && clip.height)) continue;
     result.push({
@@ -376,11 +435,13 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     0,
   );
 
+  const captionStyle = config.captionStyle ?? DEFAULT_CAPTION_STYLE;
   const captionGroups = buildCaptionGroups({
     captions: transcript.captions,
     segments: keepSegments,
     fps,
-    captionsAtATime: config.captionsAtATime,
+    captionStyle,
+    vfx: config.vfx ?? [],
   });
 
   const listicle = buildListicle(
@@ -435,7 +496,6 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     height: COMPOSITION_HEIGHT,
     durationInFrames: Math.max(1, durationInFrames),
     titleDurationSec: config.titleDurationSec,
-    captionsAtATime: config.captionsAtATime,
     sections: keepSegments.map((seg) => ({
       trimBefore: seg.trimBefore,
       trimAfter: seg.trimAfter,

@@ -6,7 +6,7 @@ import {
   captionIndexToSourceSec,
 } from "../helpers/cuts";
 import { getResultsOrCached } from "../helpers/transcript-cache";
-import { PUNCH_IN_STRENGTH } from "../../src/lib/punchin";
+import { PUNCH_IN_STRENGTH } from "../../src/lib/visual/punchin";
 import type { TranscriptCaption, SourcePunchIn } from "../helpers/types";
 
 const MODEL = "gpt-4.1-mini";

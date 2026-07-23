@@ -1,3 +1,4 @@
+import type { CaptionStyle } from "../captions/style";
 import type { CaptionEmphasis } from "./transcript-types";
 import type { Transform } from "./config-types";
 
@@ -18,6 +19,11 @@ export type CaptionGroup = {
   words: CaptionWord[];
   startFrame: number;
   endFrame: number;
+  /**
+   * Resolved style for this group (default or Quote template).
+   * Optional for older generated props.json — renderer falls back to default.
+   */
+  style?: CaptionStyle;
 };
 
 export type ListicleItem = {
@@ -117,7 +123,6 @@ export type EpisodeProps = {
   height: number;
   durationInFrames: number;
   titleDurationSec: number;
-  captionsAtATime: number;
   sections: OutputSection[];
   captionGroups: CaptionGroup[];
   listicle: ListicleOverlay | null;

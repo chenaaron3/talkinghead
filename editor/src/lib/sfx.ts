@@ -1,5 +1,5 @@
 import type { SourceSfx } from "@src/lib/types";
-import { SFX_VOLUME_DEFAULT } from "@src/lib/media";
+import { SFX_VOLUME_DEFAULT } from "@src/lib/episode/media";
 
 import { MIN_RANGE_SEC } from "./range";
 

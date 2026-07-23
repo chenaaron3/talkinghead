@@ -7,9 +7,11 @@ import { vfxTypeLabel } from '../../lib/vfx';
 import { useSelection } from '../../selection-store';
 import { useEditor } from '../../store';
 import { BRollInspector } from './BRollInspector';
+import { CaptionsInspector } from './CaptionsInspector';
 import { ListicleInspector } from './ListicleInspector';
 import { LocationVfxInspector } from './LocationVfxInspector';
 import { MusicInspector } from './MusicInspector';
+import { QuoteVfxInspector } from './QuoteVfxInspector';
 import { SfxInspector } from './SfxInspector';
 import { ShakeVfxInspector } from './ShakeVfxInspector';
 import { ZoomInspector } from './ZoomInspector';
@@ -30,6 +32,7 @@ export function InspectorPanel() {
 
   let title: string | null = null;
   let body: ReactNode = null;
+  let showClose = true;
 
   if (selection?.kind === "vfx") {
     const id = primaryId(selection);
@@ -41,6 +44,9 @@ export function InspectorPanel() {
     } else if (clip?.type === "shake") {
       title = vfxTypeLabel(clip.type);
       body = <ShakeVfxInspector clip={clip} />;
+    } else if (clip?.type === "quote") {
+      title = vfxTypeLabel(clip.type);
+      body = <QuoteVfxInspector clip={clip} />;
     }
   } else if (editableBRoll) {
     title = "B-roll";
@@ -79,11 +85,15 @@ export function InspectorPanel() {
       title = "Listicle";
       body = <ListicleInspector index={index} item={item} />;
     }
+  } else {
+    title = "Captions";
+    body = <CaptionsInspector />;
+    showClose = false;
   }
 
   return (
     <aside
-      className="flex min-h-0 min-w-0 flex-1 flex-col border-l border-border bg-panel"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-border bg-panel"
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -93,16 +103,20 @@ export function InspectorPanel() {
             <h2 className="text-xs font-medium tracking-wide text-[#e8eaef]">
               {title}
             </h2>
-            <button
-              type="button"
-              className="rounded p-0.5 text-muted hover:bg-panel-2 hover:text-[#e8eaef]"
-              aria-label="Close inspector"
-              onClick={() => clearSelection()}
-            >
-              <X className="size-3.5" />
-            </button>
+            {showClose ? (
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted hover:bg-panel-2 hover:text-[#e8eaef]"
+                aria-label="Close inspector"
+                onClick={() => clearSelection()}
+              >
+                <X className="size-3.5" />
+              </button>
+            ) : null}
           </div>
-          <div className="min-h-0 flex-1 overflow-auto px-3 py-3">{body}</div>
+          <div className="min-h-0 min-w-0 flex-1 overflow-auto px-3 py-3">
+            <div className="w-full min-w-0 max-w-full">{body}</div>
+          </div>
         </>
       ) : null}
     </aside>

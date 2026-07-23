@@ -1,0 +1,165 @@
+{
+  "targetLufs": -16,
+  "files": {
+    "sfx/beep-bop/beep.wav": {
+      "lufs": -13.1,
+      "truePeakDb": -1.1,
+      "gain": 0.7161
+    },
+    "sfx/beep-bop/boop_airplane.wav": {
+      "lufs": -10.84,
+      "truePeakDb": -2.14,
+      "gain": 0.5521
+    },
+    "sfx/beep-bop/boop_upbeat.wav": {
+      "lufs": -13.3,
+      "truePeakDb": -1.27,
+      "gain": 0.7328
+    },
+    "sfx/beep-bop/ding_light.wav": {
+      "lufs": -21.64,
+      "truePeakDb": -10.01,
+      "gain": 1.9143
+    },
+    "sfx/beep-bop/ding_strong.wav": {
+      "lufs": -16.89,
+      "truePeakDb": -5.83,
+      "gain": 1.1079
+    },
+    "sfx/beep-bop/lips_pop.wav": {
+      "lufs": -21.44,
+      "truePeakDb": -6.64,
+      "gain": 1.8707
+    },
+    "sfx/beep-bop/swish_scifi.wav": {
+      "lufs": -15.05,
+      "truePeakDb": -3.71,
+      "gain": 0.8964
+    },
+    "sfx/beep-bop/swish.wav": {
+      "lufs": -17.9,
+      "truePeakDb": -2.23,
+      "gain": 1.1521
+    },
+    "sfx/beep-bop/title-enter.wav": {
+      "lufs": -20.19,
+      "truePeakDb": -6.44,
+      "gain": 1.6199
+    },
+    "sfx/beep-bop/title-exit.wav": {
+      "lufs": -21.35,
+      "truePeakDb": -7.85,
+      "gain": 1.8514
+    },
+    "sfx/beep-bop/whoosh1.mp3": {
+      "lufs": -10.75,
+      "truePeakDb": -0.08,
+      "gain": 0.5464
+    },
+    "sfx/beep-bop/whoosh2.mp3": {
+      "lufs": -15.58,
+      "truePeakDb": -3.93,
+      "gain": 0.9528
+    },
+    "sfx/beep-bop/whoosh3.mp3": {
+      "lufs": -20.42,
+      "truePeakDb": -5.64,
+      "gain": 1.6634
+    },
+    "sfx/general/riser.mp3": {
+      "lufs": -14.65,
+      "truePeakDb": -1.93,
+      "gain": 0.8561
+    },
+    "sfx/meme/anime_wow.mp3": {
+      "lufs": -25.78,
+      "truePeakDb": -15.35,
+      "gain": 3.0832
+    },
+    "sfx/meme/boom.mp3": {
+      "lufs": -8.89,
+      "truePeakDb": -0.42,
+      "gain": 0.4411
+    },
+    "sfx/meme/bruh.mp3": {
+      "lufs": -15.5,
+      "truePeakDb": -6.57,
+      "gain": 0.9441
+    },
+    "sfx/meme/error.mp3": {
+      "lufs": -13.66,
+      "truePeakDb": -0.77,
+      "gain": 0.7638
+    },
+    "sfx/meme/fah.mp3": {
+      "lufs": -26.79,
+      "truePeakDb": -15.14,
+      "gain": 3.4634
+    },
+    "sfx/meme/mario_here_we_go.wav": {
+      "lufs": -15.38,
+      "truePeakDb": -6.25,
+      "gain": 0.9311
+    },
+    "sfx/meme/nani.wav": {
+      "lufs": -8.83,
+      "truePeakDb": 0.09,
+      "gain": 0.438
+    },
+    "sfx/meme/oof_minecraft.mp3": {
+      "lufs": -19.12,
+      "truePeakDb": -6.07,
+      "gain": 1.4322
+    },
+    "sfx/meme/oof_roblox.mp3": {
+      "lufs": -6.09,
+      "truePeakDb": -0.36,
+      "gain": 0.3195
+    },
+    "sfx/meme/punch.mp3": {
+      "lufs": -6.39,
+      "truePeakDb": 1.34,
+      "gain": 0.3308
+    },
+    "sfx/meme/rizz.mp3": {
+      "lufs": -11.98,
+      "truePeakDb": -1.86,
+      "gain": 0.6295
+    },
+    "sfx/meme/sus.mp3": {
+      "lufs": -21.81,
+      "truePeakDb": -3.92,
+      "gain": 1.3996
+    },
+    "sfx/realistic/camera-flash.mp3": {
+      "lufs": -19.64,
+      "truePeakDb": -1.23,
+      "gain": 1.0268
+    },
+    "sfx/realistic/flip.wav": {
+      "lufs": -22.25,
+      "truePeakDb": -3.84,
+      "gain": 1.3868
+    },
+    "sfx/realistic/heavenly.mp3": {
+      "lufs": -20.37,
+      "truePeakDb": -8.24,
+      "gain": 1.6539
+    },
+    "sfx/realistic/mouse_click.wav": {
+      "lufs": -24.06,
+      "truePeakDb": -3.91,
+      "gain": 1.398
+    },
+    "sfx/realistic/pencil.wav": {
+      "lufs": -26.17,
+      "truePeakDb": -7.92,
+      "gain": 2.2182
+    },
+    "sfx/realistic/tap.wav": {
+      "lufs": -8.69,
+      "truePeakDb": -0.3,
+      "gain": 0.431
+    }
+  }
+}

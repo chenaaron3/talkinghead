@@ -3,10 +3,13 @@
 const VIDEO_EXT = /\.(mp4|mov|webm)$/i;
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
 
-export const SFX_VOLUME_DEFAULT = 0.4;
+export const SFX_VOLUME_DEFAULT = 0.25;
 export const VIDEO_BROLL_VOLUME_DEFAULT = 0;
-/** Bed level ≈ −16 dB relative to dialogue at 1.0. */
-export const MUSIC_VOLUME_DEFAULT = 0.15;
+/**
+ * Bed level ≈ −12 dB relative to dialogue at 1.0.
+ * Applied after LUFS loudnessGain (see `loudnessGainFor`).
+ */
+export const MUSIC_VOLUME_DEFAULT = 0.25;
 /** Multiply bed volume while captions/SFX are active. */
 export const MUSIC_DUCK_RATIO = 0.5;
 export const MUSIC_DUCK_ATTACK_SEC = 0.12;

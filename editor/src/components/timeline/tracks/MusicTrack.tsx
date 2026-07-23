@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 
-import { duckAmountAtSec, mergeDuckRegionsSec } from "@src/lib/music-duck";
+import { duckAmountAtSec, mergeDuckRegionsSec } from "@src/lib/audio/music-duck";
 import {
   cutsToKeepRegions,
   intersectWithKeepRegions,
-} from "@src/lib/source-timeline";
+} from "@src/lib/timeline/source-timeline";
 
 import { EMPTY_CAPTIONS, EMPTY_CUTS, EMPTY_SFX } from "../../../lib/empty";
 import { isSelected } from "../../../lib/selection";

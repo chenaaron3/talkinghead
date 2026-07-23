@@ -19,7 +19,6 @@ const fallbackProps: EpisodeProps = {
   height: HEIGHT,
   durationInFrames: 30 * 10,
   titleDurationSec: 5,
-  captionsAtATime: 1,
   sections: [{ trimBefore: 0, trimAfter: 30 * 10, durationInFrames: 30 * 10 }],
   captionGroups: [],
   listicle: null,

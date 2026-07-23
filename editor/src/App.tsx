@@ -119,7 +119,7 @@ export function App() {
           <p className="text-xs">Press ⌘K or click the title to choose one.</p>
         </div>
       ) : (
-        <div className="grid min-h-0 min-w-0 grid-cols-[200px_1fr_280px] overflow-hidden border-b border-border">
+        <div className="grid min-h-0 min-w-0 grid-cols-[200px_minmax(0,1fr)_280px] overflow-hidden border-b border-border">
           <AssetsPanel />
           <TranscriptPanel />
           <PlayerPanel />

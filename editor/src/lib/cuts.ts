@@ -2,7 +2,7 @@ import {
   captionFullyInCuts,
   mergeCutsOverRemovedCaptions,
   normalizeCuts,
-} from "@src/lib/source-timeline";
+} from "@src/lib/timeline/source-timeline";
 import type { SourceCut, TranscriptCaption } from "@src/lib/types";
 
 export function cutForPause(

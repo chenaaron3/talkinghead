@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
 import { Player } from '@remotion/player';
-import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from '@src/lib/constants';
+import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from '@src/lib/episode/constants';
 import { TalkingHead } from '@src/TalkingHead';
 
 import { setPlayer } from '../lib/player-bridge';

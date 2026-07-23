@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@700&family=Montserrat:wght@900&family=Nunito:wght@800&family=Pacifico&display=swap");
 
 @theme {
   --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;

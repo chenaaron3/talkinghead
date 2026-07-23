@@ -1,4 +1,4 @@
-import { SFX_VOLUME_DEFAULT } from "@src/lib/media";
+import { SFX_VOLUME_DEFAULT } from "@src/lib/episode/media";
 import type { SourceSfx } from "@src/lib/types";
 
 import { useEditor } from "../../store";

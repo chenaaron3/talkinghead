@@ -4,11 +4,16 @@ import { episodeHeaders } from "../../lib/api";
 import { isVideoSrc } from "../../lib/broll";
 import { importMediaBatch } from "../../lib/import-media-batch";
 import { cn } from "../../lib/utils";
-import { useEditor } from "../../store";
+import { useEditor, type SfxAsset } from "../../store";
 import { Dropzone } from "../ui/dropzone";
 import { AssetPreviewDialog } from "./AssetPreviewDialog";
 
 import type { LibraryAsset } from "../../store";
+
+function sfxOptionLabel(asset: SfxAsset): string {
+  const folder = asset.folder ? `${asset.folder}/` : "";
+  return `${folder}${asset.label}`;
+}
 
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -121,6 +126,9 @@ function BRollGrid({
 
 export function BRollTab() {
   const assets = useEditor((s) => s.assets);
+  const sfxAssets = useEditor((s) => s.sfxAssets);
+  const defaultBRollSfx = useEditor((s) => s.config?.defaultBRollSfx ?? null);
+  const setDefaultBRollSfx = useEditor((s) => s.setDefaultBRollSfx);
   const episodeId = useEditor((s) => s.episodeId);
   const refreshAssets = useEditor((s) => s.refreshAssets);
   const removeBRollsBySrc = useEditor((s) => s.removeBRollsBySrc);
@@ -131,6 +139,12 @@ export function BRollTab() {
   const deletingRef = useRef(false);
 
   const selected = assets.find((a) => a.key === selectedKey) ?? null;
+  const sortedSfx = [...sfxAssets].sort((a, b) =>
+    sfxOptionLabel(a).localeCompare(sfxOptionLabel(b)),
+  );
+  const defaultStillListed =
+    defaultBRollSfx == null ||
+    sortedSfx.some((a) => a.src === defaultBRollSfx);
 
   const importBRoll = async (files: File[]) => {
     if (!episodeId) {
@@ -205,7 +219,31 @@ export function BRollTab() {
   }, [selected, episodeId, removeBRollsBySrc, refreshAssets]);
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <label className="flex shrink-0 flex-col gap-1 border-b border-border px-2.5 py-2">
+        <span className="text-[10px] font-medium tracking-wide text-muted uppercase">
+          Entrance SFX
+        </span>
+        <select
+          className="w-full rounded-md border border-border bg-panel-2 px-1.5 py-1 text-[11px] text-[#e8eaef] outline-none focus:border-accent"
+          value={defaultBRollSfx ?? ""}
+          onChange={(e) => {
+            const value = e.target.value;
+            setDefaultBRollSfx(value.length > 0 ? value : null);
+          }}
+          title="SFX added at the start of each new b-roll"
+        >
+          <option value="">None</option>
+          {!defaultStillListed && defaultBRollSfx ? (
+            <option value={defaultBRollSfx}>{defaultBRollSfx}</option>
+          ) : null}
+          {sortedSfx.map((asset) => (
+            <option key={asset.key} value={asset.src}>
+              {sfxOptionLabel(asset)}
+            </option>
+          ))}
+        </select>
+      </label>
       <Dropzone
         className="min-h-0 flex-1 overflow-auto"
         multiple
@@ -248,6 +286,6 @@ export function BRollTab() {
         asset={previewAsset}
         onClose={() => setPreviewAsset(null)}
       />
-    </>
+    </div>
   );
 }

@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import {
   findScissorPauses,
   type InterWordPause,
-} from "@src/lib/inter-word-gaps";
+} from "@src/lib/timeline/inter-word-gaps";
 import { useEditor } from "../../../store";
 
 export type ScissorGhosts = {

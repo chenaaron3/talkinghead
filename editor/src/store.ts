@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
 
-import { buildProps } from '@src/lib/build-props';
+import { buildProps } from '@src/lib/episode/build-props';
 import {
   cutsToGaps,
   cutsToKeepRegions,
   snapSourceSecToKeep,
-} from '@src/lib/source-timeline';
+} from '@src/lib/timeline/source-timeline';
 
 import { episodeHeaders } from './lib/api';
 
@@ -28,8 +28,13 @@ import {
   withVfxIntensity,
   withVfxMedia,
   withVfxTransform,
+  withQuoteTemplate,
+  withQuoteStyle,
   type VfxPreset,
 } from './lib/vfx';
+import { normalizeCaptionStyle } from '@src/lib/captions/parse-style';
+import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '@src/lib/captions/style';
+import type { QuoteTemplateId } from '@src/lib/captions/quote-templates';
 import {
   musicFromAsset,
   withMusicOffset,
@@ -50,8 +55,8 @@ import {
 } from './lib/punchin';
 import { MIN_LISTICLE_SEC, MIN_RANGE_SEC } from './lib/range';
 import { cutKeepRegion, restoreGap, setSectionEdge } from './lib/sections';
-import { deserializeWaveform, peakMax } from '@src/lib/waveform';
-import type { SerializedWaveform, WaveformData } from "@src/lib/waveform";
+import { deserializeWaveform, peakMax } from '@src/lib/audio/waveform';
+import type { SerializedWaveform, WaveformData } from "@src/lib/audio/waveform";
 
 import type { FlatCaption } from "./lib/captions";
 import type {
@@ -148,6 +153,7 @@ type EditorActions = {
     emphasis: CaptionEmphasis | undefined,
   ) => void;
   placeBRollOnCaption: (asset: LibraryAsset, caption: FlatCaption) => void;
+  setDefaultBRollSfx: (src: string | null) => void;
   placeVfxOnCaption: (preset: VfxPreset, caption: FlatCaption) => void;
   setVfxLocation: (
     id: string,
@@ -162,7 +168,15 @@ type EditorActions = {
   cutCaption: (caption: FlatCaption) => void;
   setMode: (mode: EditorMode) => void;
   toggleMode: () => void;
-  setCaptionsAtATime: (n: number) => void;
+  updateCaptionStyle: (patch: Partial<CaptionStyle>, live?: boolean) => void;
+  /** Replace the episode caption style wholesale (e.g. applying a template). */
+  setCaptionStyle: (style: CaptionStyle, live?: boolean) => void;
+  updateQuoteTemplate: (id: string, templateId: QuoteTemplateId) => void;
+  updateQuoteStyle: (
+    id: string,
+    patch: Partial<CaptionStyle>,
+    live?: boolean,
+  ) => void;
   setTitle: (title: string) => void;
   cutInterWordPause: (pause: {
     cutStart: number;
@@ -686,6 +700,8 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const { sourceSec, transcript } = get();
       const { selection, selectCaption } = useSelection.getState();
       if (!transcript) return;
+      // Keep Quote / b-roll / etc. selected while scrubbing playhead for preview.
+      if (selection != null && selection.kind !== "caption") return;
       if (selection?.kind === "caption" && selection.ids.length > 1) return;
       const index = captionIndexAt(sourceSec, transcript.captions);
       if (index == null) return;
@@ -888,7 +904,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     },
 
     placeBRollOnCaption: (asset, caption) => {
-      const { config, transcript } = get();
+      const { config, transcript, sfxAssets } = get();
       if (!config || !transcript) return;
       const { selection } = useSelection.getState();
       const range = captionActionRange(transcript, selection, caption);
@@ -916,10 +932,42 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       } else {
         clip = base;
       }
+
+      let nextSfx = config.sfx ?? [];
+      const defaultSrc = config.defaultBRollSfx;
+      if (defaultSrc) {
+        const sfxAsset = sfxAssets.find((a) => a.src === defaultSrc);
+        if (sfxAsset) {
+          const srcDurationSec = Math.max(MIN_RANGE_SEC, sfxAsset.durationSec);
+          const entrance: SourceSfx = {
+            id: newId("sfx"),
+            src: sfxAsset.src,
+            start: clip.start,
+            end: Math.min(transcript.duration, clip.start + srcDurationSec),
+            srcDurationSec,
+          };
+          const sfxResult = upsertSfx(nextSfx, entrance);
+          if (!("error" in sfxResult)) nextSfx = sfxResult;
+        }
+      }
+
       const result = upsertBRoll(config.bRolls, clip);
       if ("error" in result) return;
-      commit({ config: { ...config, bRolls: result }, transcript });
+      commit({
+        config: { ...config, bRolls: result, sfx: nextSfx },
+        transcript,
+      });
       useSelection.getState().selectBRoll(clip.id);
+    },
+
+    setDefaultBRollSfx: (src) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      if (src === config.defaultBRollSfx) return;
+      commit({
+        config: { ...config, defaultBRollSfx: src },
+        transcript,
+      });
     },
 
     placeVfxOnCaption: (preset, caption) => {
@@ -1077,15 +1125,39 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       }));
     },
 
-    setCaptionsAtATime: (n) => {
+    updateCaptionStyle: (patch, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
-      const captionsAtATime = Math.min(5, Math.max(1, Math.round(n)));
-      if (captionsAtATime === config.captionsAtATime) return;
-      commit({
-        config: { ...config, captionsAtATime },
-        transcript,
-      });
+      const captionStyle = normalizeCaptionStyle(
+        { ...(config.captionStyle ?? DEFAULT_CAPTION_STYLE), ...patch },
+        DEFAULT_CAPTION_STYLE,
+      );
+      commit(
+        {
+          config: {
+            ...config,
+            captionStyle,
+          },
+          transcript,
+        },
+        live,
+      );
+    },
+
+    setCaptionStyle: (style, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const captionStyle = normalizeCaptionStyle(style, DEFAULT_CAPTION_STYLE);
+      commit(
+        {
+          config: {
+            ...config,
+            captionStyle,
+          },
+          transcript,
+        },
+        live,
+      );
     },
 
     setTitle: (title) => {
@@ -1212,6 +1284,28 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const clip = (config.vfx ?? []).find((c) => c.id === id);
       if (!clip) return;
       const next = withVfxIntensity(clip, intensity);
+      const result = upsertVfx(config.vfx ?? [], next);
+      if ("error" in result) return;
+      commit({ config: { ...config, vfx: result }, transcript }, live);
+    },
+
+    updateQuoteTemplate: (id, templateId) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip) return;
+      const next = withQuoteTemplate(clip, templateId);
+      const result = upsertVfx(config.vfx ?? [], next);
+      if ("error" in result) return;
+      commit({ config: { ...config, vfx: result }, transcript });
+    },
+
+    updateQuoteStyle: (id, patch, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip) return;
+      const next = withQuoteStyle(clip, patch);
       const result = upsertVfx(config.vfx ?? [], next);
       if ("error" in result) return;
       commit({ config: { ...config, vfx: result }, transcript }, live);

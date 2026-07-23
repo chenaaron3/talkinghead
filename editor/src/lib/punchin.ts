@@ -4,7 +4,7 @@ import {
   DEFAULT_PUNCH_IN_ORIGIN_Y,
   DEFAULT_PUNCH_IN_SCALE,
   clampPunchInOrigin,
-} from "@src/lib/punchin";
+} from "@src/lib/visual/punchin";
 import { MIN_RANGE_SEC } from "./range";
 
 export {
@@ -18,7 +18,7 @@ export {
   punchInStrengthFromScale,
   resolvePunchInOrigin,
   type PunchInStrength,
-} from "@src/lib/punchin";
+} from "@src/lib/visual/punchin";
 
 export function punchInForCaption(caption: {
   start: number;

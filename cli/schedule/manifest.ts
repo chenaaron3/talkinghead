@@ -60,6 +60,17 @@ export function missingPlatforms(
   return platforms.filter((p) => !isPlatformDone(entry, p));
 }
 
+/** Incomplete entries (any configured platform still null), oldest slot first. */
+export function incompleteEntries(
+  manifest: ScheduleManifest,
+  platforms: PlatformId[],
+): ManifestEntry[] {
+  return manifest.entries
+    .filter((e) => missingPlatforms(e, platforms).length > 0)
+    .slice()
+    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+}
+
 /** All scheduledAt values used for cadence (any entry that has at least one platform link or a scheduledAt). */
 export function scheduledAtsForCadence(manifest: ScheduleManifest): string[] {
   return manifest.entries

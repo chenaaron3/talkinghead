@@ -6,7 +6,7 @@ import {
   DEFAULT_PUNCH_IN_WORD_BY_WORD,
   resolvePunchInOrigin,
   wordPunchInScale,
-} from '../lib/punchin';
+} from '../lib/visual/punchin';
 import type { PunchInSegment } from '../lib/types';
 
 /** Soft start/end for a full-range slow push-in. */

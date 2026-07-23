@@ -6,7 +6,7 @@ import {
   MUSIC_FADE_IN_SEC,
   MUSIC_FADE_OUT_SEC,
   MUSIC_VOLUME_DEFAULT,
-} from "./media";
+} from "../episode/media";
 
 export type DuckRegion = {
   startFrame: number;
@@ -181,5 +181,6 @@ export function musicVolumeAtFrame(options: MusicVolumeOptions): number {
     fade = Math.min(fade, Math.max(0, framesFromEnd / fadeOutFrames));
   }
 
-  return Math.min(1, Math.max(0, ducked * fade));
+  // Allow >1 so LUFS loudnessGain can boost quiet masters.
+  return Math.max(0, ducked * fade);
 }

@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
-import { cutsToKeepRegions } from "@src/lib/source-timeline";
+import { cutsToKeepRegions } from "@src/lib/timeline/source-timeline";
 import type { FlatCaption } from "../../../lib/captions";
 import type { RangeKind } from "../../../lib/active-range";
+import {
+  captionForEndEdge,
+  captionForStartEdge,
+  linkedTargetsOnCaptionEdge,
+  type LinkedEdgeTarget,
+} from "../../../lib/linked-caption-edges";
 import { clampRangeEdge } from "../../../lib/range";
 import { snapTranscriptCaptionEdge } from "../../../lib/snap";
 import {
@@ -15,10 +21,30 @@ import { useSelection } from "../../../selection-store";
 import { useEditor } from "../../../store";
 
 export type RangeResize =
-  | { kind: "broll"; id: string; edge: "start" | "end" }
-  | { kind: "vfx"; id: string; edge: "start" | "end" }
-  | { kind: "sfx"; id: string; edge: "start" | "end" }
-  | { kind: "zoom"; id: number; edge: "start" | "end" }
+  | {
+      kind: "broll";
+      id: string;
+      edge: "start" | "end";
+      linked: LinkedEdgeTarget[];
+    }
+  | {
+      kind: "vfx";
+      id: string;
+      edge: "start" | "end";
+      linked: LinkedEdgeTarget[];
+    }
+  | {
+      kind: "sfx";
+      id: string;
+      edge: "start" | "end";
+      linked: LinkedEdgeTarget[];
+    }
+  | {
+      kind: "zoom";
+      id: number;
+      edge: "start" | "end";
+      linked: LinkedEdgeTarget[];
+    }
   | { kind: "listicle"; id: number };
 
 /** Active start-marker drag (listicle is always a point/start drag). */
@@ -38,6 +64,22 @@ export function markerDraggingFromResize(
     return { kind: resize.kind, id: resize.id };
   }
   return null;
+}
+
+function linkedForEdge(
+  edge: "start" | "end",
+  sec: number,
+  exclude: LinkedEdgeTarget,
+  captions: FlatCaption[],
+): LinkedEdgeTarget[] {
+  const config = useEditor.getState().config;
+  if (!config) return [];
+  const caption =
+    edge === "start"
+      ? captionForStartEdge(captions, sec)
+      : captionForEndEdge(captions, sec);
+  if (!caption) return [];
+  return linkedTargetsOnCaptionEdge(config, caption, edge, exclude);
 }
 
 export function useRangeResize() {
@@ -80,61 +122,75 @@ export function useRangeResize() {
     return () => window.removeEventListener("mouseup", onUp);
   }, [resize]);
 
+  const applyEdge = (
+    target: LinkedEdgeTarget,
+    edge: "start" | "end",
+    value: number,
+  ) => {
+    if (target.kind === "broll") {
+      const clip = useEditor
+        .getState()
+        .config?.bRolls.find((c) => c.id === target.id);
+      if (!clip) return;
+      const { start, end } = clampRangeEdge(edge, value, clip);
+      updateBRollRange(clip.id, start, end, true);
+      return;
+    }
+    if (target.kind === "vfx") {
+      const clip = useEditor
+        .getState()
+        .config?.vfx?.find((c) => c.id === target.id);
+      if (!clip) return;
+      const { start, end } = clampRangeEdge(edge, value, clip);
+      updateVfxRange(clip.id, start, end, true);
+      return;
+    }
+    if (target.kind === "sfx") {
+      updateSfxRange(target.id, edge, value, true);
+      return;
+    }
+    const seg = useEditor.getState().config?.punchInSegments[target.id];
+    if (!seg) return;
+    const { start, end } = clampRangeEdge(edge, value, seg);
+    updatePunchInRange(target.id, start, end, true);
+  };
+
   const snapToCaption = (caption: FlatCaption, shiftKey = false) => {
     if (!resize) return;
 
-    const edgeSec = (edge: "start" | "end") =>
-      shiftKey
-        ? edge === "start"
-          ? caption.start
-          : caption.end
-        : snapTranscriptCaptionEdge(caption, edge, indexedCaptions, keeps);
-
     if (resize.kind === "listicle") {
-      const reveal = edgeSec("start");
+      const reveal = snapTranscriptCaptionEdge(
+        caption,
+        "start",
+        indexedCaptions,
+        keeps,
+      );
       updateListicleItemReveal(resize.id, reveal, true);
       seekSource(reveal);
       return;
     }
 
-    if (resize.kind === "broll") {
-      const clip = bRolls.find((c) => c.id === resize.id);
-      if (!clip) return;
-      const value = edgeSec(resize.edge);
-      const { start, end } = clampRangeEdge(resize.edge, value, clip);
-      updateBRollRange(clip.id, start, end, true);
-      seekSource(resize.edge === "start" ? start : end);
-      return;
-    }
+    const value = snapTranscriptCaptionEdge(
+      caption,
+      resize.edge,
+      indexedCaptions,
+      keeps,
+    );
 
-    if (resize.kind === "vfx") {
-      const clip = vfx.find((c) => c.id === resize.id);
-      if (!clip) return;
-      const value = edgeSec(resize.edge);
-      const { start, end } = clampRangeEdge(resize.edge, value, clip);
-      updateVfxRange(clip.id, start, end, true);
-      seekSource(resize.edge === "start" ? start : end);
-      return;
-    }
+    const primary: LinkedEdgeTarget =
+      resize.kind === "zoom"
+        ? { kind: "zoom", id: resize.id }
+        : { kind: resize.kind, id: resize.id };
 
-    if (resize.kind === "sfx") {
-      const value = edgeSec(resize.edge);
-      updateSfxRange(resize.id, resize.edge, value, true);
-      const next = useEditor
-        .getState()
-        .config?.sfx?.find((c) => c.id === resize.id);
-      if (next) {
-        seekSource(resize.edge === "start" ? next.start : next.end);
+    applyEdge(primary, resize.edge, value);
+
+    if (shiftKey) {
+      for (const target of resize.linked) {
+        applyEdge(target, resize.edge, value);
       }
-      return;
     }
 
-    const seg = punchIns[resize.id];
-    if (!seg) return;
-    const value = edgeSec(resize.edge);
-    const { start, end } = clampRangeEdge(resize.edge, value, seg);
-    updatePunchInRange(resize.id, start, end, true);
-    seekSource(resize.edge === "start" ? start : end);
+    seekSource(value);
   };
 
   const startRangeResize = (
@@ -152,8 +208,15 @@ export function useRangeResize() {
       const clip = bRolls.find((c) => c.id === clipId);
       if (!clip) return;
       selectBRoll(clipId);
-      setResize({ kind: "broll", id: clipId, edge });
-      seekSource(edge === "start" ? clip.start : clip.end);
+      const sec = edge === "start" ? clip.start : clip.end;
+      const linked = linkedForEdge(
+        edge,
+        sec,
+        { kind: "broll", id: clipId },
+        indexedCaptions,
+      );
+      setResize({ kind: "broll", id: clipId, edge, linked });
+      seekSource(sec);
       return;
     }
 
@@ -162,8 +225,15 @@ export function useRangeResize() {
       const clip = vfx.find((c) => c.id === clipId);
       if (!clip) return;
       selectVfx(clipId);
-      setResize({ kind: "vfx", id: clipId, edge });
-      seekSource(edge === "start" ? clip.start : clip.end);
+      const sec = edge === "start" ? clip.start : clip.end;
+      const linked = linkedForEdge(
+        edge,
+        sec,
+        { kind: "vfx", id: clipId },
+        indexedCaptions,
+      );
+      setResize({ kind: "vfx", id: clipId, edge, linked });
+      seekSource(sec);
       return;
     }
 
@@ -172,8 +242,15 @@ export function useRangeResize() {
       const clip = sfx.find((c) => c.id === clipId);
       if (!clip) return;
       selectSfx(clipId);
-      setResize({ kind: "sfx", id: clipId, edge });
-      seekSource(edge === "start" ? clip.start : clip.end);
+      const sec = edge === "start" ? clip.start : clip.end;
+      const linked = linkedForEdge(
+        edge,
+        sec,
+        { kind: "sfx", id: clipId },
+        indexedCaptions,
+      );
+      setResize({ kind: "sfx", id: clipId, edge, linked });
+      seekSource(sec);
       return;
     }
 
@@ -181,8 +258,15 @@ export function useRangeResize() {
     const seg = punchIns[index];
     if (!seg) return;
     selectPunchIn(index);
-    setResize({ kind: "zoom", id: index, edge });
-    seekSource(edge === "start" ? seg.start : seg.end);
+    const sec = edge === "start" ? seg.start : seg.end;
+    const linked = linkedForEdge(
+      edge,
+      sec,
+      { kind: "zoom", id: index },
+      indexedCaptions,
+    );
+    setResize({ kind: "zoom", id: index, edge, linked });
+    seekSource(sec);
   };
 
   const startSfxDrag = (e: MouseEvent, id: string) => {

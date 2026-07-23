@@ -1,0 +1,30 @@
+{
+  "targetLufs": -16,
+  "files": {
+    "music/Lofi1.mp3": {
+      "lufs": -19.63,
+      "truePeakDb": -4.6,
+      "gain": 1.5136
+    },
+    "music/Lofi2.mp3": {
+      "lufs": -17.44,
+      "truePeakDb": -8.23,
+      "gain": 1.1803
+    },
+    "music/Lofi3.mp3": {
+      "lufs": -12.46,
+      "truePeakDb": -0.37,
+      "gain": 0.6653
+    },
+    "music/Lofi4.mp3": {
+      "lufs": -15.13,
+      "truePeakDb": -2.7,
+      "gain": 0.9047
+    },
+    "music/Lofi5.mp3": {
+      "lufs": -14.69,
+      "truePeakDb": -2.25,
+      "gain": 0.86
+    }
+  }
+}

@@ -5,7 +5,7 @@ import {
   normalizeCuts,
   removeCut,
   setKeepEdge,
-} from "@src/lib/source-timeline";
+} from "@src/lib/timeline/source-timeline";
 
 export type SourceGap = {
   id: number;

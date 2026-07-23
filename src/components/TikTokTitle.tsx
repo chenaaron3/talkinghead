@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 
-import { FADE_DURATION_SEC } from '../lib/constants';
+import { FADE_DURATION_SEC } from '../lib/episode/constants';
 import { SfxOverlay } from './SfxOverlay';
 
 const BOARD_STYLE: React.CSSProperties = {

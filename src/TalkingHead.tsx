@@ -7,11 +7,11 @@ import { BRollOverlay } from './components/BRollOverlay';
 import { MusicOverlay } from './components/MusicOverlay';
 import { PunchIn } from './components/PunchIn';
 import { SfxOverlay } from './components/SfxOverlay';
-import { TikTokCaptions } from './components/TikTokCaptions';
+import { TikTokCaptions } from './components/captions/TikTokCaptions';
 import { TikTokTitle } from './components/TikTokTitle';
 import { ScreenShake, VfxOverlay, shakesFromVfx } from './components/VfxOverlay';
 import { useListicleOverlay } from './hooks/useListicleOverlay';
-import { SAFE_AREA } from './lib/constants';
+import { SAFE_AREA } from './lib/episode/constants';
 
 import type { EpisodeProps } from "./lib/types";
 
@@ -83,8 +83,8 @@ export const TalkingHead: React.FC<EpisodeProps> = ({
           <TikTokTitle title={title} durationSec={titleDurationSec} />
         ) : null}
         {listicleNode}
-        <TikTokCaptions groups={captionGroups} />
       </AbsoluteFill>
+      <TikTokCaptions groups={captionGroups} />
     </AbsoluteFill>
   );
 };

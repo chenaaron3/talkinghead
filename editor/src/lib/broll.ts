@@ -2,14 +2,14 @@ import type { SourceBRoll, Transform } from "@src/lib/types";
 import {
   VIDEO_BROLL_VOLUME_DEFAULT,
   isVideoSrc,
-} from "@src/lib/media";
+} from "@src/lib/episode/media";
 import {
   DEFAULT_KEN_BURNS,
   KEN_BURNS_MAX,
   KEN_BURNS_MIN,
   clampKenBurns,
   resolveKenBurns,
-} from "@src/lib/ken-burns";
+} from "@src/lib/visual/ken-burns";
 
 import { MIN_RANGE_SEC } from "./range";
 

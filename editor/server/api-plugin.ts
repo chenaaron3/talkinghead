@@ -14,7 +14,7 @@ import { probeVideoFps } from '../../cli/helpers/whisper';
 import { runProcess } from '../../cli/process';
 import { renderEpisode } from '../../cli/render-episode';
 import { runSchedule } from '../../cli/schedule/run';
-import { buildProps } from '../../src/lib/build-props';
+import { buildProps } from '../../src/lib/episode/build-props';
 import { normalizeBRollMedia, probeMedia } from './broll-media';
 import { getEpisodeScheduleInfo, listEditorEpisodes } from './episodes';
 import {
@@ -27,7 +27,7 @@ import {
 
 import type { Plugin } from "vite";
 import type { EpisodeConfig, Transcript } from "../../cli/helpers/types";
-import type { SerializedWaveform } from "../../src/lib/waveform";
+import type { SerializedWaveform } from "../../src/lib/audio/waveform";
 function sendNdjson(
   res: import("http").ServerResponse,
   writeEvent: (data: unknown) => void,
@@ -508,7 +508,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               ...existingYaml,
               aroll: body.config.aroll,
               title: body.config.title,
-              captionsAtATime: body.config.captionsAtATime,
+              captionStyle: body.config.captionStyle,
               cuts: body.config.cuts,
               listicleOverlay: body.config.listicleOverlay,
               punchInSegments: body.config.punchInSegments,
@@ -516,6 +516,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               vfx: body.config.vfx ?? [],
               sfx: body.config.sfx ?? [],
               music: body.config.music ?? null,
+              defaultBRollSfx: body.config.defaultBRollSfx ?? null,
             });
 
             const transcriptPath = path.join(
@@ -826,7 +827,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
                 ensureMusicAsset(body.config.music ?? null);
                 writeEpisodeConfig(episodeDir, {
                   aroll: body.config.aroll,
-                  captionsAtATime: body.config.captionsAtATime,
+                  captionStyle: body.config.captionStyle,
                   cuts: body.config.cuts,
                   listicleOverlay: body.config.listicleOverlay,
                   punchInSegments: body.config.punchInSegments,
@@ -834,6 +835,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
                   vfx: body.config.vfx ?? [],
                   sfx: body.config.sfx ?? [],
                   music: body.config.music ?? null,
+                  defaultBRollSfx: body.config.defaultBRollSfx ?? null,
                 });
                 writeJson(
                   path.join(episodeDir, "generated", "transcript.json"),

@@ -7,8 +7,8 @@ import {
   DEFAULT_PEAKS_PER_SEC,
   peaksFromWavBuffer,
   serializeWaveform,
-} from "../../src/lib/waveform";
-import type { SerializedWaveform } from "../../src/lib/waveform";
+} from "../../src/lib/audio/waveform";
+import type { SerializedWaveform } from "../../src/lib/audio/waveform";
 import { ROOT } from "./types";
 
 function extractWav(videoPath: string, wavPath: string): void {

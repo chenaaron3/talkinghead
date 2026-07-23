@@ -11,11 +11,11 @@ import {
 } from "remotion";
 import { Video } from "@remotion/media";
 
-import { containSize } from "../lib/broll-layout";
+import { containSize } from "../lib/visual/broll-layout";
 import {
   VIDEO_BROLL_VOLUME_DEFAULT,
   isVideoSrc,
-} from "../lib/media";
+} from "../lib/episode/media";
 import type { BRollClip } from "../lib/types";
 
 const FADE_SEC = 0.12;

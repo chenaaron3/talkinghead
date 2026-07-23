@@ -8,6 +8,7 @@ import { formatLocalSlot, nextPublishAt } from "./cadence";
 import { loadScheduleConfig } from "./config";
 import {
   findEntry,
+  incompleteEntries,
   isFullyScheduled,
   loadManifest,
   missingPlatforms,
@@ -40,14 +41,15 @@ function parseArgs(argv: string[]) {
   }
 
   const positional = rest.filter((a) => !a.startsWith("--"));
-  if (positional.length === 0) {
+  if (positional.length > 1) {
     throw new Error(
-      "Usage: pnpm schedule -- source/<episode> [--platforms youtube instagram tiktok]\n" +
-        "Example: pnpm schedule -- source/day1",
+      "Usage: pnpm schedule [--platforms youtube instagram tiktok]\n" +
+        "       pnpm schedule -- source/<episode> [--platforms ...]\n" +
+        "With no episode: retry all incomplete uploads from schedule-manifest.json",
     );
   }
 
-  return { input: positional[0]!, platformsOverride };
+  return { input: positional[0], platformsOverride };
 }
 
 function requireRenderedAssets(episodeId: string): {
@@ -66,9 +68,16 @@ function requireRenderedAssets(episodeId: string): {
   return { videoPath, coverPath };
 }
 
-export async function runSchedule(argv: string[]): Promise<void> {
-  const { input, platformsOverride } = parseArgs(argv);
-  const { episodeId, episodeDir } = resolveEpisodeDir(input);
+async function scheduleEpisode(opts: {
+  episodeId: string;
+  platforms: PlatformId[];
+  timezone: string;
+  time: string;
+  /** When true, already-complete episodes are a no-op instead of an error. */
+  allowAlreadyComplete?: boolean;
+}): Promise<{ failures: string[] }> {
+  const { episodeId, platforms, timezone, time, allowAlreadyComplete } = opts;
+  const { episodeDir } = resolveEpisodeDir(path.join("source", episodeId));
   const episodeConfig = loadEpisodeConfig(episodeDir);
   if (!episodeConfig.title) {
     throw new Error(
@@ -77,14 +86,16 @@ export async function runSchedule(argv: string[]): Promise<void> {
     );
   }
   const title = episodeConfig.title;
-  const scheduleConfig = loadScheduleConfig();
-  const platforms = platformsOverride ?? scheduleConfig.platforms;
   const { videoPath, coverPath } = requireRenderedAssets(episodeId);
 
   let manifest = loadManifest();
   const existing = findEntry(manifest, episodeId);
 
   if (existing && isFullyScheduled(existing, platforms)) {
+    if (allowAlreadyComplete) {
+      console.log(`[schedule] ${episodeId} already fully scheduled — skip`);
+      return { failures: [] };
+    }
     throw new Error(
       `Episode "${episodeId}" is already fully scheduled on: ${platforms.join(", ")}\n` +
         `Manifest: schedule-manifest.json`,
@@ -94,7 +105,7 @@ export async function runSchedule(argv: string[]): Promise<void> {
   const toRun = missingPlatforms(existing, platforms);
   if (toRun.length === 0) {
     console.log(`[schedule] nothing to do for ${episodeId}`);
-    return;
+    return { failures: [] };
   }
 
   // Cadence: reuse existing entry's scheduledAt on partial retry; else compute next slot
@@ -102,7 +113,7 @@ export async function runSchedule(argv: string[]): Promise<void> {
   if (existing?.scheduledAt) {
     publishAt = new Date(existing.scheduledAt);
     console.log(
-      `[schedule] retrying ${episodeId} at existing slot ${formatLocalSlot(publishAt, scheduleConfig.timezone)}`,
+      `[schedule] retrying ${episodeId} at existing slot ${formatLocalSlot(publishAt, timezone)}`,
     );
   } else {
     // Exclude this episode from cadence basis if somehow present without scheduledAt
@@ -111,11 +122,11 @@ export async function runSchedule(argv: string[]): Promise<void> {
     });
     publishAt = nextPublishAt({
       scheduledAts: others,
-      time: scheduleConfig.time,
-      timezone: scheduleConfig.timezone,
+      time,
+      timezone,
     });
     console.log(
-      `[schedule] next slot: ${formatLocalSlot(publishAt, scheduleConfig.timezone)} (${scheduleConfig.timezone})`,
+      `[schedule] next slot: ${formatLocalSlot(publishAt, timezone)} (${timezone})`,
     );
   }
 
@@ -141,7 +152,7 @@ export async function runSchedule(argv: string[]): Promise<void> {
   console.log(`[schedule] title="${title}"`);
   console.log(`[schedule] platforms: ${toRun.join(", ")} (parallel)`);
 
-  const publishers = getPublishers(toRun, scheduleConfig.timezone);
+  const publishers = getPublishers(toRun, timezone);
   const scheduleInput: ScheduleInput = {
     title,
     videoPath,
@@ -195,12 +206,89 @@ export async function runSchedule(argv: string[]): Promise<void> {
 
   await Promise.all(tasks);
 
-  console.log(`\n[schedule] manifest → schedule-manifest.json`);
+  console.log(`[schedule] manifest → schedule-manifest.json`);
+  return { failures };
+}
+
+async function retryFailed(platforms: PlatformId[], timezone: string, time: string) {
+  const manifest = loadManifest();
+  const incomplete = incompleteEntries(manifest, platforms);
+
+  if (incomplete.length === 0) {
+    console.log("[schedule] no incomplete uploads in schedule-manifest.json");
+    return;
+  }
+
+  console.log(
+    `[schedule] retrying ${incomplete.length} incomplete episode(s): ${incomplete
+      .map((e) => e.episodeId)
+      .join(", ")}`,
+  );
+
+  const episodeFailures: { episodeId: string; detail: string }[] = [];
+  const failedEpisodeIds = new Set<string>();
+
+  for (const entry of incomplete) {
+    const missing = missingPlatforms(entry, platforms);
+    console.log(
+      `\n[schedule] ── ${entry.episodeId} (missing: ${missing.join(", ")}) ──`,
+    );
+    try {
+      const { failures } = await scheduleEpisode({
+        episodeId: entry.episodeId,
+        platforms,
+        timezone,
+        time,
+        allowAlreadyComplete: true,
+      });
+      for (const f of failures) {
+        failedEpisodeIds.add(entry.episodeId);
+        episodeFailures.push({ episodeId: entry.episodeId, detail: f });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[schedule] ${entry.episodeId} failed: ${message}`);
+      failedEpisodeIds.add(entry.episodeId);
+      episodeFailures.push({ episodeId: entry.episodeId, detail: message });
+    }
+  }
+
+  const okCount = incomplete.length - failedEpisodeIds.size;
+  console.log(
+    `\n[schedule] retry summary: ${okCount}/${incomplete.length} episodes ok`,
+  );
+  if (episodeFailures.length > 0) {
+    throw new Error(
+      `Retry finished with failures. Re-run \`pnpm schedule\` to try again.\n` +
+        episodeFailures.map((f) => `  - ${f.episodeId}: ${f.detail}`).join("\n"),
+    );
+  }
+  console.log("[schedule] done — all incomplete uploads resolved");
+}
+
+export async function runSchedule(argv: string[]): Promise<void> {
+  const { input, platformsOverride } = parseArgs(argv);
+  const scheduleConfig = loadScheduleConfig();
+  const platforms = platformsOverride ?? scheduleConfig.platforms;
+
+  if (!input) {
+    await retryFailed(platforms, scheduleConfig.timezone, scheduleConfig.time);
+    return;
+  }
+
+  const { episodeId } = resolveEpisodeDir(input);
+  const { failures } = await scheduleEpisode({
+    episodeId,
+    platforms,
+    timezone: scheduleConfig.timezone,
+    time: scheduleConfig.time,
+  });
+
   if (failures.length > 0) {
     throw new Error(
       `Partial failure. Re-run the same command to retry missing platforms.\n` +
         failures.map((f) => `  - ${f}`).join("\n"),
     );
   }
-  console.log(`[schedule] done — ${episodeId} scheduled on ${toRun.join(", ")}`);
+  console.log(`[schedule] done — ${episodeId} scheduled`);
 }

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from "../../src/lib/constants";
+import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from "../../src/lib/episode/constants";
 import { PUBLIC_VFX_DIR } from "../../cli/helpers/types";
 import { probeMedia } from "./broll-media";
 

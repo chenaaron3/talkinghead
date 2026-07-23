@@ -3,8 +3,9 @@ import { staticFile, useVideoConfig } from "remotion";
 
 import { Audio } from "@remotion/media";
 
-import { MUSIC_DUCK_BRIDGE_SEC, MUSIC_VOLUME_DEFAULT } from "../lib/media";
-import { mergeDuckRegions, musicVolumeAtFrame } from "../lib/music-duck";
+import { loudnessGainFor } from "../lib/audio/loudness";
+import { MUSIC_DUCK_BRIDGE_SEC, MUSIC_VOLUME_DEFAULT } from "../lib/episode/media";
+import { mergeDuckRegions, musicVolumeAtFrame } from "../lib/audio/music-duck";
 import type { CaptionGroup, MusicClip, SfxClip } from "../lib/types";
 
 function regionsFromCaptions(groups: CaptionGroup[] | null | undefined) {
@@ -49,7 +50,8 @@ export const MusicOverlay: React.FC<{
 
   if (!music) return null;
 
-  const bedVolume = music.volume ?? MUSIC_VOLUME_DEFAULT;
+  const bedVolume =
+    (music.volume ?? MUSIC_VOLUME_DEFAULT) * loudnessGainFor(music.src);
   const trimBefore =
     music.mediaOffsetSec != null && music.mediaOffsetSec > 0
       ? Math.round(music.mediaOffsetSec * fps)

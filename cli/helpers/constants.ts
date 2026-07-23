@@ -11,7 +11,7 @@ export {
   SCISSOR_GAP_THRESHOLD_SEC,
   SCISSOR_MARGIN_SEC,
   WORD_MARGIN_SEC,
-} from "../../src/lib/editing-constants";
+} from "../../src/lib/timeline/editing-constants";
 /** Title/caption fade in/out duration (seconds) */
 export const FADE_DURATION_SEC = 0.15;
 
@@ -30,5 +30,3 @@ export const FILLER_WORDS = [
 
 /** Fallback when titleDurationSec is omitted from config */
 export const DEFAULT_TITLE_DURATION_SEC = 5;
-/** Fallback when captionsAtATime is omitted from config */
-export const DEFAULT_CAPTIONS_AT_A_TIME = 1;

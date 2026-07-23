@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Scissors } from "lucide-react";
+import { Captions, Scissors } from "lucide-react";
 
+import { useSelection } from "../../selection-store";
 import { useEditor } from "../../store";
 import { Button } from "../ui/button";
 import {
@@ -16,7 +17,11 @@ export function TranscriptToolbar() {
   const title = useEditor((s) => s.title);
   const configTitle = useEditor((s) => s.config?.title ?? "");
   const setTitle = useEditor((s) => s.setTitle);
+  const selection = useSelection((s) => s.selection);
+  const selectCaptionsPanel = useSelection((s) => s.selectCaptionsPanel);
+  const clearSelection = useSelection((s) => s.clearSelection);
   const scissorMode = mode === "scissor";
+  const captionsOpen = selection?.kind === "captions";
 
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -29,7 +34,7 @@ export function TranscriptToolbar() {
     el.select();
   }, [editing]);
 
-  const tooltip = scissorMode
+  const scissorTooltip = scissorMode
     ? "Click pauses to cut · Click words to delete · Esc to exit"
     : "Scissor mode (C)";
 
@@ -74,22 +79,46 @@ export function TranscriptToolbar() {
       </div>
 
       <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant={scissorMode ? "default" : "outline"}
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs"
-              aria-pressed={scissorMode}
-              onClick={() => toggleMode()}
-            >
-              <Scissors className="size-3.5" />
-              Scissors
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">{tooltip}</TooltipContent>
-        </Tooltip>
+        <div className="flex shrink-0 items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant={captionsOpen ? "default" : "outline"}
+                size="sm"
+                className="h-7 gap-1.5 px-2.5 text-xs"
+                aria-pressed={captionsOpen}
+                onClick={() => {
+                  if (captionsOpen) clearSelection();
+                  else selectCaptionsPanel();
+                }}
+              >
+                <Captions className="size-3.5" />
+                Captions
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Edit default caption style
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant={scissorMode ? "default" : "outline"}
+                size="sm"
+                className="h-7 gap-1.5 px-2.5 text-xs"
+                aria-pressed={scissorMode}
+                onClick={() => toggleMode()}
+              >
+                <Scissors className="size-3.5" />
+                Scissors
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{scissorTooltip}</TooltipContent>
+          </Tooltip>
+        </div>
       </TooltipProvider>
     </div>
   );

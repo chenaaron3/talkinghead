@@ -32,7 +32,6 @@ export function InspectorPanel() {
 
   let title: string | null = null;
   let body: ReactNode = null;
-  let showClose = true;
 
   if (selection?.kind === "vfx") {
     const id = primaryId(selection);
@@ -85,10 +84,9 @@ export function InspectorPanel() {
       title = "Listicle";
       body = <ListicleInspector index={index} item={item} />;
     }
-  } else {
+  } else if (selection?.kind === "captions") {
     title = "Captions";
     body = <CaptionsInspector />;
-    showClose = false;
   }
 
   return (
@@ -103,16 +101,14 @@ export function InspectorPanel() {
             <h2 className="text-xs font-medium tracking-wide text-[#e8eaef]">
               {title}
             </h2>
-            {showClose ? (
-              <button
-                type="button"
-                className="rounded p-0.5 text-muted hover:bg-panel-2 hover:text-[#e8eaef]"
-                aria-label="Close inspector"
-                onClick={() => clearSelection()}
-              >
-                <X className="size-3.5" />
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="rounded p-0.5 text-muted hover:bg-panel-2 hover:text-[#e8eaef]"
+              aria-label="Close inspector"
+              onClick={() => clearSelection()}
+            >
+              <X className="size-3.5" />
+            </button>
           </div>
           <div className="min-h-0 min-w-0 flex-1 overflow-auto px-3 py-3">
             <div className="w-full min-w-0 max-w-full">{body}</div>

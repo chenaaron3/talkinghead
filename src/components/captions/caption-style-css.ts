@@ -26,7 +26,5 @@ export function captionStyleToCss(style: CaptionStyle): CSSProperties {
       : undefined,
     margin: 0,
     maxWidth: "100%",
-    overflowWrap: "anywhere",
-    wordBreak: "break-word",
   };
 }

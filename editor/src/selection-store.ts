@@ -44,6 +44,8 @@ type SelectionActions = {
   selectGap: (gapId: number | null) => void;
   selectKeepRegion: (index: number | null) => void;
   selectCaption: (index: number | null, mode?: SelectionMode) => void;
+  /** Open the episode Captions style inspector (toolbar). */
+  selectCaptionsPanel: () => void;
   clearSelection: () => void;
 };
 
@@ -152,6 +154,11 @@ export const useSelection = create<SelectionState & SelectionActions>(
         captionFocus: index,
       });
     },
+    selectCaptionsPanel: () =>
+      set({
+        selection: { kind: "captions", ids: [] },
+        ...clearCaptionRangeEnds(),
+      }),
     clearSelection: () =>
       set({ selection: null, ...clearCaptionRangeEnds() }),
   }),

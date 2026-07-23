@@ -2,34 +2,53 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { CaptionGroupView } from "@src/components/captions/CaptionGroupView";
 import type { CaptionStyle } from "@src/lib/captions/style";
-import { CAPTION_FADE_DURATION_SEC } from "@src/lib/episode/constants";
+import {
+  CAPTION_FADE_DURATION_SEC,
+  COMPOSITION_HEIGHT,
+  COMPOSITION_WIDTH,
+  SAFE_AREA,
+} from "@src/lib/episode/constants";
 import type { CaptionGroup, CaptionWord } from "@src/lib/types";
 
-/** Fixed sample — CSS textTransform handles case. */
-const PREVIEW_TEXTS = ["This", "is", "a", "caption"] as const;
+/** Fixed sample phrases — CSS textTransform handles case. */
+const PREVIEW_PHRASES = [
+  ["This", "is", "a", "caption"],
+  ["Watch", "what", "happens", "next"],
+  ["Keep", "going"],
+] as const;
 
 const PREVIEW_FPS = 30;
 const WORD_STAGGER_FRAMES = 7;
 const HOLD_FRAMES = 18;
+const GAP_FRAMES = 8;
 
-function buildPreviewWords(): CaptionWord[] {
-  return PREVIEW_TEXTS.map((text, i) => {
-    const startFrame = i * WORD_STAGGER_FRAMES;
-    return {
-      text,
-      startFrame,
-      endFrame: startFrame + WORD_STAGGER_FRAMES,
-    };
-  });
-}
+const SAFE_TOP = 0.12;
+const SAFE_BOTTOM = 0.22;
 
-function cycleLength(wordCount: number): number {
+function groupDuration(wordCount: number): number {
   return Math.max(1, (wordCount - 1) * WORD_STAGGER_FRAMES + HOLD_FRAMES);
 }
 
-function usePreviewFrame(playing: boolean, wordCount: number): number {
+function buildPreviewGroups(style: CaptionStyle): CaptionGroup[] {
+  let cursor = 0;
+  return PREVIEW_PHRASES.map((texts) => {
+    const startFrame = cursor;
+    const words: CaptionWord[] = texts.map((text, i) => {
+      const wordStart = startFrame + i * WORD_STAGGER_FRAMES;
+      return {
+        text,
+        startFrame: wordStart,
+        endFrame: wordStart + WORD_STAGGER_FRAMES,
+      };
+    });
+    const endFrame = startFrame + groupDuration(texts.length);
+    cursor = endFrame + GAP_FRAMES;
+    return { words, startFrame, endFrame, style };
+  });
+}
+
+function usePreviewFrame(playing: boolean, cycleLen: number): number {
   const [frame, setFrame] = useState(0);
-  const len = cycleLength(wordCount);
 
   useEffect(() => {
     if (!playing) {
@@ -44,115 +63,115 @@ function usePreviewFrame(playing: boolean, wordCount: number): number {
     const tick = (now: number) => {
       if (now - last >= 1000 / PREVIEW_FPS) {
         last = now;
-        current = (current + 1) % len;
+        current = (current + 1) % cycleLen;
         setFrame(current);
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [playing, wordCount, len]);
+  }, [playing, cycleLen]);
 
-  // Idle: past the last word so the full phrase is shown settled.
-  return playing ? frame : len;
+  return frame;
 }
 
-/** Template picker sample — CaptionGroupView + hardcoded words. */
+function captionFocusY(styleY: number): number {
+  return SAFE_TOP + styleY * (1 - SAFE_TOP - SAFE_BOTTOM);
+}
+
+/** Template picker sample — composition stage scaled to fill width. */
 export function CaptionTemplatePreview({
   style,
   playing = false,
   className,
 }: {
   style: CaptionStyle;
-  /** Loop the template’s entrance animation (set while hovering a chip). */
   playing?: boolean;
   className?: string;
 }) {
-  const words = useMemo(() => buildPreviewWords(), []);
-  const frame = usePreviewFrame(playing, words.length);
+  const groups = useMemo(() => buildPreviewGroups(style), [style]);
+  const cycleLen = useMemo(() => {
+    const last = groups[groups.length - 1];
+    return last ? last.endFrame + GAP_FRAMES : 1;
+  }, [groups]);
+  const frame = usePreviewFrame(playing, cycleLen);
+  const displayFrame = playing
+    ? frame
+    : Math.max(0, (groups[0]?.endFrame ?? 1) - 1);
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [offsetY, setOffsetY] = useState(0);
 
   const fadeFrames = Math.max(
     1,
     Math.round(CAPTION_FADE_DURATION_SEC * PREVIEW_FPS),
   );
-  const groupEndFrame = cycleLength(words.length);
+  const focusY = captionFocusY(style.y);
 
-  const group: CaptionGroup = useMemo(
-    () => ({
-      words,
-      startFrame: 0,
-      endFrame: groupEndFrame,
-      style,
-    }),
-    [words, groupEndFrame, style],
+  const active = groups.find(
+    (group) => displayFrame >= group.startFrame && displayFrame < group.endFrame,
   );
 
   useLayoutEffect(() => {
     const container = containerRef.current;
-    const content = contentRef.current;
-    if (!container || !content) return;
+    if (!container) return;
 
     const measure = () => {
-      const pad = 12;
-      const cw = Math.max(1, container.clientWidth - pad * 2);
-      const ch = Math.max(1, container.clientHeight - pad * 2);
-      const prev = content.style.transform;
-      content.style.transform = "scale(1)";
-      const bw = Math.max(1, content.offsetWidth);
-      const bh = Math.max(1, content.offsetHeight);
-      content.style.transform = prev;
-      setScale(Math.min(1, cw / bw, ch / bh));
+      const cw = Math.max(1, container.clientWidth);
+      const ch = Math.max(1, container.clientHeight);
+      const nextScale = cw / COMPOSITION_WIDTH;
+      setScale(nextScale);
+      setOffsetY(ch / 2 - focusY * COMPOSITION_HEIGHT * nextScale);
     };
 
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(container);
     return () => ro.disconnect();
-  }, [
-    style.fontFamily,
-    style.fontSize,
-    style.backdrop,
-    style.stack,
-    style.stroke?.width,
-    style.stroke?.color,
-    style.textTransform,
-    style.shadow,
-    style.color,
-  ]);
+  }, [focusY]);
 
   return (
     <div
       ref={containerRef}
       className={className}
       style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        position: "relative",
         width: "100%",
-        height: 132,
+        height: 128,
         overflow: "hidden",
-        padding: 12,
         background: "linear-gradient(180deg, #2a2f3a 0%, #1a1d26 100%)",
       }}
     >
       <div
-        ref={contentRef}
         style={{
-          width: "100%",
+          position: "absolute",
+          left: 0,
+          top: offsetY,
+          width: COMPOSITION_WIDTH,
+          height: COMPOSITION_HEIGHT,
           transform: `scale(${scale})`,
-          transformOrigin: "center center",
+          transformOrigin: "top left",
         }}
       >
-        <CaptionGroupView
-          group={group}
-          frame={frame}
-          fps={PREVIEW_FPS}
-          fadeFrames={fadeFrames}
-          embed
-        />
+        <div
+          style={{
+            position: "absolute",
+            top: SAFE_AREA.top,
+            bottom: SAFE_AREA.bottom,
+            left: SAFE_AREA.left,
+            right: SAFE_AREA.right,
+          }}
+        >
+          {active ? (
+            <CaptionGroupView
+              group={active}
+              frame={displayFrame}
+              fps={PREVIEW_FPS}
+              fadeFrames={fadeFrames}
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   );

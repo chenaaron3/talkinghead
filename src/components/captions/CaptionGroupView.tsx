@@ -1,11 +1,11 @@
-import React from 'react';
+import React from "react";
 
-import { DEFAULT_CAPTION_STYLE } from '../../lib/captions/style';
-import { lastVisibleWordIndex, typewriterCursorOn } from './caption-animation';
-import { captionStyleToCss } from './caption-style-css';
-import { CaptionWordSpan } from './CaptionWordSpan';
-
+import { DEFAULT_CAPTION_STYLE } from "../../lib/captions/style";
 import type { CaptionGroup, CaptionWord } from "../../lib/types";
+
+import { lastVisibleWordIndex, typewriterCursorOn } from "./caption-animation";
+import { captionStyleToCss } from "./caption-style-css";
+import { CaptionWordSpan } from "./CaptionWordSpan";
 
 /** Split a group into two rows: first half / second half (ceil on top). */
 export function splitCaptionLines<T>(words: T[]): { top: T[]; bottom: T[] } {
@@ -23,18 +23,12 @@ export const CaptionGroupView: React.FC<{
   frame: number;
   fps: number;
   fadeFrames: number;
-  /**
-   * Skip absolute safe-area placement — for inspector template preview
-   * where the parent centers/scales the group.
-   */
-  embed?: boolean;
-}> = ({ group, frame, fps, fadeFrames, embed = false }) => {
+}> = ({ group, frame, fps, fadeFrames }) => {
   const style = group.style ?? DEFAULT_CAPTION_STYLE;
   const animation = style.animation;
   const karaoke = animation === "karaoke";
   const stack = style.stack ?? false;
   const backdrop = style.backdrop ?? "none";
-  // Karaoke needs the truly spoken index (not "all visible").
   const lastVisibleIndex = lastVisibleWordIndex(
     group.words,
     frame,
@@ -48,7 +42,8 @@ export const CaptionGroupView: React.FC<{
   );
 
   const baseText = captionStyleToCss(style);
-  const gap = backdrop === "scrap" || backdrop === "pill" ? "0.45em 0.55em" : "0.35em";
+  const gap =
+    backdrop === "scrap" || backdrop === "pill" ? "0.45em 0.55em" : "0.35em";
 
   const renderWord = (word: CaptionWord, index: number) => {
     const spoken = karaoke
@@ -80,10 +75,10 @@ export const CaptionGroupView: React.FC<{
   const groupChrome: React.CSSProperties =
     backdrop === "box"
       ? {
-        backgroundColor: "rgba(0, 0, 0, 0.82)",
-        padding: "0.35em 0.55em",
-        borderRadius: 8,
-      }
+          backgroundColor: "rgba(0, 0, 0, 0.82)",
+          padding: "0.35em 0.55em",
+          borderRadius: 8,
+        }
       : {};
 
   let body: React.ReactNode;
@@ -147,20 +142,6 @@ export const CaptionGroupView: React.FC<{
       >
         {group.words.map((word, index) => renderWord(word, index))}
       </p>
-    );
-  }
-
-  if (embed) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          width: "100%",
-        }}
-      >
-        {body}
-      </div>
     );
   }
 

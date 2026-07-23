@@ -105,7 +105,9 @@ export function resolveCaptionWordVisual({
 
   switch (animation) {
     case "karaoke":
+      // Ahead words stay visible but dim; spoken words go full yellow.
       color = spoken ? DEFAULT_HIGHLIGHT_COLOR : undefined;
+      opacity = spoken ? 1 : 0.35;
       if (active) scale = wordPopScale(frame, word, fps, EMPHASIS_POP_SEC);
       break;
 
@@ -124,7 +126,8 @@ export function resolveCaptionWordVisual({
       break;
   }
 
-  if (word.emphasis && animation !== "pop" && animation !== "karaoke") {
+  // Emphasis color wins over karaoke yellow / default paint.
+  if (word.emphasis) {
     color = EMPHASIS_COLORS[word.emphasis];
   }
 

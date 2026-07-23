@@ -105,7 +105,7 @@ export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
       stroke: null,
       shadow: false,
       textTransform: "uppercase",
-      captionsAtATime: 3,
+      captionsAtATime: 8,
       stack: false,
       backdrop: "scrap",
     },

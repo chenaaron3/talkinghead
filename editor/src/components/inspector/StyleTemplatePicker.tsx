@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState } from 'react';
+
+import { resolveCaptionFont } from '@src/lib/captions/style';
+
+import { cn } from '../../lib/utils';
+import { useEditor } from '../../store';
+import { CaptionTemplatePreview } from './CaptionTemplatePreview';
 
 import type { CaptionStyle } from "@src/lib/captions/style";
-import { resolveCaptionFont } from "@src/lib/captions/style";
-import { cn } from "../../lib/utils";
-import { useEditor } from "../../store";
-
-import { CaptionTemplatePreview } from "./CaptionTemplatePreview";
-
 export type StyleTemplateChip = {
   id: string;
   label: string;
@@ -53,7 +53,7 @@ export function StyleTemplatePicker({
             </div>
           </>
         ) : (
-          <div className="flex h-[132px] items-center justify-center bg-panel-2 text-[11px] text-muted">
+          <div className="flex h-[75px] items-center justify-center bg-panel-2 text-[11px] text-muted">
             Hover a template
           </div>
         )}

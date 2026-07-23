@@ -56,6 +56,10 @@ pnpm process -- source/day1
 # → out/day1/video.mp4
 # → out/day1/cover.jpg
 
+# Bake person cutout (Bria via fal) for behind-person b-roll; needs FAL_KEY
+pnpm process -- source/day1 --cutout --no-render
+# Re-bake: delete public/episodes/<ep>/cutout.webm (and/or config cutout), then re-run --cutout
+
 # Force re-transcription (ignore cache), then render
 pnpm process -- source/day1 --force
 

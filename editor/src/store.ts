@@ -18,6 +18,7 @@ import {
   withBRollTransform,
   withBRollVolume,
   withBRollKenBurns,
+  withBRollBehind,
   DEFAULT_KEN_BURNS,
   type Transform,
 } from './lib/broll';
@@ -35,6 +36,7 @@ import {
 import { normalizeCaptionStyle } from '@src/lib/captions/parse-style';
 import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '@src/lib/captions/style';
 import type { QuoteTemplateId } from '@src/lib/captions/quote-templates';
+import { DEFAULT_TITLE_STYLE } from '@src/lib/title/templates';
 import {
   musicFromAsset,
   withMusicOffset,
@@ -171,6 +173,8 @@ type EditorActions = {
   updateCaptionStyle: (patch: Partial<CaptionStyle>, live?: boolean) => void;
   /** Replace the episode caption style wholesale (e.g. applying a template). */
   setCaptionStyle: (style: CaptionStyle, live?: boolean) => void;
+  /** Replace the episode title style wholesale (e.g. applying a template). */
+  setTitleStyle: (style: CaptionStyle, live?: boolean) => void;
   updateQuoteTemplate: (id: string, templateId: QuoteTemplateId) => void;
   updateQuoteStyle: (
     id: string,
@@ -204,6 +208,7 @@ type EditorActions = {
     kenBurns: number | null,
     live?: boolean,
   ) => void;
+  updateBRollBehind: (id: string, behind: boolean, live?: boolean) => void;
   updateVfxRange: (
     id: string,
     start: number,
@@ -917,6 +922,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
         width: asset.width,
         height: asset.height,
         kenBurns: DEFAULT_KEN_BURNS,
+        ...(config.cutout ? { behind: true as const } : {}),
       };
       let clip: SourceBRoll;
       if (asset.durationSec != null && asset.durationSec > 0) {
@@ -1160,6 +1166,22 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       );
     },
 
+    setTitleStyle: (style, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const titleStyle = normalizeCaptionStyle(style, DEFAULT_TITLE_STYLE);
+      commit(
+        {
+          config: {
+            ...config,
+            titleStyle,
+          },
+          transcript,
+        },
+        live,
+      );
+    },
+
     setTitle: (title) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
@@ -1247,6 +1269,18 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const clip = config.bRolls.find((c) => c.id === id);
       if (!clip) return;
       const next = withBRollKenBurns(clip, kenBurns);
+      const result = upsertBRoll(config.bRolls, next);
+      if ("error" in result) return;
+      commit({ config: { ...config, bRolls: result }, transcript }, live);
+    },
+
+    updateBRollBehind: (id, behind, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      if (!config.cutout) return;
+      const clip = config.bRolls.find((c) => c.id === id);
+      if (!clip) return;
+      const next = withBRollBehind(clip, behind);
       const result = upsertBRoll(config.bRolls, next);
       if ("error" in result) return;
       commit({ config: { ...config, bRolls: result }, transcript }, live);

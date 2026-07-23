@@ -13,6 +13,7 @@ import {
 } from "../visual/punchin";
 import { resolveKenBurns } from "../visual/ken-burns";
 import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from "../captions/style";
+import { DEFAULT_TITLE_STYLE } from "../title/templates";
 import {
   DEFAULT_QUOTE_TEMPLATE_ID,
   isQuoteTemplateId,
@@ -40,7 +41,7 @@ import type {
   SfxClip,
   MusicClip,
 } from "../types";
-import { DEFAULT_SHAKE_INTENSITY } from "./config-types";
+import { DEFAULT_SHAKE_INTENSITY, arollBgSrcForCutout } from "./config-types";
 
 function secToFrames(sec: number, fps: number): number {
   return Math.max(0, Math.round(sec * fps));
@@ -315,6 +316,9 @@ function buildBRolls(
     if (kenBurns != null) {
       built.kenBurns = kenBurns;
     }
+    if (clip.behind) {
+      built.behind = true;
+    }
     result.push(built);
   }
   return result.sort((a, b) => a.startFrame - b.startFrame);
@@ -487,15 +491,23 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
 
   const music = buildMusic(config.music);
 
+  // When cutout exists, play the room plate (person punched out) so soft
+  // matte edges don't stack two copies of the subject (halo / blur).
+  const resolvedVideoSrc = config.cutout
+    ? arollBgSrcForCutout(config.cutout.src)
+    : videoSrc;
+
   return {
     episodeId,
     title,
-    videoSrc,
+    videoSrc: resolvedVideoSrc,
+    cutoutSrc: config.cutout?.src ?? null,
     fps,
     width: COMPOSITION_WIDTH,
     height: COMPOSITION_HEIGHT,
     durationInFrames: Math.max(1, durationInFrames),
     titleDurationSec: config.titleDurationSec,
+    titleStyle: config.titleStyle ?? DEFAULT_TITLE_STYLE,
     sections: keepSegments.map((seg) => ({
       trimBefore: seg.trimBefore,
       trimAfter: seg.trimAfter,

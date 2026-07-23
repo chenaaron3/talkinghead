@@ -41,6 +41,9 @@ const BOLD_WHITE_BASE: CaptionStyle = {
   captionsAtATime: 1,
   stack: false,
   backdrop: "none",
+  fontStyle: "normal",
+  textAlign: "center",
+  backdropColor: null,
 };
 
 export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
@@ -74,6 +77,9 @@ export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
       captionsAtATime: 3,
       stack: false,
       backdrop: "none",
+      fontStyle: "normal",
+      textAlign: "center",
+      backdropColor: null,
     },
   },
   "handwritten-box": {
@@ -91,6 +97,9 @@ export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
       captionsAtATime: 3,
       stack: false,
       backdrop: "box",
+      fontStyle: "normal",
+      textAlign: "center",
+      backdropColor: null,
     },
   },
   scrappy: {
@@ -108,6 +117,9 @@ export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
       captionsAtATime: 8,
       stack: false,
       backdrop: "scrap",
+      fontStyle: "normal",
+      textAlign: "center",
+      backdropColor: null,
     },
   },
 };

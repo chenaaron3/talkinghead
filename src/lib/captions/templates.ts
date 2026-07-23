@@ -52,6 +52,9 @@ export const CAPTION_TEMPLATES: Record<CaptionTemplateId, CaptionTemplate> = {
       captionsAtATime: 5,
       stack: false,
       backdrop: "none",
+      fontStyle: "normal",
+      textAlign: "center",
+      backdropColor: null,
     },
   },
   beast: {
@@ -69,6 +72,9 @@ export const CAPTION_TEMPLATES: Record<CaptionTemplateId, CaptionTemplate> = {
       captionsAtATime: 3,
       stack: false,
       backdrop: "none",
+      fontStyle: "normal",
+      textAlign: "center",
+      backdropColor: null,
     },
   },
   hormozi: {
@@ -86,6 +92,9 @@ export const CAPTION_TEMPLATES: Record<CaptionTemplateId, CaptionTemplate> = {
       captionsAtATime: 5,
       stack: false,
       backdrop: "none",
+      fontStyle: "normal",
+      textAlign: "center",
+      backdropColor: null,
     },
   },
 };

@@ -98,9 +98,49 @@ export type SourceBRoll = {
    * Presence enables the effect; omit when off. Default when enabled: 1.15.
    */
   kenBurns?: number;
+  /**
+   * When true and episode has a baked cutout, composite under the person plate.
+   * Omit / false = normal overlay on top. Default false in YAML.
+   */
+  behind?: boolean;
 } & Range &
   VisualAsset &
   Partial<Transform>;
+
+/**
+ * Baked person cutout under `public/`.
+ * Absent / null = sandwich compositing off.
+ *
+ * `src` is upright A-roll RGB + Bria alpha (person plate).
+ * When present, {@link buildProps} sets `videoSrc` to the sibling
+ * `aroll-bg.webm` (room with person punched out) via {@link arollBgSrcForCutout}.
+ */
+export type SourceCutout = {
+  /** Person plate with alpha, e.g. `episodes/day1/cutout.webm` */
+  src: string;
+  width: number;
+  height: number;
+  srcDurationSec: number;
+  /** A-roll fingerprint used to skip re-bake when unchanged. */
+  source: {
+    size: number;
+    mtimeMs: number;
+  };
+};
+
+/** Room underlay beside a cutout (`…/cutout.webm` → `…/aroll-bg.webm`). */
+export function arollBgSrcForCutout(cutoutSrc: string): string {
+  const i = cutoutSrc.lastIndexOf("/");
+  const dir = i >= 0 ? cutoutSrc.slice(0, i + 1) : "";
+  return `${dir}aroll-bg.webm`;
+}
+
+/** Opaque upright RGB used while baking (`…/cutout.webm` → `…/aroll-display.mp4`). */
+export function arollDisplaySrcForCutout(cutoutSrc: string): string {
+  const i = cutoutSrc.lastIndexOf("/");
+  const dir = i >= 0 ? cutoutSrc.slice(0, i + 1) : "";
+  return `${dir}aroll-display.mp4`;
+}
 
 /**
  * Visual effect kinds. Expand this union as new effects land.
@@ -244,6 +284,8 @@ export type EpisodeConfig = {
   /** Null when omitted — process generates via OpenAI and writes config.yaml. */
   title: string | null;
   titleDurationSec: number;
+  /** On-screen title look (same shape as captionStyle). */
+  titleStyle: CaptionStyle;
   /**
    * Default on-screen caption look (editable).
    * Quote VFX overrides with a curated template for their range.
@@ -267,4 +309,9 @@ export type EpisodeConfig = {
    * `null` disables. Default: {@link DEFAULT_BROLL_ENTRANCE_SFX}.
    */
   defaultBRollSfx: string | null;
+  /**
+   * Baked person cutout for behind-person b-roll sandwich.
+   * Null when not baked — presence enables compositing.
+   */
+  cutout: SourceCutout | null;
 };

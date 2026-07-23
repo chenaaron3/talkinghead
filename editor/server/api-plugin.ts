@@ -508,6 +508,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               ...existingYaml,
               aroll: body.config.aroll,
               title: body.config.title,
+              titleStyle: body.config.titleStyle,
               captionStyle: body.config.captionStyle,
               cuts: body.config.cuts,
               listicleOverlay: body.config.listicleOverlay,
@@ -517,6 +518,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               sfx: body.config.sfx ?? [],
               music: body.config.music ?? null,
               defaultBRollSfx: body.config.defaultBRollSfx ?? null,
+              cutout: body.config.cutout ?? null,
             });
 
             const transcriptPath = path.join(
@@ -827,6 +829,8 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
                 ensureMusicAsset(body.config.music ?? null);
                 writeEpisodeConfig(episodeDir, {
                   aroll: body.config.aroll,
+                  title: body.config.title,
+                  titleStyle: body.config.titleStyle,
                   captionStyle: body.config.captionStyle,
                   cuts: body.config.cuts,
                   listicleOverlay: body.config.listicleOverlay,
@@ -836,6 +840,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
                   sfx: body.config.sfx ?? [],
                   music: body.config.music ?? null,
                   defaultBRollSfx: body.config.defaultBRollSfx ?? null,
+                  cutout: body.config.cutout ?? null,
                 });
                 writeJson(
                   path.join(episodeDir, "generated", "transcript.json"),

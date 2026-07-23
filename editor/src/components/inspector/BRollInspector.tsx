@@ -24,6 +24,8 @@ export function BRollInspector({
   const updateBRollMediaOffset = useEditor((s) => s.updateBRollMediaOffset);
   const updateBRollVolume = useEditor((s) => s.updateBRollVolume);
   const updateBRollKenBurns = useEditor((s) => s.updateBRollKenBurns);
+  const updateBRollBehind = useEditor((s) => s.updateBRollBehind);
+  const hasCutout = useEditor((s) => Boolean(s.config?.cutout));
   const isVideo = isVideoSrc(clip.src);
 
   const patch = (partial: Partial<Transform>, live: boolean) => {
@@ -67,6 +69,16 @@ export function BRollInspector({
             onCommit={(v) => updateBRollVolume(clip.id, v, true)}
           />
         </>
+      ) : null}
+
+      {hasCutout ? (
+        <ToggleField
+          label="Behind person"
+          checked={Boolean(clip.behind)}
+          onCheckedChange={(checked) =>
+            updateBRollBehind(clip.id, checked, true)
+          }
+        />
       ) : null}
 
       <div className="flex flex-col gap-1.5">

@@ -2,6 +2,7 @@ export * from "./episode/config-types";
 export * from "./captions/style";
 export * from "./captions/templates";
 export * from "./captions/quote-templates";
+export * from "./title/templates";
 export * from "./episode/transcript-types";
 export * from "./episode/props-types";
 export * from "./episode/pipeline-types";

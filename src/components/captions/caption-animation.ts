@@ -78,6 +78,11 @@ export function lastVisibleWordIndex(
   return last;
 }
 
+/** Shared blink phase for caption + title typewriter cursors. */
+export function typewriterCursorBlink(frame: number): boolean {
+  return Math.floor(frame / (CURSOR_BLINK_FRAMES / 2)) % 2 === 0;
+}
+
 export function typewriterCursorOn(
   animation: CaptionAnimation,
   lastVisibleIndex: number,
@@ -88,6 +93,41 @@ export function typewriterCursorOn(
     animation === "typewriter" &&
     lastVisibleIndex >= 0 &&
     frame < groupEndFrame &&
-    Math.floor(frame / (CURSOR_BLINK_FRAMES / 2)) % 2 === 0
+    typewriterCursorBlink(frame)
   );
+}
+
+/**
+ * How many frames to spend revealing a title / free-text typewriter,
+ * leaving room to read before the clip ends.
+ */
+export function typewriterTypeFrames(
+  fps: number,
+  durationFrames: number,
+): number {
+  const typeSec = Math.min(2.2, Math.max(0.8, durationFrames / fps - 1.2));
+  return Math.max(1, Math.round(typeSec * fps));
+}
+
+/**
+ * Split free text into per-character caption words staggered across
+ * `typeFrames`, so titles can reuse {@link lastVisibleWordIndex} /
+ * {@link typewriterCursorOn} like quote captions.
+ */
+export function typewriterCharWords(
+  text: string,
+  typeFrames: number,
+  startFrame = 0,
+): CaptionWord[] {
+  if (text.length === 0) return [];
+  const span = Math.max(1, typeFrames);
+  return Array.from(text).map((ch, i) => {
+    const t = text.length <= 1 ? 0 : i / (text.length - 1);
+    const wordStart = startFrame + Math.floor(t * (span - 1));
+    return {
+      text: ch,
+      startFrame: wordStart,
+      endFrame: wordStart + 1,
+    };
+  });
 }

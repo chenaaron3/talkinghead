@@ -67,6 +67,8 @@ export type BRollClip = {
   volume?: number;
   /** End-scale multiplier on `scale`; presence enables Ken Burns. */
   kenBurns?: number;
+  /** Under person cutout when cutoutSrc is set. Default false. */
+  behind?: boolean;
 } & Partial<Transform>;
 
 type VfxClipBase = {
@@ -118,11 +120,18 @@ export type EpisodeProps = {
   episodeId: string;
   title: string;
   videoSrc: string;
+  /**
+   * Person plate with alpha (original A-roll RGB + Bria matte).
+   * When set, `videoSrc` is the sibling room plate (`aroll-bg.webm`).
+   */
+  cutoutSrc?: string | null;
   fps: number;
   width: number;
   height: number;
   durationInFrames: number;
   titleDurationSec: number;
+  /** Omit on older generated props — renderer falls back to stamp default. */
+  titleStyle?: CaptionStyle;
   sections: OutputSection[];
   captionGroups: CaptionGroup[];
   listicle: ListicleOverlay | null;

@@ -57,10 +57,14 @@ export const CaptionWordSpan: React.FC<{
 
   if (!visual.mount) return null;
 
+  const whitespace = /^\s+$/.test(word.text);
+
   return (
     <span
       style={{
         display: "inline-block",
+        // Bare space in an inline-block collapses to 0 width without this.
+        whiteSpace: whitespace ? "pre" : undefined,
         visibility: visual.visibility,
         opacity: visual.opacity,
         color: visual.color,

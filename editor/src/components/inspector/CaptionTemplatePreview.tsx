@@ -47,12 +47,16 @@ function buildPreviewGroups(style: CaptionStyle): CaptionGroup[] {
   });
 }
 
-function usePreviewFrame(playing: boolean, cycleLen: number): number {
-  const [frame, setFrame] = useState(0);
+function usePreviewFrame(
+  playing: boolean,
+  cycleLen: number,
+  idleFrame: number,
+): number {
+  const [frame, setFrame] = useState(idleFrame);
 
   useEffect(() => {
     if (!playing) {
-      setFrame(0);
+      setFrame(idleFrame);
       return;
     }
     setFrame(0);
@@ -70,7 +74,7 @@ function usePreviewFrame(playing: boolean, cycleLen: number): number {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [playing, cycleLen]);
+  }, [playing, cycleLen, idleFrame]);
 
   return frame;
 }
@@ -79,7 +83,10 @@ function captionFocusY(styleY: number): number {
   return SAFE_TOP + styleY * (1 - SAFE_TOP - SAFE_BOTTOM);
 }
 
-/** Template picker sample — composition stage scaled to fill width. */
+/**
+ * Template picker preview — captions, quotes, and titles paint through
+ * {@link CaptionGroupView} on a scaled composition stage.
+ */
 export function CaptionTemplatePreview({
   style,
   playing = false,
@@ -94,10 +101,9 @@ export function CaptionTemplatePreview({
     const last = groups[groups.length - 1];
     return last ? last.endFrame + GAP_FRAMES : 1;
   }, [groups]);
-  const frame = usePreviewFrame(playing, cycleLen);
-  const displayFrame = playing
-    ? frame
-    : Math.max(0, (groups[0]?.endFrame ?? 1) - 1);
+  const idleFrame = Math.max(0, (groups[0]?.endFrame ?? 1) - 1);
+  const frame = usePreviewFrame(playing, cycleLen, idleFrame);
+  const displayFrame = playing ? frame : idleFrame;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -110,7 +116,8 @@ export function CaptionTemplatePreview({
   const focusY = captionFocusY(style.y);
 
   const active = groups.find(
-    (group) => displayFrame >= group.startFrame && displayFrame < group.endFrame,
+    (group) =>
+      displayFrame >= group.startFrame && displayFrame < group.endFrame,
   );
 
   useLayoutEffect(() => {

@@ -19,9 +19,11 @@ export function TranscriptToolbar() {
   const setTitle = useEditor((s) => s.setTitle);
   const selection = useSelection((s) => s.selection);
   const selectCaptionsPanel = useSelection((s) => s.selectCaptionsPanel);
+  const selectTitlePanel = useSelection((s) => s.selectTitlePanel);
   const clearSelection = useSelection((s) => s.clearSelection);
   const scissorMode = mode === "scissor";
   const captionsOpen = selection?.kind === "captions";
+  const titleOpen = selection?.kind === "title";
 
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,9 +71,15 @@ export function TranscriptToolbar() {
         ) : (
           <button
             type="button"
-            className="h-7 max-w-full truncate rounded-md px-1 text-left text-sm font-medium text-[#e8eaef] hover:bg-panel-2"
+            className={[
+              "h-7 max-w-full truncate rounded-md px-1 text-left text-sm font-medium text-[#e8eaef] hover:bg-panel-2",
+              titleOpen ? "bg-accent/15 ring-1 ring-accent" : "",
+            ].join(" ")}
             title="Click to edit title"
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              selectTitlePanel();
+              setEditing(true);
+            }}
           >
             {title || "Untitled"}
           </button>

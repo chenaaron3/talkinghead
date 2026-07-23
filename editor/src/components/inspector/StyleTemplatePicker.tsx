@@ -1,24 +1,26 @@
-import { useState } from 'react';
+import { useState } from "react";
 
-import { resolveCaptionFont } from '@src/lib/captions/style';
+import {
+  resolveCaptionFont,
+  type CaptionStyle,
+} from "@src/lib/captions/style";
 
-import { cn } from '../../lib/utils';
-import { useEditor } from '../../store';
-import { CaptionTemplatePreview } from './CaptionTemplatePreview';
+import { cn } from "../../lib/utils";
+import { useEditor } from "../../store";
+import { CaptionTemplatePreview } from "./CaptionTemplatePreview";
 
-import type { CaptionStyle } from "@src/lib/captions/style";
 export type StyleTemplateChip = {
   id: string;
   label: string;
   style: CaptionStyle;
 };
 
-/** Shared template preview + sidescroll used by Captions and Quote inspectors. */
+/** Shared template preview + sidescroll used by Captions, Quote, and Title inspectors. */
 export function StyleTemplatePicker({
   templates,
   value,
   onChange,
-  /** When set, used as the idle preview (e.g. live episode caption style). */
+  /** When set, used as the idle preview (e.g. live episode style). */
   fallbackStyle,
 }: {
   templates: StyleTemplateChip[];
@@ -53,7 +55,7 @@ export function StyleTemplatePicker({
             </div>
           </>
         ) : (
-          <div className="flex h-[75px] items-center justify-center bg-panel-2 text-[11px] text-muted">
+          <div className="flex h-[128px] items-center justify-center bg-panel-2 text-[11px] text-muted">
             Hover a template
           </div>
         )}
@@ -63,6 +65,7 @@ export function StyleTemplatePicker({
         <div className="flex w-max gap-2 pb-1">
           {templates.map((template) => {
             const selectedChip = template.id === value;
+            const face = resolveCaptionFont(template.style.fontFamily);
             return (
               <button
                 key={template.id}
@@ -87,10 +90,8 @@ export function StyleTemplatePicker({
                   className="max-w-full truncate text-[11px] leading-tight"
                   style={{
                     color: template.style.color,
-                    fontFamily: resolveCaptionFont(template.style.fontFamily)
-                      .family,
-                    fontWeight: resolveCaptionFont(template.style.fontFamily)
-                      .weight,
+                    fontFamily: face.family,
+                    fontWeight: face.weight,
                   }}
                 >
                   Aa

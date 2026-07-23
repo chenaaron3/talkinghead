@@ -94,7 +94,22 @@ export function compactBRoll(clip: SourceBRoll): SourceBRoll {
   if (clip.kenBurns != null) {
     out.kenBurns = clampKenBurns(clip.kenBurns);
   }
+  if (clip.behind) {
+    out.behind = true;
+  }
   return out;
+}
+
+export function withBRollBehind(
+  clip: SourceBRoll,
+  behind: boolean,
+): SourceBRoll {
+  if (!behind) {
+    const rest = { ...clip };
+    delete rest.behind;
+    return compactBRoll(rest);
+  }
+  return compactBRoll({ ...clip, behind: true });
 }
 
 /** Write only non-default transform fields (omit identity in config.yaml). */
@@ -139,7 +154,8 @@ export function withBRollKenBurns(
   kenBurns: number | null,
 ): SourceBRoll {
   if (kenBurns == null) {
-    const { kenBurns: _removed, ...rest } = clip;
+    const rest = { ...clip };
+    delete rest.kenBurns;
     return compactBRoll(rest);
   }
   return compactBRoll({ ...clip, kenBurns: clampKenBurns(kenBurns) });

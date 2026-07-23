@@ -16,7 +16,12 @@ function matchingCaptionTemplateId(
 ): CaptionTemplateId | null {
   const key = JSON.stringify(style);
   for (const template of CAPTION_TEMPLATE_LIST) {
-    if (JSON.stringify(template.style) === key) return template.id;
+    if (
+      JSON.stringify(normalizeCaptionStyle(template.style, DEFAULT_CAPTION_STYLE)) ===
+      key
+    ) {
+      return template.id;
+    }
   }
   return null;
 }

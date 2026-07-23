@@ -5,6 +5,8 @@ import {
   isCaptionAnimation,
   isCaptionBackdrop,
   isCaptionFontId,
+  isCaptionFontStyle,
+  isCaptionTextAlign,
   isCaptionTextTransform,
   type CaptionStyle,
   type CaptionStroke,
@@ -51,6 +53,23 @@ export function normalizeCaptionStyle(
   const backdrop = isCaptionBackdrop(src.backdrop)
     ? src.backdrop
     : (fallback.backdrop ?? "none");
+  const fontStyle = isCaptionFontStyle(src.fontStyle)
+    ? src.fontStyle
+    : (fallback.fontStyle ?? "normal");
+  const textAlign = isCaptionTextAlign(src.textAlign)
+    ? src.textAlign
+    : (fallback.textAlign ?? "center");
+  let backdropColor: string | null;
+  if ("backdropColor" in src) {
+    const raw = src.backdropColor;
+    if (raw == null || raw === "") backdropColor = null;
+    else {
+      const color = String(raw).trim();
+      backdropColor = color || null;
+    }
+  } else {
+    backdropColor = fallback.backdropColor ?? null;
+  }
 
   let stroke: CaptionStroke | null;
   if ("stroke" in src) {
@@ -78,5 +97,8 @@ export function normalizeCaptionStyle(
     ),
     stack,
     backdrop,
+    fontStyle,
+    textAlign,
+    backdropColor,
   };
 }

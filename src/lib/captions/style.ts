@@ -82,7 +82,27 @@ export function isCaptionBackdrop(value: unknown): value is CaptionBackdrop {
   );
 }
 
-/** Shared caption look for episode defaults and Quote templates. */
+export const CAPTION_FONT_STYLES = ["normal", "italic"] as const;
+export type CaptionFontStyle = (typeof CAPTION_FONT_STYLES)[number];
+
+export function isCaptionFontStyle(value: unknown): value is CaptionFontStyle {
+  return (
+    typeof value === "string" &&
+    (CAPTION_FONT_STYLES as readonly string[]).includes(value)
+  );
+}
+
+export const CAPTION_TEXT_ALIGNS = ["left", "center"] as const;
+export type CaptionTextAlign = (typeof CAPTION_TEXT_ALIGNS)[number];
+
+export function isCaptionTextAlign(value: unknown): value is CaptionTextAlign {
+  return (
+    typeof value === "string" &&
+    (CAPTION_TEXT_ALIGNS as readonly string[]).includes(value)
+  );
+}
+
+/** Shared caption look for episode defaults, Quote templates, and titles. */
 export type CaptionStyle = {
   fontFamily: CaptionFontId;
   fontSize: number;
@@ -101,6 +121,15 @@ export type CaptionStyle = {
   stack?: boolean;
   /** none | solid box behind group | rounded pill per word | torn scrap per word. */
   backdrop?: CaptionBackdrop;
+  /** CSS font-style. Default normal. */
+  fontStyle?: CaptionFontStyle;
+  /** Horizontal align for non-stack layouts / titles. Default center. */
+  textAlign?: CaptionTextAlign;
+  /**
+   * Fill color when `backdrop` is `box` (titles use yellow/white boards).
+   * Captions default to translucent black when omitted.
+   */
+  backdropColor?: string | null;
 };
 
 /** Matches the historic hard-coded TikTok yellow captions. */
@@ -116,6 +145,9 @@ export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   captionsAtATime: 5,
   stack: false,
   backdrop: "none",
+  fontStyle: "normal",
+  textAlign: "center",
+  backdropColor: null,
 };
 
 /** Shared Y for aesthetic Quote templates — near the title band. */

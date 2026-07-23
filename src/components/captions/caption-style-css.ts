@@ -11,10 +11,11 @@ export function captionStyleToCss(style: CaptionStyle): CSSProperties {
   return {
     fontFamily: font.family,
     fontWeight: font.weight,
+    fontStyle: style.fontStyle ?? "normal",
     fontSize: style.fontSize,
     lineHeight: 1.2,
     color: style.color,
-    textAlign: "center",
+    textAlign: style.textAlign ?? "center",
     textTransform: style.textTransform,
     letterSpacing: style.fontFamily === "montserrat" ? "-0.02em" : "0",
     WebkitTextStroke: style.stroke

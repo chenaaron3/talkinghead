@@ -8,6 +8,7 @@ import {
   DEFAULT_CONFIG_PATH,
   type EpisodeConfig,
   type SourceBRoll,
+  type SourceCutout,
   type SourceListicle,
   type SourceMusic,
   type SourcePunchIn,
@@ -24,6 +25,7 @@ import {
 import { DEFAULT_PUNCH_IN_SCALE } from "../../src/lib/visual/punchin";
 import { normalizeCaptionStyle } from "../../src/lib/captions/parse-style";
 import { defaultEpisodeCaptionStyle } from "../../src/lib/captions/templates";
+import { defaultEpisodeTitleStyle } from "../../src/lib/title/templates";
 import {
   DEFAULT_QUOTE_TEMPLATE_ID,
   isQuoteTemplateId,
@@ -283,8 +285,56 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
     if (entry.kenBurns != null && Number.isFinite(kenBurns) && kenBurns > 0) {
       clip.kenBurns = kenBurns;
     }
+    if (entry.behind === true) {
+      clip.behind = true;
+    }
     return clip;
   });
+}
+
+function parseCutout(
+  value: unknown,
+  configPath: string,
+): SourceCutout | null {
+  if (value == null) return null;
+  if (!isPlainObject(value)) {
+    throw new Error(`"cutout" must be an object or null in ${configPath}`);
+  }
+  const src = String(value.src ?? "").trim();
+  const width = Number(value.width);
+  const height = Number(value.height);
+  const srcDurationSec = Number(value.srcDurationSec);
+  if (
+    !src ||
+    !Number.isFinite(width) ||
+    width <= 0 ||
+    !Number.isFinite(height) ||
+    height <= 0 ||
+    !Number.isFinite(srcDurationSec) ||
+    srcDurationSec <= 0
+  ) {
+    throw new Error(
+      `"cutout" needs src, positive width/height/srcDurationSec in ${configPath}`,
+    );
+  }
+  const sourceRaw = value.source;
+  if (!isPlainObject(sourceRaw)) {
+    throw new Error(`"cutout.source" must be an object in ${configPath}`);
+  }
+  const size = Number(sourceRaw.size);
+  const mtimeMs = Number(sourceRaw.mtimeMs);
+  if (!Number.isFinite(size) || size < 0 || !Number.isFinite(mtimeMs)) {
+    throw new Error(
+      `"cutout.source" needs size and mtimeMs in ${configPath}`,
+    );
+  }
+  return {
+    src,
+    width,
+    height,
+    srcDurationSec,
+    source: { size, mtimeMs },
+  };
 }
 
 function parseDefaultBRollSfx(
@@ -477,11 +527,16 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     merged.captionStyle,
     defaultEpisodeCaptionStyle(),
   );
+  const titleStyle = normalizeCaptionStyle(
+    merged.titleStyle,
+    defaultEpisodeTitleStyle(),
+  );
 
   return {
     aroll,
     title,
     captionStyle,
+    titleStyle,
     titleDurationSec: Number(
       merged.titleDurationSec ?? DEFAULT_TITLE_DURATION_SEC,
     ),
@@ -496,6 +551,7 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     sfx: parseSfx(local.sfx, configPath),
     music: parseMusic(local.music, configPath),
     defaultBRollSfx: parseDefaultBRollSfx(merged.defaultBRollSfx, configPath),
+    cutout: parseCutout(local.cutout, configPath),
   };
 }
 

@@ -86,6 +86,61 @@ function replaceWithFfmpeg(absPath: string, ffmpegArgs: string[]): void {
 }
 
 /**
+ * True when container/EXIF orientation means coded size ≠ display size
+ * (typical iPhone portrait MOV with rotation=-90).
+ */
+export function hasDisplayOrientation(absPath: string): boolean {
+  const probe = probeMedia(absPath);
+  if (probe.width == null || probe.height == null) return false;
+  const decoded = decodedSize(absPath);
+  return probe.width !== decoded.width || probe.height !== decoded.height;
+}
+
+/**
+ * Write an upright H.264 copy with rotation baked into pixels.
+ * ffmpeg autorotates on encode so Remotion and cloud cutout see the same frame.
+ */
+export function writeUprightVideoCopy(
+  srcPath: string,
+  destPath: string,
+  options?: { audio?: boolean },
+): void {
+  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  const withAudio = options?.audio === true;
+  const result = spawnSync(
+    "ffmpeg",
+    [
+      "-y",
+      "-i",
+      srcPath,
+      "-c:v",
+      "libx264",
+      "-crf",
+      "18",
+      "-preset",
+      "veryfast",
+      ...(withAudio
+        ? (["-c:a", "aac", "-b:a", "192k"] as const)
+        : (["-an"] as const)),
+      "-movflags",
+      "+faststart",
+      destPath,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) {
+    try {
+      fs.unlinkSync(destPath);
+    } catch {
+      // ignore
+    }
+    throw new Error(
+      `ffmpeg upright copy failed for ${srcPath}: ${result.stderr}`,
+    );
+  }
+}
+
+/**
  * Bake display orientation into pixels when coded size ≠ decoded size.
  * ffmpeg autorotate applies EXIF (images) and container rotation (video).
  * Remotion then sees upright pixels whose width/height match the layout box.

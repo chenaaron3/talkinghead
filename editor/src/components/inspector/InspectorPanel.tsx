@@ -14,6 +14,7 @@ import { MusicInspector } from './MusicInspector';
 import { QuoteVfxInspector } from './QuoteVfxInspector';
 import { SfxInspector } from './SfxInspector';
 import { ShakeVfxInspector } from './ShakeVfxInspector';
+import { TitleInspector } from './TitleInspector';
 import { ZoomInspector } from './ZoomInspector';
 
 /**
@@ -87,6 +88,9 @@ export function InspectorPanel() {
   } else if (selection?.kind === "captions") {
     title = "Captions";
     body = <CaptionsInspector />;
+  } else if (selection?.kind === "title") {
+    title = "Title";
+    body = <TitleInspector />;
   }
 
   return (

@@ -46,6 +46,8 @@ type SelectionActions = {
   selectCaption: (index: number | null, mode?: SelectionMode) => void;
   /** Open the episode Captions style inspector (toolbar). */
   selectCaptionsPanel: () => void;
+  /** Open the episode Title style inspector (toolbar title). */
+  selectTitlePanel: () => void;
   clearSelection: () => void;
 };
 
@@ -159,6 +161,17 @@ export const useSelection = create<SelectionState & SelectionActions>(
         selection: { kind: "captions", ids: [] },
         ...clearCaptionRangeEnds(),
       }),
+    selectTitlePanel: () => {
+      const editor = useEditor.getState();
+      // Seek to the title window so the player shows the styled title.
+      if (editor.sourceSec > 0.05) {
+        editor.seekSource(0);
+      }
+      set({
+        selection: { kind: "title", ids: [] },
+        ...clearCaptionRangeEnds(),
+      });
+    },
     clearSelection: () =>
       set({ selection: null, ...clearCaptionRangeEnds() }),
   }),

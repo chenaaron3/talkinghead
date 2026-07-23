@@ -130,6 +130,11 @@ export type CaptionStyle = {
    * Captions default to translucent black when omitted.
    */
   backdropColor?: string | null;
+  /**
+   * When `backdrop` is `box`, paint a per-line hugging silhouette (white board)
+   * instead of a single rectangular stamp.
+   */
+  contourBoard?: boolean;
 };
 
 /** Matches the historic hard-coded TikTok yellow captions. */
@@ -148,6 +153,7 @@ export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   fontStyle: "normal",
   textAlign: "center",
   backdropColor: null,
+  contourBoard: false,
 };
 
 /** Shared Y for aesthetic Quote templates — near the title band. */

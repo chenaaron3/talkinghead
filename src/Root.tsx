@@ -35,6 +35,7 @@ const fallbackProps: EpisodeProps = {
     fontStyle: "normal",
     textAlign: "center",
     backdropColor: "#FFE600",
+    contourBoard: false,
   },
   sections: [{ trimBefore: 0, trimAfter: 30 * 10, durationInFrames: 30 * 10 }],
   captionGroups: [],

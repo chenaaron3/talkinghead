@@ -59,6 +59,10 @@ export function normalizeCaptionStyle(
   const textAlign = isCaptionTextAlign(src.textAlign)
     ? src.textAlign
     : (fallback.textAlign ?? "center");
+  const contourBoard =
+    typeof src.contourBoard === "boolean"
+      ? src.contourBoard
+      : (fallback.contourBoard ?? false);
   let backdropColor: string | null;
   if ("backdropColor" in src) {
     const raw = src.backdropColor;
@@ -100,5 +104,6 @@ export function normalizeCaptionStyle(
     fontStyle,
     textAlign,
     backdropColor,
+    contourBoard,
   };
 }

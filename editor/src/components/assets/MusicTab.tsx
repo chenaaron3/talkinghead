@@ -1,5 +1,8 @@
 import { useState } from 'react';
 
+import { loudnessGainFor } from '@src/lib/audio/loudness';
+import { MUSIC_VOLUME_DEFAULT } from '@src/lib/episode/media';
+
 import { episodeHeaders } from '../../lib/api';
 import { importMediaBatch } from '../../lib/import-media-batch';
 import { cn } from '../../lib/utils';
@@ -10,6 +13,9 @@ import { useAudioPreview } from './useAudioPreview';
 export function MusicTab() {
   const assets = useEditor((s) => s.musicAssets);
   const activeSrc = useEditor((s) => s.config?.music?.src ?? null);
+  const musicVolume = useEditor(
+    (s) => s.config?.music?.volume ?? MUSIC_VOLUME_DEFAULT,
+  );
   const onSelect = useEditor((s) => s.setMusic);
   const episodeId = useEditor((s) => s.episodeId);
   const refreshAssets = useEditor((s) => s.refreshAssets);
@@ -97,7 +103,11 @@ export function MusicTab() {
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-music/25 text-music hover:bg-music/40"
                   onClick={(e) => {
                     e.stopPropagation();
-                    preview(asset.key, asset.src);
+                    preview(
+                      asset.key,
+                      asset.src,
+                      musicVolume * loudnessGainFor(asset.src),
+                    );
                   }}
                   title={playingKey === asset.key ? "Stop" : "Preview"}
                 >

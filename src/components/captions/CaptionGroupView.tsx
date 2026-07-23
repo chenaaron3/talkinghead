@@ -1,11 +1,18 @@
-import React from "react";
+import React, { useMemo, type CSSProperties, type ReactNode } from "react";
 
 import { DEFAULT_CAPTION_STYLE } from "../../lib/captions/style";
 import type { CaptionGroup, CaptionWord } from "../../lib/types";
 
 import { lastVisibleWordIndex, typewriterCursorOn } from "./caption-animation";
+import { boardFill, boxChrome } from "./caption-board-chrome";
 import { captionStyleToCss } from "./caption-style-css";
 import { CaptionWordSpan } from "./CaptionWordSpan";
+import {
+  safeContentWidthPx,
+  wrapContourLines,
+  type ContourLine,
+} from "./contour-board";
+import { ContourBoard } from "./ContourBoard";
 
 /** Split a group into two rows: first half / second half (ceil on top). */
 export function splitCaptionLines<T>(words: T[]): { top: T[]; bottom: T[] } {
@@ -14,25 +21,6 @@ export function splitCaptionLines<T>(words: T[]): { top: T[]; bottom: T[] } {
   return {
     top: words.slice(0, mid),
     bottom: words.slice(mid),
-  };
-}
-
-function boxChrome(style: NonNullable<CaptionGroup["style"]>): React.CSSProperties {
-  const fill = style.backdropColor?.trim() || "rgba(0, 0, 0, 0.82)";
-  const board = Boolean(style.backdropColor?.trim());
-  if (!board) {
-    return {
-      backgroundColor: fill,
-      padding: "0.35em 0.55em",
-      borderRadius: 8,
-    };
-  }
-  const yellow = fill.toLowerCase() === "#ffe600";
-  return {
-    backgroundColor: fill,
-    borderRadius: yellow ? 24 : 20,
-    padding: yellow ? "28px 32px" : "22px 28px",
-    boxShadow: "0 6px 0 rgba(0, 0, 0, 0.35)",
   };
 }
 
@@ -79,6 +67,9 @@ export const CaptionGroupView: React.FC<{
   const stack = style.stack ?? false;
   const backdrop = style.backdrop ?? "none";
   const textAlign = style.textAlign ?? "center";
+  const contour =
+    !stack && backdrop === "box" && (style.contourBoard ?? false);
+  const fill = boardFill(style) ?? (contour ? "#FFFFFF" : null);
   const lastVisibleIndex = lastVisibleWordIndex(
     group.words,
     frame,
@@ -101,6 +92,16 @@ export const CaptionGroupView: React.FC<{
     : backdrop === "scrap" || backdrop === "pill"
       ? "0.45em 0.55em"
       : "0.35em";
+
+  const wordBackdrop = contour ? "none" : backdrop;
+
+  const contourLines = useMemo(
+    () =>
+      contour
+        ? wrapContourLines(group.words, style, safeContentWidthPx())
+        : [],
+    [contour, group.words, style],
+  );
 
   const renderWord = (word: CaptionWord, index: number) => {
     if (word.text === "\n") {
@@ -133,13 +134,24 @@ export const CaptionGroupView: React.FC<{
           cursorOn
         }
         cursorColor={style.color}
-        backdrop={backdrop}
+        backdrop={wordBackdrop}
       />
     );
   };
 
-  const groupChrome: React.CSSProperties =
-    backdrop === "box" ? boxChrome(style) : {};
+  const renderLineWords = (line: ContourLine): ReactNode => {
+    const nodes: ReactNode[] = [];
+    line.forEach(({ word, index }, i) => {
+      if (i > 0) {
+        nodes.push(<React.Fragment key={`sp-${index}`}>{" "}</React.Fragment>);
+      }
+      nodes.push(renderWord(word, index));
+    });
+    return nodes;
+  };
+
+  const groupChrome: CSSProperties =
+    backdrop === "box" && !contour ? boxChrome(style) : {};
 
   const rowJustify =
     textAlign === "left" ? "flex-start" : "center";
@@ -186,6 +198,16 @@ export const CaptionGroupView: React.FC<{
           </div>
         ) : null}
       </div>
+    );
+  } else if (contour && fill) {
+    body = (
+      <ContourBoard
+        fill={fill}
+        textAlign={textAlign}
+        textStyle={baseText}
+        lines={contourLines}
+        renderLine={renderLineWords}
+      />
     );
   } else {
     const children = charTypewriter

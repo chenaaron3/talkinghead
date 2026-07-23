@@ -1,15 +1,15 @@
-import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { ChevronRight } from 'lucide-react';
+import { useState } from 'react';
 
-import { cn } from "../../lib/utils";
-import { useEditor, type SfxAsset } from "../../store";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../ui/collapsible";
-import { useAudioPreview } from "./useAudioPreview";
+import { loudnessGainFor } from '@src/lib/audio/loudness';
+import { SFX_VOLUME_DEFAULT } from '@src/lib/episode/media';
 
+import { cn } from '../../lib/utils';
+import { useEditor } from '../../store';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { useAudioPreview } from './useAudioPreview';
+
+import type { SfxAsset } from '../../store';
 const FOLDER_ORDER = ["meme", "beep-bop", "realistic"] as const;
 
 const FOLDER_LABELS: Record<string, string> = {
@@ -61,7 +61,7 @@ function SfxRow({
 }: {
   asset: SfxAsset;
   playingKey: string | null;
-  onPreview: (key: string, src: string) => void;
+  onPreview: (key: string, src: string, volume?: number) => void;
   onDragStart: () => void;
 }) {
   return (
@@ -83,7 +83,12 @@ function SfxRow({
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-sfx/25 text-sfx hover:bg-sfx/40"
         onClick={(e) => {
           e.stopPropagation();
-          onPreview(asset.key, asset.src);
+          console.log(SFX_VOLUME_DEFAULT * loudnessGainFor(asset.src))
+          onPreview(
+            asset.key,
+            asset.src,
+            SFX_VOLUME_DEFAULT * loudnessGainFor(asset.src),
+          );
         }}
         title={playingKey === asset.key ? "Stop" : "Preview"}
       >

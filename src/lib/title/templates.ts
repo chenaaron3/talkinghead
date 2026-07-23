@@ -42,6 +42,7 @@ export const DEFAULT_TITLE_STYLE: CaptionStyle = {
   fontStyle: "normal",
   textAlign: "center",
   backdropColor: "#FFE600",
+  contourBoard: false,
 };
 
 export const DEFAULT_TITLE_TEMPLATE_ID: TitleTemplateId = "stamp";
@@ -65,6 +66,7 @@ export const TITLE_TEMPLATES: Record<TitleTemplateId, TitleTemplate> = {
       fontStyle: "italic",
       textAlign: "left",
       backdropColor: null,
+      contourBoard: false,
     },
   },
   "white-board": {
@@ -85,6 +87,7 @@ export const TITLE_TEMPLATES: Record<TitleTemplateId, TitleTemplate> = {
       fontStyle: "normal",
       textAlign: "center",
       backdropColor: "#FFFFFF",
+      contourBoard: true,
     },
   },
   stamp: {

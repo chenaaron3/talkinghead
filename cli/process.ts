@@ -165,8 +165,8 @@ export async function runProcess(
       cachePath: path.join(generatedDir, "title.json"),
       force,
     });
-    writeEpisodeTitle(episodeDir, title);
-    config = { ...config, title };
+    const vfx = writeEpisodeTitle(episodeDir, title);
+    config = { ...config, title, vfx };
     console.log(`[title] wrote config.yaml`);
   }
   console.log(`[process] title="${title}"`);

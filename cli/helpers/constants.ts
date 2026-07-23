@@ -28,5 +28,5 @@ export const FILLER_WORDS = [
   "mhm",
 ] as const;
 
-/** Fallback when titleDurationSec is omitted from config */
-export const DEFAULT_TITLE_DURATION_SEC = 5;
+/** Duration used only when seeding the initial text VFX (`0 → end`). */
+export const DEFAULT_TEXT_VFX_DURATION_SEC = 5;

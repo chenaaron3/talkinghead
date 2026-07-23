@@ -18,7 +18,7 @@ import {
   mapSourceSecToOutputSec,
   validateCuts,
 } from "../timeline/source-timeline";
-import { DEFAULT_TITLE_STYLE } from "../title/templates";
+import { DEFAULT_TEXT_TEMPLATE_ID, isTextTemplateId, resolveTextTemplateStyle } from "../text/templates";
 import { resolveKenBurns } from "../visual/ken-burns";
 import {
   DEFAULT_PUNCH_IN_ANIMATE,
@@ -42,6 +42,7 @@ import type {
   SourcePunchIn,
   SourceBRoll,
   SourceQuoteVfx,
+  SourceTextVfx,
   SourceVfx,
   SourceMusic,
   SourceSfx,
@@ -328,6 +329,16 @@ function buildBRolls(
   return result.sort((a, b) => a.startFrame - b.startFrame);
 }
 
+function resolveClipTextStyle(clip: SourceTextVfx): CaptionStyle {
+  const templateId = isTextTemplateId(clip.templateId)
+    ? clip.templateId
+    : DEFAULT_TEXT_TEMPLATE_ID;
+  return normalizeCaptionStyle(
+    clip.style,
+    resolveTextTemplateStyle(templateId),
+  );
+}
+
 function buildVfx(
   vfx: SourceVfx[],
   segments: KeepSegment[],
@@ -358,7 +369,19 @@ function buildVfx(
       continue;
     }
 
-    // Quote is caption-only — no visual overlay clip.
+    if (clip.type === "text") {
+      result.push({
+        id: clip.id,
+        type: "text",
+        startFrame: frames.startFrame,
+        endFrame: frames.endFrame,
+        text: clip.text,
+        style: resolveClipTextStyle(clip),
+      });
+      continue;
+    }
+
+    // Quote restyles captions — not a visual-plane VFX.
     if (clip.type === "quote") continue;
 
     // Location (and future media VFX): skip until media is baked.
@@ -510,8 +533,6 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     width: COMPOSITION_WIDTH,
     height: COMPOSITION_HEIGHT,
     durationInFrames: Math.max(1, durationInFrames),
-    titleDurationSec: config.titleDurationSec,
-    titleStyle: config.titleStyle ?? DEFAULT_TITLE_STYLE,
     sections: keepSegments.map((seg) => ({
       trimBefore: seg.trimBefore,
       trimAfter: seg.trimAfter,

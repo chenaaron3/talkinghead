@@ -111,7 +111,7 @@ export function typewriterTypeFrames(
 
 /**
  * Split free text into per-character caption words staggered across
- * `typeFrames`, so titles can reuse {@link lastVisibleWordIndex} /
+ * `typeFrames`, so text VFX can reuse {@link lastVisibleWordIndex} /
  * {@link typewriterCursorOn} like quote captions.
  */
 export function typewriterCharWords(

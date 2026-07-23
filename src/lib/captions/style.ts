@@ -102,7 +102,7 @@ export function isCaptionTextAlign(value: unknown): value is CaptionTextAlign {
   );
 }
 
-/** Shared caption look for episode defaults, Quote templates, and titles. */
+/** Shared caption look for episode defaults, Quote templates, and text VFX. */
 export type CaptionStyle = {
   fontFamily: CaptionFontId;
   fontSize: number;
@@ -123,10 +123,10 @@ export type CaptionStyle = {
   backdrop?: CaptionBackdrop;
   /** CSS font-style. Default normal. */
   fontStyle?: CaptionFontStyle;
-  /** Horizontal align for non-stack layouts / titles. Default center. */
+  /** Horizontal align for non-stack layouts / text VFX. Default center. */
   textAlign?: CaptionTextAlign;
   /**
-   * Fill color when `backdrop` is `box` (titles use yellow/white boards).
+   * Fill color when `backdrop` is `box` (text VFX uses yellow/white boards).
    * Captions default to translucent black when omitted.
    */
   backdropColor?: string | null;
@@ -156,7 +156,7 @@ export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   contourBoard: false,
 };
 
-/** Shared Y for aesthetic Quote templates — near the title band. */
+/** Shared Y for aesthetic Quote templates — near the text VFX band. */
 export const QUOTE_CAPTION_Y = 0.08;
 
 /** Bottom of safe area — default / caption templates. */

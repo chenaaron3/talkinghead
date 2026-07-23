@@ -1,9 +1,10 @@
-import { MapPin, Quote, Vibrate, type LucideIcon } from "lucide-react";
+import { MapPin, Quote, Type, Vibrate, type LucideIcon } from "lucide-react";
 import type {
   ImageAsset,
   SourceLocationVfx,
   SourceQuoteVfx,
   SourceShakeVfx,
+  SourceTextVfx,
   SourceVfx,
   SourceVfxWithImageAsset,
   SourceVfxWithTransform,
@@ -24,6 +25,13 @@ import {
   resolveQuoteTemplateStyle,
   type QuoteTemplateId,
 } from "@src/lib/captions/quote-templates";
+import {
+  DEFAULT_TEXT_TEMPLATE_ID,
+  TEXT_TEMPLATES,
+  isTextTemplateId,
+  resolveTextTemplateStyle,
+  type TextTemplateId,
+} from "@src/lib/text/templates";
 import { normalizeCaptionStyle } from "@src/lib/captions/parse-style";
 
 import {
@@ -57,6 +65,7 @@ export const VFX_META: Record<VfxType, VfxMeta> = {
   location: { label: "Location", Icon: MapPin },
   shake: { label: "Shake", Icon: Vibrate },
   quote: { label: "Quote", Icon: Quote },
+  text: { label: "Text", Icon: Type },
 };
 
 export type VfxPreset = {
@@ -81,6 +90,10 @@ export function vfxClipLabel(clip: SourceVfx): string {
     const id = resolveQuoteTemplateId(clip);
     return QUOTE_TEMPLATES[id]?.label ?? VFX_META.quote.label;
   }
+  if (clip.type === "text") {
+    const id = resolveTextTemplateId(clip);
+    return TEXT_TEMPLATES[id]?.label ?? VFX_META.text.label;
+  }
   if ("label" in clip && clip.label) return clip.label;
   return VFX_META[clip.type].label;
 }
@@ -95,6 +108,10 @@ export function isShakeVfx(clip: SourceVfx): clip is SourceShakeVfx {
 
 export function isQuoteVfx(clip: SourceVfx): clip is SourceQuoteVfx {
   return clip.type === "quote";
+}
+
+export function isTextVfx(clip: SourceVfx): clip is SourceTextVfx {
+  return clip.type === "text";
 }
 
 /** True when image media is fully present (baked). */
@@ -134,6 +151,23 @@ export function resolveQuoteStyle(clip: SourceQuoteVfx): CaptionStyle {
   return resolveQuoteTemplateStyle(resolveQuoteTemplateId(clip));
 }
 
+export function resolveTextTemplateId(clip: SourceTextVfx): TextTemplateId {
+  return isTextTemplateId(clip.templateId)
+    ? clip.templateId
+    : DEFAULT_TEXT_TEMPLATE_ID;
+}
+
+/** Resolved editable style on a Text clip (falls back to template). */
+export function resolveTextStyle(clip: SourceTextVfx): CaptionStyle {
+  if (clip.style) {
+    return normalizeCaptionStyle(
+      clip.style,
+      resolveTextTemplateStyle(resolveTextTemplateId(clip)),
+    );
+  }
+  return resolveTextTemplateStyle(resolveTextTemplateId(clip));
+}
+
 function rangesOverlap(
   a: { start: number; end: number },
   b: { start: number; end: number },
@@ -166,6 +200,19 @@ export function compactVfx(clip: SourceVfx): SourceVfx {
       end: clip.end,
       templateId,
       style: resolveQuoteStyle(clip),
+    };
+  }
+
+  if (clip.type === "text") {
+    const templateId = resolveTextTemplateId(clip);
+    return {
+      id: clip.id,
+      type: "text",
+      start: clip.start,
+      end: clip.end,
+      text: clip.text,
+      templateId,
+      style: resolveTextStyle(clip),
     };
   }
 
@@ -260,6 +307,35 @@ export function withQuoteStyle(
   return compactVfx({ ...clip, style });
 }
 
+export function withTextTemplate(
+  clip: SourceVfx,
+  templateId: TextTemplateId,
+): SourceVfx {
+  if (!isTextVfx(clip)) return clip;
+  return compactVfx({
+    ...clip,
+    templateId,
+    style: { ...resolveTextTemplateStyle(templateId) },
+  });
+}
+
+export function withTextStyle(
+  clip: SourceVfx,
+  patch: Partial<CaptionStyle>,
+): SourceVfx {
+  if (!isTextVfx(clip)) return clip;
+  const style = normalizeCaptionStyle(
+    { ...resolveTextStyle(clip), ...patch },
+    resolveTextStyle(clip),
+  );
+  return compactVfx({ ...clip, style });
+}
+
+export function withTextContent(clip: SourceVfx, text: string): SourceVfx {
+  if (!isTextVfx(clip)) return clip;
+  return compactVfx({ ...clip, text });
+}
+
 export function createVfxFromPreset(
   preset: VfxPreset,
   range: { start: number; end: number },
@@ -281,6 +357,17 @@ export function createVfxFromPreset(
       end: range.end,
       templateId: DEFAULT_QUOTE_TEMPLATE_ID,
       style: { ...resolveQuoteTemplateStyle(DEFAULT_QUOTE_TEMPLATE_ID) },
+    };
+  }
+  if (preset.type === "text") {
+    return {
+      id,
+      type: "text",
+      start: range.start,
+      end: range.end,
+      text: "",
+      templateId: DEFAULT_TEXT_TEMPLATE_ID,
+      style: { ...resolveTextTemplateStyle(DEFAULT_TEXT_TEMPLATE_ID) },
     };
   }
   return {

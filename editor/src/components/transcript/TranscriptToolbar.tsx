@@ -19,11 +19,18 @@ export function TranscriptToolbar() {
   const setTitle = useEditor((s) => s.setTitle);
   const selection = useSelection((s) => s.selection);
   const selectCaptionsPanel = useSelection((s) => s.selectCaptionsPanel);
-  const selectTitlePanel = useSelection((s) => s.selectTitlePanel);
+  const selectTextPanel = useSelection((s) => s.selectTextPanel);
   const clearSelection = useSelection((s) => s.clearSelection);
+  const vfx = useEditor((s) => s.config?.vfx);
   const scissorMode = mode === "scissor";
   const captionsOpen = selection?.kind === "captions";
-  const titleOpen = selection?.kind === "title";
+  const selectedVfxId =
+    selection?.kind === "vfx" && selection.ids.length > 0
+      ? selection.ids[selection.ids.length - 1]
+      : null;
+  const titleOpen =
+    typeof selectedVfxId === "string" &&
+    vfx?.some((clip) => clip.id === selectedVfxId && clip.type === "text");
 
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -77,7 +84,7 @@ export function TranscriptToolbar() {
             ].join(" ")}
             title="Click to edit title"
             onClick={() => {
-              selectTitlePanel();
+              selectTextPanel();
               setEditing(true);
             }}
           >

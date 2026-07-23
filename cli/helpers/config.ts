@@ -14,9 +14,13 @@ import {
   isVfxType,
 } from "../../src/lib/episode/config-types";
 import { isVideoSrc } from "../../src/lib/episode/media";
-import { defaultEpisodeTitleStyle } from "../../src/lib/title/templates";
+import {
+  DEFAULT_TEXT_TEMPLATE_ID,
+  isTextTemplateId,
+  resolveTextTemplateStyle,
+} from "../../src/lib/text/templates";
 import { DEFAULT_PUNCH_IN_SCALE } from "../../src/lib/visual/punchin";
-import { DEFAULT_TITLE_DURATION_SEC } from "./constants";
+import { DEFAULT_TEXT_VFX_DURATION_SEC } from "./constants";
 import {
   DEFAULT_CONFIG_PATH,
   EpisodeConfig,
@@ -28,6 +32,7 @@ import {
   SourceMusic,
   SourcePunchIn,
   SourceSfx,
+  SourceTextVfx,
   SourceVfx,
 } from "./types";
 
@@ -363,7 +368,7 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
     }
     if (!isVfxType(entry.type)) {
       throw new Error(
-        `"vfx[${index}]" needs type (location | shake | quote) in ${configPath}`,
+        `"vfx[${index}]" needs type (location | shake | quote | text) in ${configPath}`,
       );
     }
 
@@ -390,6 +395,26 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
         resolveQuoteTemplateStyle(templateId),
       );
       return { id, type: "quote", start, end, templateId, style };
+    }
+
+    if (entry.type === "text") {
+      const rawTemplate = String(entry.templateId ?? "").trim();
+      const templateId = isTextTemplateId(rawTemplate)
+        ? rawTemplate
+        : DEFAULT_TEXT_TEMPLATE_ID;
+      const style = normalizeCaptionStyle(
+        entry.style,
+        resolveTextTemplateStyle(templateId),
+      );
+      return {
+        id,
+        type: "text",
+        start,
+        end,
+        text: String(entry.text ?? ""),
+        templateId,
+        style,
+      };
     }
 
     const src = String(entry.src ?? "").trim();
@@ -505,6 +530,25 @@ function parseMusic(value: unknown, configPath: string): SourceMusic | null {
   return clip;
 }
 
+function ensureDefaultTextVfx(
+  vfx: SourceVfx[],
+  opts: { title: string | null },
+): SourceVfx[] {
+  if (vfx.some((clip) => clip.type === "text")) return vfx;
+
+  const templateId = DEFAULT_TEXT_TEMPLATE_ID;
+  const clip: SourceTextVfx = {
+    id: "text-default",
+    type: "text",
+    start: 0,
+    end: DEFAULT_TEXT_VFX_DURATION_SEC,
+    text: opts.title ?? "",
+    templateId,
+    style: { ...resolveTextTemplateStyle(templateId) },
+  };
+  return [...vfx, clip].sort((a, b) => a.start - b.start);
+}
+
 export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
   const configPath = path.join(episodeDir, "config.yaml");
   const defaults = readYaml(DEFAULT_CONFIG_PATH);
@@ -522,19 +566,12 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     merged.captionStyle,
     defaultEpisodeCaptionStyle(),
   );
-  const titleStyle = normalizeCaptionStyle(
-    merged.titleStyle,
-    defaultEpisodeTitleStyle(),
-  );
+  const vfx = ensureDefaultTextVfx(parseVfx(local.vfx, configPath), { title });
 
   return {
     aroll,
     title,
     captionStyle,
-    titleStyle,
-    titleDurationSec: Number(
-      merged.titleDurationSec ?? DEFAULT_TITLE_DURATION_SEC,
-    ),
     listicle: Boolean(merged.listicle ?? false),
     punchIns: Boolean(merged.punchIns ?? false),
     emphasis: Boolean(merged.emphasis ?? false),
@@ -542,7 +579,7 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     listicleOverlay: parseListicleOverlay(local.listicleOverlay, configPath),
     punchInSegments: parsePunchInSegments(local.punchInSegments, configPath),
     bRolls: parseBRolls(local.bRolls, configPath),
-    vfx: parseVfx(local.vfx, configPath),
+    vfx,
     sfx: parseSfx(local.sfx, configPath),
     music: parseMusic(local.music, configPath),
     defaultBRollSfx: parseDefaultBRollSfx(merged.defaultBRollSfx, configPath),
@@ -560,9 +597,21 @@ export function writeEpisodeConfig(
   writeYaml(configPath, { ...existing, ...patch });
 }
 
-/** Merge `title` into episode config.yaml (creates the file if missing). */
-export function writeEpisodeTitle(episodeDir: string, title: string): void {
-  writeEpisodeConfig(episodeDir, { title });
+/** Write episode title and ensure a default intro text VFX exists. */
+export function writeEpisodeTitle(
+  episodeDir: string,
+  title: string,
+): SourceVfx[] {
+  const configPath = path.join(episodeDir, "config.yaml");
+  const existing = readYaml(configPath);
+  let vfx = ensureDefaultTextVfx(parseVfx(existing.vfx, configPath), { title });
+  vfx = vfx.map((clip) => {
+    if (clip.type !== "text" || clip.start !== 0) return clip;
+    if (clip.text.trim() !== "") return clip;
+    return { ...clip, text: title };
+  });
+  writeEpisodeConfig(episodeDir, { title, vfx });
+  return vfx;
 }
 
 export function listProcessedEpisodes(): string[] {

@@ -145,8 +145,9 @@ export function arollDisplaySrcForCutout(cutoutSrc: string): string {
 /**
  * Visual effect kinds. Expand this union as new effects land.
  * `quote` restyles captions for a range (see quote-templates).
+ * `text` is a free-text overlay for a range (see text/templates).
  */
-export const VFX_TYPES = ["location", "shake", "quote"] as const;
+export const VFX_TYPES = ["location", "shake", "quote", "text"] as const;
 export type VfxType = (typeof VFX_TYPES)[number];
 
 export function isVfxType(value: unknown): value is VfxType {
@@ -195,7 +196,25 @@ export type SourceQuoteVfx = SourceVfxBase & {
   style: CaptionStyle;
 };
 
-export type SourceVfx = SourceLocationVfx | SourceShakeVfx | SourceQuoteVfx;
+/**
+ * On-screen text overlay for a source range.
+ * Owns its own `text`, timing, and look (text templates).
+ */
+export type SourceTextVfx = SourceVfxBase & {
+  type: "text";
+  /** On-screen copy for this clip. */
+  text: string;
+  /** Key into the curated Text template catalog. */
+  templateId: string;
+  /** Full caption style for this instance (copied from template on pick). */
+  style: CaptionStyle;
+};
+
+export type SourceVfx =
+  | SourceLocationVfx
+  | SourceShakeVfx
+  | SourceQuoteVfx
+  | SourceTextVfx;
 
 /**
  * Distribute over `SourceVfx`, keeping members whose declared keys include all of `K`
@@ -283,9 +302,6 @@ export type EpisodeConfig = {
   aroll: string;
   /** Null when omitted — process generates via OpenAI and writes config.yaml. */
   title: string | null;
-  titleDurationSec: number;
-  /** On-screen title look (same shape as captionStyle). */
-  titleStyle: CaptionStyle;
   /**
    * Default on-screen caption look (editable).
    * Quote VFX overrides with a curated template for their range.

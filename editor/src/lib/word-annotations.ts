@@ -98,6 +98,43 @@ function vfxMarkersAt(
     }));
 }
 
+/**
+ * Intro text VFX starts at 0, before speech — pin its marker onto the first caption.
+ */
+function attachIntroTextMarker(
+  captions: FlatCaption[],
+  clips: SourceVfx[],
+  out: Map<number, WordAnnotation>,
+): void {
+  if (captions.length === 0) return;
+  const clip = clips.find((c) => c.type === "text" && c.start === 0);
+  if (!clip) return;
+
+  const target = captions[0]!;
+  const annotation = out.get(target.index) ?? {};
+  const markers = annotation.vfxMarkers ?? [];
+  if (!markers.some((m) => m.id === clip.id)) {
+    markers.push({
+      id: clip.id,
+      type: clip.type,
+      label: vfxClipLabel(clip),
+    });
+    annotation.vfxMarkers = markers;
+  }
+  // Short intro that ends before speech: still show a range chip on word 0.
+  const overlaps = captions.some(
+    (c) => c.start < clip.end && c.end > clip.start,
+  );
+  if (!overlaps) {
+    const ranges = annotation.vfxRanges ?? [];
+    if (!ranges.some((r) => r.id === clip.id)) {
+      ranges.push({ id: clip.id, edge: "both" });
+      annotation.vfxRanges = ranges;
+    }
+  }
+  out.set(target.index, annotation);
+}
+
 function punchInMarkersAt(
   caption: FlatCaption,
   segments: { start: number }[],
@@ -181,6 +218,8 @@ export function buildWordAnnotations(
       out.set(caption.index, annotation);
     }
   }
+
+  attachIntroTextMarker(captions, config.vfx ?? [], out);
 
   return out;
 }

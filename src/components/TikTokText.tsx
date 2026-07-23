@@ -8,9 +8,9 @@ import {
 
 import { FADE_DURATION_SEC } from "../lib/episode/constants";
 import type { CaptionStyle } from "../lib/captions/style";
-import { DEFAULT_TITLE_STYLE } from "../lib/title/templates";
+import { DEFAULT_TEXT_STYLE } from "../lib/text/templates";
 import { CaptionGroupView } from "./captions/CaptionGroupView";
-import { buildTitleCaptionGroup } from "./captions/title-caption-group";
+import { buildTextCaptionGroup } from "./captions/text-caption-group";
 import { SfxOverlay } from "./SfxOverlay";
 
 function fadeOpacity(
@@ -36,27 +36,27 @@ function fadeOpacity(
   );
 }
 
-export const TikTokTitle: React.FC<{
-  title: string;
+export const TikTokText: React.FC<{
+  text: string;
   durationSec: number;
   style?: CaptionStyle;
-}> = ({ title, durationSec, style: styleProp }) => {
+}> = ({ text, durationSec, style: styleProp }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const style = styleProp ?? DEFAULT_TITLE_STYLE;
+  const style = styleProp ?? DEFAULT_TEXT_STYLE;
 
   const durationFrames = Math.round(durationSec * fps);
   const fadeFrames = Math.max(1, Math.round(FADE_DURATION_SEC * fps));
   const group = useMemo(
-    () => buildTitleCaptionGroup(title, style, fps, durationFrames),
-    [title, style, fps, durationFrames],
+    () => buildTextCaptionGroup(text, style, fps, durationFrames),
+    [text, style, fps, durationFrames],
   );
 
   const sfx = (
     <SfxOverlay
       sfx={[
         {
-          id: "title-enter",
+          id: "text-enter",
           src: "sfx/beep-bop/title-enter.wav",
           startFrame: 0,
           endFrame: Math.max(1, Math.ceil(0.35 * fps)),

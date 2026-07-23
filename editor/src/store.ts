@@ -31,12 +31,15 @@ import {
   withVfxTransform,
   withQuoteTemplate,
   withQuoteStyle,
+  withTextTemplate,
+  withTextStyle,
+  withTextContent,
   type VfxPreset,
 } from './lib/vfx';
 import { normalizeCaptionStyle } from '@src/lib/captions/parse-style';
 import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '@src/lib/captions/style';
 import type { QuoteTemplateId } from '@src/lib/captions/quote-templates';
-import { DEFAULT_TITLE_STYLE } from '@src/lib/title/templates';
+import type { TextTemplateId } from '@src/lib/text/templates';
 import {
   musicFromAsset,
   withMusicOffset,
@@ -173,14 +176,19 @@ type EditorActions = {
   updateCaptionStyle: (patch: Partial<CaptionStyle>, live?: boolean) => void;
   /** Replace the episode caption style wholesale (e.g. applying a template). */
   setCaptionStyle: (style: CaptionStyle, live?: boolean) => void;
-  /** Replace the episode title style wholesale (e.g. applying a template). */
-  setTitleStyle: (style: CaptionStyle, live?: boolean) => void;
   updateQuoteTemplate: (id: string, templateId: QuoteTemplateId) => void;
   updateQuoteStyle: (
     id: string,
     patch: Partial<CaptionStyle>,
     live?: boolean,
   ) => void;
+  updateTextTemplate: (id: string, templateId: TextTemplateId) => void;
+  updateTextVfxStyle: (
+    id: string,
+    patch: Partial<CaptionStyle>,
+    live?: boolean,
+  ) => void;
+  updateTextVfxContent: (id: string, text: string, live?: boolean) => void;
   setTitle: (title: string) => void;
   cutInterWordPause: (pause: {
     cutStart: number;
@@ -1166,30 +1174,20 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       );
     },
 
-    setTitleStyle: (style, live = false) => {
-      const { config, transcript } = get();
-      if (!config || !transcript) return;
-      const titleStyle = normalizeCaptionStyle(style, DEFAULT_TITLE_STYLE);
-      commit(
-        {
-          config: {
-            ...config,
-            titleStyle,
-          },
-          transcript,
-        },
-        live,
-      );
-    },
-
     setTitle: (title) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
       const next = title.length === 0 ? null : title;
       if (next === config.title) return;
+      const vfx = (config.vfx ?? []).map((clip) => {
+        if (clip.type === "text" && clip.start === 0) {
+          return withTextContent(clip, next ?? "");
+        }
+        return clip;
+      });
       commit(
         {
-          config: { ...config, title: next },
+          config: { ...config, title: next, vfx },
           transcript,
         },
         true,
@@ -1343,6 +1341,48 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const result = upsertVfx(config.vfx ?? [], next);
       if ("error" in result) return;
       commit({ config: { ...config, vfx: result }, transcript }, live);
+    },
+
+    updateTextTemplate: (id, templateId) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip) return;
+      const next = withTextTemplate(clip, templateId);
+      const result = upsertVfx(config.vfx ?? [], next);
+      if ("error" in result) return;
+      commit({
+        config: { ...config, vfx: result },
+        transcript,
+      });
+    },
+
+    updateTextVfxStyle: (id, patch, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip) return;
+      const next = withTextStyle(clip, patch);
+      const result = upsertVfx(config.vfx ?? [], next);
+      if ("error" in result) return;
+      commit(
+        { config: { ...config, vfx: result }, transcript },
+        live,
+      );
+    },
+
+    updateTextVfxContent: (id, text, live = false) => {
+      const { config, transcript } = get();
+      if (!config || !transcript) return;
+      const clip = (config.vfx ?? []).find((c) => c.id === id);
+      if (!clip) return;
+      const next = withTextContent(clip, text);
+      const result = upsertVfx(config.vfx ?? [], next);
+      if ("error" in result) return;
+      commit(
+        { config: { ...config, vfx: result }, transcript },
+        live,
+      );
     },
 
     updateSfxRange: (id, edge, value, live = false) => {

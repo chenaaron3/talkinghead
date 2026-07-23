@@ -1,8 +1,7 @@
 import type { SourceListicleItem } from "@src/lib/types";
 
-import { useEditor } from "../../store";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
+import { useEditor } from '../../store';
+import { TextField } from './field';
 
 export function ListicleInspector({
   index,
@@ -16,16 +15,12 @@ export function ListicleInspector({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[11px] text-muted">Item {index + 1}</p>
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="listicle-label">Label</Label>
-        <Input
-          id="listicle-label"
-          type="text"
-          value={item.label}
-          onFocus={() => useEditor.getState().beginGesture()}
-          onChange={(e) => updateListicleItemLabel(index, e.target.value, true)}
-        />
-      </div>
+      <TextField
+        id="listicle-label"
+        label="Label"
+        value={item.label}
+        onLiveChange={(label) => updateListicleItemLabel(index, label, true)}
+      />
     </div>
   );
 }

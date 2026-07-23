@@ -527,7 +527,6 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               ...existingYaml,
               aroll: body.config.aroll,
               title: body.config.title,
-              titleStyle: body.config.titleStyle,
               captionStyle: body.config.captionStyle,
               cuts: body.config.cuts,
               listicleOverlay: body.config.listicleOverlay,
@@ -849,7 +848,6 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
                 writeEpisodeConfig(episodeDir, {
                   aroll: body.config.aroll,
                   title: body.config.title,
-                  titleStyle: body.config.titleStyle,
                   captionStyle: body.config.captionStyle,
                   cuts: body.config.cuts,
                   listicleOverlay: body.config.listicleOverlay,

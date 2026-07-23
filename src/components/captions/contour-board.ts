@@ -16,7 +16,7 @@ function parsePercent(value: string): number {
   return Number.parseFloat(value) / 100;
 }
 
-/** Horizontal room titles/captions get inside the safe area. */
+/** Horizontal room text/captions get inside the safe area. */
 export function safeContentWidthPx(): number {
   return (
     COMPOSITION_WIDTH *

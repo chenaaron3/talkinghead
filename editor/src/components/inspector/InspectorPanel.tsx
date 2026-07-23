@@ -1,21 +1,21 @@
 import type { ReactNode } from "react";
-import { X } from 'lucide-react';
+import { X } from "lucide-react";
 
-import { primaryId } from '../../lib/selection';
-import { useEditableBRoll } from '../../lib/use-editable-broll';
-import { vfxTypeLabel } from '../../lib/vfx';
-import { useSelection } from '../../selection-store';
-import { useEditor } from '../../store';
-import { BRollInspector } from './BRollInspector';
-import { CaptionsInspector } from './CaptionsInspector';
-import { ListicleInspector } from './ListicleInspector';
-import { LocationVfxInspector } from './LocationVfxInspector';
-import { MusicInspector } from './MusicInspector';
-import { QuoteVfxInspector } from './QuoteVfxInspector';
-import { SfxInspector } from './SfxInspector';
-import { ShakeVfxInspector } from './ShakeVfxInspector';
-import { TitleInspector } from './TitleInspector';
-import { ZoomInspector } from './ZoomInspector';
+import { primaryId } from "../../lib/selection";
+import { useEditableBRoll } from "../../lib/use-editable-broll";
+import { vfxTypeLabel } from "../../lib/vfx";
+import { useSelection } from "../../selection-store";
+import { useEditor } from "../../store";
+import { BRollInspector } from "./BRollInspector";
+import { CaptionsInspector } from "./CaptionsInspector";
+import { ListicleInspector } from "./ListicleInspector";
+import { LocationVfxInspector } from "./LocationVfxInspector";
+import { MusicInspector } from "./MusicInspector";
+import { QuoteVfxInspector } from "./QuoteVfxInspector";
+import { SfxInspector } from "./SfxInspector";
+import { ShakeVfxInspector } from "./ShakeVfxInspector";
+import { TextVfxInspector } from "./TextVfxInspector";
+import { ZoomInspector } from "./ZoomInspector";
 
 /**
  * Selection inspector column. Always reserves ~25% of the transcript row
@@ -47,6 +47,9 @@ export function InspectorPanel() {
     } else if (clip?.type === "quote") {
       title = vfxTypeLabel(clip.type);
       body = <QuoteVfxInspector clip={clip} />;
+    } else if (clip?.type === "text") {
+      title = vfxTypeLabel(clip.type);
+      body = <TextVfxInspector clip={clip} />;
     }
   } else if (editableBRoll) {
     title = "B-roll";
@@ -88,9 +91,6 @@ export function InspectorPanel() {
   } else if (selection?.kind === "captions") {
     title = "Captions";
     body = <CaptionsInspector />;
-  } else if (selection?.kind === "title") {
-    title = "Title";
-    body = <TitleInspector />;
   }
 
   return (

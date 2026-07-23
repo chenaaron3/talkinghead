@@ -1,7 +1,6 @@
 export type SelectionKind =
   | "caption"
   | "captions"
-  | "title"
   | "broll"
   | "vfx"
   | "sfx"
@@ -15,8 +14,6 @@ export type Selection =
   | { kind: "caption"; ids: number[] }
   /** Episode default caption style panel (opened from toolbar). */
   | { kind: "captions"; ids: number[] }
-  /** Episode title style panel (opened from toolbar title). */
-  | { kind: "title"; ids: number[] }
   | { kind: "broll"; ids: string[] }
   | { kind: "vfx"; ids: string[] }
   | { kind: "sfx"; ids: string[] }

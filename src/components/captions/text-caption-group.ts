@@ -7,13 +7,13 @@ import {
 } from "./caption-animation";
 
 /**
- * Build a caption group for on-screen title rendering via CaptionGroupView.
+ * Build a caption group for on-screen text VFX via CaptionGroupView.
  * - typewriter → per-character words
- * - pop (stamp) → all words visible; enter scale stays in the title wrapper
+ * - pop (stamp) → all words visible; enter scale stays in the text wrapper
  * - otherwise → spaced words, all visible from frame 0
  */
-export function buildTitleCaptionGroup(
-  title: string,
+export function buildTextCaptionGroup(
+  text: string,
   style: CaptionStyle,
   fps: number,
   durationFrames: number,
@@ -22,23 +22,23 @@ export function buildTitleCaptionGroup(
   let words: CaptionWord[];
 
   if (style.animation === "typewriter") {
-    words = typewriterCharWords(title, typewriterTypeFrames(fps, endFrame));
+    words = typewriterCharWords(text, typewriterTypeFrames(fps, endFrame));
   } else {
-    const parts = title
+    const parts = text
       .split(/(\n)/)
       .flatMap((part) =>
         part === "\n"
           ? ["\n"]
           : part.split(/\s+/).filter((t) => t.length > 0),
       );
-    words = parts.map((text) => ({
-      text,
+    words = parts.map((word) => ({
+      text: word,
       startFrame: 0,
       endFrame,
     }));
   }
 
-  // Stamp enter is group-level in TikTokTitle; avoid per-word pop here.
+  // Stamp enter is group-level in TikTokText; avoid per-word pop here.
   const groupStyle: CaptionStyle =
     style.animation === "pop" ? { ...style, animation: "none" } : style;
 

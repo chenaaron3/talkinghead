@@ -1,20 +1,29 @@
-import React, { useMemo } from 'react';
-import { AbsoluteFill, Series, staticFile, useVideoConfig } from 'remotion';
+import React, { useMemo } from "react";
+import {
+  AbsoluteFill,
+  Sequence,
+  Series,
+  staticFile,
+  useVideoConfig,
+} from "remotion";
 
-import { Video } from '@remotion/media';
+import { Video } from "@remotion/media";
 
-import { BRollOverlay } from './components/BRollOverlay';
-import { TikTokCaptions } from './components/captions/TikTokCaptions';
-import { MusicOverlay } from './components/MusicOverlay';
-import { PunchIn } from './components/PunchIn';
-import { SfxOverlay } from './components/SfxOverlay';
-import { TikTokTitle } from './components/TikTokTitle';
-import { ScreenShake, shakesFromVfx, VfxOverlay } from './components/VfxOverlay';
-import { useListicleOverlay } from './hooks/useListicleOverlay';
-import { SAFE_AREA } from './lib/episode/constants';
-import { DEFAULT_TITLE_STYLE } from './lib/title/templates';
+import { BRollOverlay } from "./components/BRollOverlay";
+import { TikTokCaptions } from "./components/captions/TikTokCaptions";
+import { MusicOverlay } from "./components/MusicOverlay";
+import { PunchIn } from "./components/PunchIn";
+import { SfxOverlay } from "./components/SfxOverlay";
+import { TikTokText } from "./components/TikTokText";
+import { ScreenShake, shakesFromVfx, VfxOverlay } from "./components/VfxOverlay";
+import { useListicleOverlay } from "./hooks/useListicleOverlay";
+import { SAFE_AREA } from "./lib/episode/constants";
 
-import type { EpisodeProps, OutputSection } from "./lib/types";
+import type {
+  EpisodeProps,
+  OutputSection,
+  TextVfxClip,
+} from "./lib/types";
 
 const ArollSeries: React.FC<{
   videoSrc: string;
@@ -50,13 +59,10 @@ const ArollSeries: React.FC<{
 };
 
 export const TalkingHead: React.FC<EpisodeProps> = ({
-  title,
   videoSrc,
   cutoutSrc,
   sections,
   captionGroups,
-  titleDurationSec,
-  titleStyle,
   listicle,
   punchIns,
   bRolls,
@@ -64,9 +70,15 @@ export const TalkingHead: React.FC<EpisodeProps> = ({
   sfx,
   music,
 }) => {
-  const { showTitle, node: listicleNode } = useListicleOverlay(listicle);
+  const { fps } = useVideoConfig();
+  const { showText, node: listicleNode } = useListicleOverlay(listicle);
   const shakes = shakesFromVfx(vfx);
   const hasCutout = Boolean(cutoutSrc);
+  const textClips = useMemo(
+    () =>
+      (vfx ?? []).filter((clip): clip is TextVfxClip => clip.type === "text"),
+    [vfx],
+  );
 
   const { behindBRolls, frontBRolls } = useMemo(() => {
     if (!bRolls?.length) {
@@ -100,7 +112,7 @@ export const TalkingHead: React.FC<EpisodeProps> = ({
           ) : null}
         </PunchIn>
 
-        {/* Below title/listicle/captions so chrome stays readable over images */}
+        {/* Below text/listicle/captions so chrome stays readable over images */}
         <BRollOverlay bRolls={frontBRolls} />
         <VfxOverlay vfx={vfx} />
       </ScreenShake>
@@ -119,13 +131,25 @@ export const TalkingHead: React.FC<EpisodeProps> = ({
           pointerEvents: "none",
         }}
       >
-        {showTitle ? (
-          <TikTokTitle
-            title={title}
-            durationSec={titleDurationSec}
-            style={titleStyle ?? DEFAULT_TITLE_STYLE}
-          />
-        ) : null}
+        {textClips.map((clip) => {
+          // Listicle may hide the intro text after MIN_TEXT_SEC.
+          if (clip.startFrame === 0 && !showText) return null;
+          const durationFrames = Math.max(1, clip.endFrame - clip.startFrame);
+          return (
+            <Sequence
+              key={clip.id}
+              from={clip.startFrame}
+              durationInFrames={durationFrames}
+              layout="none"
+            >
+              <TikTokText
+                text={clip.text}
+                durationSec={durationFrames / fps}
+                style={clip.style}
+              />
+            </Sequence>
+          );
+        })}
         {listicleNode}
       </AbsoluteFill>
       <TikTokCaptions groups={captionGroups} />

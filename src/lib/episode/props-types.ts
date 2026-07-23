@@ -92,7 +92,14 @@ export type ShakeVfxClip = VfxClipBase & {
   intensity: number;
 };
 
-export type VfxClip = LocationVfxClip | ShakeVfxClip;
+/** Free-text overlay for the clip range. */
+export type TextVfxClip = VfxClipBase & {
+  type: "text";
+  text: string;
+  style: CaptionStyle;
+};
+
+export type VfxClip = LocationVfxClip | ShakeVfxClip | TextVfxClip;
 
 export type SfxClip = {
   id: string;
@@ -129,9 +136,6 @@ export type EpisodeProps = {
   width: number;
   height: number;
   durationInFrames: number;
-  titleDurationSec: number;
-  /** Omit on older generated props — renderer falls back to stamp default. */
-  titleStyle?: CaptionStyle;
   sections: OutputSection[];
   captionGroups: CaptionGroup[];
   listicle: ListicleOverlay | null;

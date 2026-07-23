@@ -46,8 +46,8 @@ type SelectionActions = {
   selectCaption: (index: number | null, mode?: SelectionMode) => void;
   /** Open the episode Captions style inspector (toolbar). */
   selectCaptionsPanel: () => void;
-  /** Open the episode Title style inspector (toolbar title). */
-  selectTitlePanel: () => void;
+  /** Open the leading text VFX inspector (toolbar title). */
+  selectTextPanel: () => void;
   clearSelection: () => void;
 };
 
@@ -161,14 +161,23 @@ export const useSelection = create<SelectionState & SelectionActions>(
         selection: { kind: "captions", ids: [] },
         ...clearCaptionRangeEnds(),
       }),
-    selectTitlePanel: () => {
+    selectTextPanel: () => {
       const editor = useEditor.getState();
-      // Seek to the title window so the player shows the styled title.
-      if (editor.sourceSec > 0.05) {
-        editor.seekSource(0);
+      const textClip =
+        (editor.config?.vfx ?? []).find(
+          (clip) => clip.type === "text" && clip.start === 0,
+        ) ??
+        (editor.config?.vfx ?? []).find((clip) => clip.type === "text");
+      const seekTo = textClip?.start ?? 0;
+      if (Math.abs(editor.sourceSec - seekTo) > 0.05) {
+        editor.seekSource(seekTo);
+      }
+      if (!textClip) {
+        set({ selection: null, ...clearCaptionRangeEnds() });
+        return;
       }
       set({
-        selection: { kind: "title", ids: [] },
+        selection: { kind: "vfx", ids: [textClip.id] },
         ...clearCaptionRangeEnds(),
       });
     },

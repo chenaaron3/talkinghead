@@ -84,7 +84,7 @@ function captionFocusY(styleY: number): number {
 }
 
 /**
- * Template picker preview — captions, quotes, and titles paint through
+ * Template picker preview — captions, quotes, and text VFX paint through
  * {@link CaptionGroupView} on a scaled composition stage.
  */
 export function CaptionTemplatePreview({

@@ -1,25 +1,32 @@
-import {
-    groupStyledCaptionWords, padLastWordInGroups, prepareRenderCaptions, stripPunctuationForDisplay
-} from '../captions/words';
-import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from './constants';
-import {
-    cutsToKeepSegments, intersectWithKeepRegions, mapSourceSecToOutputFrame,
-    mapSourceSecToOutputSec, validateCuts
-} from '../timeline/source-timeline';
-
-import {
-  DEFAULT_PUNCH_IN_ANIMATE,
-  DEFAULT_PUNCH_IN_WORD_BY_WORD,
-} from "../visual/punchin";
-import { resolveKenBurns } from "../visual/ken-burns";
-import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from "../captions/style";
-import { DEFAULT_TITLE_STYLE } from "../title/templates";
+import { normalizeCaptionStyle } from "../captions/parse-style";
 import {
   DEFAULT_QUOTE_TEMPLATE_ID,
   isQuoteTemplateId,
   resolveQuoteTemplateStyle,
 } from "../captions/quote-templates";
-import { normalizeCaptionStyle } from "../captions/parse-style";
+import { CaptionStyle, DEFAULT_CAPTION_STYLE, type } from "../captions/style";
+import {
+  groupStyledCaptionWords,
+  padLastWordInGroups,
+  prepareRenderCaptions,
+  stripPunctuationForDisplay,
+} from "../captions/words";
+import {
+  cutsToKeepSegments,
+  intersectWithKeepRegions,
+  mapSourceSecToOutputFrame,
+  mapSourceSecToOutputSec,
+  validateCuts,
+} from "../timeline/source-timeline";
+import { DEFAULT_TITLE_STYLE } from "../title/templates";
+import { resolveKenBurns } from "../visual/ken-burns";
+import {
+  DEFAULT_PUNCH_IN_ANIMATE,
+  DEFAULT_PUNCH_IN_WORD_BY_WORD,
+} from "../visual/punchin";
+import { arollBgSrcForCutout, DEFAULT_SHAKE_INTENSITY } from "./config-types";
+import { COMPOSITION_HEIGHT, COMPOSITION_WIDTH } from "./constants";
+
 import type {
   BRollClip,
   VfxClip,
@@ -41,8 +48,6 @@ import type {
   SfxClip,
   MusicClip,
 } from "../types";
-import { DEFAULT_SHAKE_INTENSITY, arollBgSrcForCutout } from "./config-types";
-
 function secToFrames(sec: number, fps: number): number {
   return Math.max(0, Math.round(sec * fps));
 }
@@ -250,8 +255,7 @@ function buildPunchIns(
       durationSec,
     );
     if (!frames) continue;
-    const wordByWord =
-      punchIn.wordByWord ?? DEFAULT_PUNCH_IN_WORD_BY_WORD;
+    const wordByWord = punchIn.wordByWord ?? DEFAULT_PUNCH_IN_WORD_BY_WORD;
     const animate = punchIn.animate ?? DEFAULT_PUNCH_IN_ANIMATE;
     const built: PunchInSegment = {
       startFrame: frames.startFrame,

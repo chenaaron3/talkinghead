@@ -1,8 +1,9 @@
 import "dotenv/config";
+
 import fs from "node:fs";
 import path from "node:path";
+
 import { buildProps } from "../src/lib/episode/build-props";
-import type { SerializedWaveform } from "../src/lib/audio/waveform";
 import {
   findSourceVideo,
   loadEpisodeConfig,
@@ -12,7 +13,6 @@ import {
 } from "./helpers/config";
 import { buildCutsFromWords } from "./helpers/cuts";
 import { rebuildAllPropsIndex } from "./helpers/props-index";
-import type { EpisodeProps, Transcript } from "./helpers/types";
 import { PUBLIC_EPISODES_DIR, ROOT } from "./helpers/types";
 import { buildWaveform, waveformCacheValid } from "./helpers/waveform";
 import { probeVideoFps, runWhisper } from "./helpers/whisper";
@@ -23,6 +23,8 @@ import { buildPunchInSegments } from "./modules/punchin";
 import { buildTitle } from "./modules/title";
 import { renderEpisode } from "./render-episode";
 
+import type { SerializedWaveform } from "../src/lib/audio/waveform";
+import type { EpisodeProps, Transcript } from "./helpers/types";
 function parseArgs(argv: string[]) {
   const force = argv.includes("--force");
   const cutout = argv.includes("--cutout");
@@ -75,7 +77,9 @@ function linkVideo(videoPath: string, episodeId: string): string {
   return `episodes/${episodeId}/${destName}`;
 }
 
-export async function runProcess(argv: string[]): Promise<{ episodeId: string }> {
+export async function runProcess(
+  argv: string[],
+): Promise<{ episodeId: string }> {
   const { input, force, cutout, noRender } = parseArgs(argv);
   const { episodeId, episodeDir } = resolveEpisodeDir(input);
   let config = loadEpisodeConfig(episodeDir);

@@ -4,12 +4,12 @@ import { AbsoluteFill, Series, staticFile, useVideoConfig } from 'remotion';
 import { Video } from '@remotion/media';
 
 import { BRollOverlay } from './components/BRollOverlay';
+import { TikTokCaptions } from './components/captions/TikTokCaptions';
 import { MusicOverlay } from './components/MusicOverlay';
 import { PunchIn } from './components/PunchIn';
 import { SfxOverlay } from './components/SfxOverlay';
-import { TikTokCaptions } from './components/captions/TikTokCaptions';
 import { TikTokTitle } from './components/TikTokTitle';
-import { ScreenShake, VfxOverlay, shakesFromVfx } from './components/VfxOverlay';
+import { ScreenShake, shakesFromVfx, VfxOverlay } from './components/VfxOverlay';
 import { useListicleOverlay } from './hooks/useListicleOverlay';
 import { SAFE_AREA } from './lib/episode/constants';
 import { DEFAULT_TITLE_STYLE } from './lib/title/templates';

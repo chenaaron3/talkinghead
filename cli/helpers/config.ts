@@ -1,36 +1,36 @@
 import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
-import {
-  DEFAULT_TITLE_DURATION_SEC,
-} from "./constants";
-import {
-  DEFAULT_CONFIG_PATH,
-  type EpisodeConfig,
-  type SourceBRoll,
-  type SourceCutout,
-  type SourceListicle,
-  type SourceMusic,
-  type SourcePunchIn,
-  type SourceSfx,
-  type SourceVfx,
-  type SourceCut,
-  SOURCE_DIR,
-} from "./types";
-import { isVideoSrc } from "../../src/lib/episode/media";
-import {
-  DEFAULT_BROLL_ENTRANCE_SFX,
-  isVfxType,
-} from "../../src/lib/episode/config-types";
-import { DEFAULT_PUNCH_IN_SCALE } from "../../src/lib/visual/punchin";
+
 import { normalizeCaptionStyle } from "../../src/lib/captions/parse-style";
-import { defaultEpisodeCaptionStyle } from "../../src/lib/captions/templates";
-import { defaultEpisodeTitleStyle } from "../../src/lib/title/templates";
 import {
   DEFAULT_QUOTE_TEMPLATE_ID,
   isQuoteTemplateId,
   resolveQuoteTemplateStyle,
 } from "../../src/lib/captions/quote-templates";
+import { defaultEpisodeCaptionStyle } from "../../src/lib/captions/templates";
+import {
+  DEFAULT_BROLL_ENTRANCE_SFX,
+  isVfxType,
+} from "../../src/lib/episode/config-types";
+import { isVideoSrc } from "../../src/lib/episode/media";
+import { defaultEpisodeTitleStyle } from "../../src/lib/title/templates";
+import { DEFAULT_PUNCH_IN_SCALE } from "../../src/lib/visual/punchin";
+import { DEFAULT_TITLE_DURATION_SEC } from "./constants";
+import {
+  DEFAULT_CONFIG_PATH,
+  EpisodeConfig,
+  SOURCE_DIR,
+  SourceBRoll,
+  SourceCut,
+  SourceCutout,
+  SourceListicle,
+  SourceMusic,
+  SourcePunchIn,
+  SourceSfx,
+  SourceVfx,
+  type,
+} from "./types";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -196,9 +196,7 @@ function parsePunchInSegments(
       ...(typeof entry.wordByWord === "boolean"
         ? { wordByWord: entry.wordByWord }
         : {}),
-      ...(typeof entry.animate === "boolean"
-        ? { animate: entry.animate }
-        : {}),
+      ...(typeof entry.animate === "boolean" ? { animate: entry.animate } : {}),
     };
     if (entry.originX != null && Number.isFinite(originX)) {
       punchIn.originX = Math.min(1, Math.max(0, originX));
@@ -267,8 +265,10 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
     }
 
     if (entry.scale != null && Number.isFinite(scale)) clip.scale = scale;
-    if (entry.offsetX != null && Number.isFinite(offsetX)) clip.offsetX = offsetX;
-    if (entry.offsetY != null && Number.isFinite(offsetY)) clip.offsetY = offsetY;
+    if (entry.offsetX != null && Number.isFinite(offsetX))
+      clip.offsetX = offsetX;
+    if (entry.offsetY != null && Number.isFinite(offsetY))
+      clip.offsetY = offsetY;
     if (entry.rotation != null && Number.isFinite(rotation)) {
       clip.rotation = rotation;
     }
@@ -292,10 +292,7 @@ function parseBRolls(value: unknown, configPath: string): SourceBRoll[] {
   });
 }
 
-function parseCutout(
-  value: unknown,
-  configPath: string,
-): SourceCutout | null {
+function parseCutout(value: unknown, configPath: string): SourceCutout | null {
   if (value == null) return null;
   if (!isPlainObject(value)) {
     throw new Error(`"cutout" must be an object or null in ${configPath}`);
@@ -324,9 +321,7 @@ function parseCutout(
   const size = Number(sourceRaw.size);
   const mtimeMs = Number(sourceRaw.mtimeMs);
   if (!Number.isFinite(size) || size < 0 || !Number.isFinite(mtimeMs)) {
-    throw new Error(
-      `"cutout.source" needs size and mtimeMs in ${configPath}`,
-    );
+    throw new Error(`"cutout.source" needs size and mtimeMs in ${configPath}`);
   }
   return {
     src,
@@ -365,9 +360,7 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
     const start = Number(entry.start);
     const end = Number(entry.end);
     if (!id || !Number.isFinite(start) || !Number.isFinite(end)) {
-      throw new Error(
-        `"vfx[${index}]" needs id, start, end in ${configPath}`,
-      );
+      throw new Error(`"vfx[${index}]" needs id, start, end in ${configPath}`);
     }
     if (!isVfxType(entry.type)) {
       throw new Error(
@@ -378,7 +371,11 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
     if (entry.type === "shake") {
       const clip: SourceVfx = { id, type: "shake", start, end };
       const intensity = Number(entry.intensity);
-      if (entry.intensity != null && Number.isFinite(intensity) && intensity > 0) {
+      if (
+        entry.intensity != null &&
+        Number.isFinite(intensity) &&
+        intensity > 0
+      ) {
         clip.intensity = intensity;
       }
       return clip;
@@ -427,8 +424,10 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
       clip.height = height;
     }
     if (entry.scale != null && Number.isFinite(scale)) clip.scale = scale;
-    if (entry.offsetX != null && Number.isFinite(offsetX)) clip.offsetX = offsetX;
-    if (entry.offsetY != null && Number.isFinite(offsetY)) clip.offsetY = offsetY;
+    if (entry.offsetX != null && Number.isFinite(offsetX))
+      clip.offsetX = offsetX;
+    if (entry.offsetY != null && Number.isFinite(offsetY))
+      clip.offsetY = offsetY;
     if (entry.rotation != null && Number.isFinite(rotation)) {
       clip.rotation = rotation;
     }
@@ -473,10 +472,7 @@ function parseSfx(value: unknown, configPath: string): SourceSfx[] {
   });
 }
 
-function parseMusic(
-  value: unknown,
-  configPath: string,
-): SourceMusic | null {
+function parseMusic(value: unknown, configPath: string): SourceMusic | null {
   if (value == null) return null;
   if (!isPlainObject(value)) {
     throw new Error(`"music" must be an object or null in ${configPath}`);

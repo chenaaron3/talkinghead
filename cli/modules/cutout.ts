@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+
 import { fal } from "@fal-ai/client";
 
 import {
@@ -14,6 +15,7 @@ import {
   arollDisplaySrcForCutout,
 } from "../../src/lib/episode/config-types";
 import { PUBLIC_EPISODES_DIR, ROOT } from "../helpers/types";
+
 import type { SourceCutout } from "../helpers/types";
 
 const BRIA_MODEL = "bria/video/background-removal/v3";
@@ -197,11 +199,9 @@ export async function bakeCutout(options: {
 
     console.log(`[cutout] uploading ${path.basename(uploadPath)} to fal…`);
     const bytes = fs.readFileSync(uploadPath);
-    const file = new File(
-      [new Uint8Array(bytes)],
-      path.basename(uploadPath),
-      { type: mimeForExt(path.extname(uploadPath)) },
-    );
+    const file = new File([new Uint8Array(bytes)], path.basename(uploadPath), {
+      type: mimeForExt(path.extname(uploadPath)),
+    });
 
     let videoUrl: string;
     try {

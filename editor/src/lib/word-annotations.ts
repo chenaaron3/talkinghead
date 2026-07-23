@@ -1,4 +1,5 @@
 import type { EpisodeConfig, SourceVfx, VfxType } from "@src/lib/types";
+import { findIntroTextVfx } from "@src/lib/episode/text-vfx";
 import type { FlatCaption } from "./captions";
 import { vfxClipLabel } from "./vfx";
 
@@ -99,7 +100,7 @@ function vfxMarkersAt(
 }
 
 /**
- * Intro text VFX starts at 0, before speech — pin its marker onto the first caption.
+ * Intro text VFX starts before speech — pin its marker onto the first caption.
  */
 function attachIntroTextMarker(
   captions: FlatCaption[],
@@ -107,7 +108,7 @@ function attachIntroTextMarker(
   out: Map<number, WordAnnotation>,
 ): void {
   if (captions.length === 0) return;
-  const clip = clips.find((c) => c.type === "text" && c.start === 0);
+  const clip = findIntroTextVfx(clips, captions[0]!.start);
   if (!clip) return;
 
   const target = captions[0]!;

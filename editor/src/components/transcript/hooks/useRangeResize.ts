@@ -13,6 +13,7 @@ import { snapTranscriptCaptionEdge } from "../../../lib/snap";
 import {
   EMPTY_BROLLS,
   EMPTY_CAPTIONS,
+  EMPTY_CUTS,
   EMPTY_PUNCH_INS,
   EMPTY_SFX,
   EMPTY_VFX,
@@ -88,7 +89,7 @@ export function useRangeResize() {
   const sfx = useEditor((s) => s.config?.sfx ?? EMPTY_SFX);
   const punchIns = useEditor((s) => s.config?.punchInSegments ?? EMPTY_PUNCH_INS);
   const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
-  const cuts = useEditor((s) => s.config?.cuts ?? []);
+  const cuts = useEditor((s) => s.config?.cuts ?? EMPTY_CUTS);
   const duration = useEditor((s) => s.transcript?.duration ?? 0);
   const keeps = useMemo(
     () => cutsToKeepRegions(cuts, duration),

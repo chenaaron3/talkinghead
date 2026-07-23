@@ -40,6 +40,7 @@ import { normalizeCaptionStyle } from '@src/lib/captions/parse-style';
 import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '@src/lib/captions/style';
 import type { QuoteTemplateId } from '@src/lib/captions/quote-templates';
 import type { TextTemplateId } from '@src/lib/text/templates';
+import { findIntroTextVfx } from '@src/lib/episode/text-vfx';
 import {
   musicFromAsset,
   withMusicOffset,
@@ -1179,8 +1180,10 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       if (!config || !transcript) return;
       const next = title.length === 0 ? null : title;
       if (next === config.title) return;
+      const firstWordStart = transcript.captions[0]?.start ?? Number.POSITIVE_INFINITY;
+      const intro = findIntroTextVfx(config.vfx ?? [], firstWordStart);
       const vfx = (config.vfx ?? []).map((clip) => {
-        if (clip.type === "text" && clip.start === 0) {
+        if (intro && clip.id === intro.id) {
           return withTextContent(clip, next ?? "");
         }
         return clip;

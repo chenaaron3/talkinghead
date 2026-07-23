@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { findIntroTextVfx } from "@src/lib/episode/text-vfx";
 import {
   applySelection,
   clearKind,
@@ -163,10 +164,10 @@ export const useSelection = create<SelectionState & SelectionActions>(
       }),
     selectTextPanel: () => {
       const editor = useEditor.getState();
+      const firstWordStart =
+        editor.transcript?.captions[0]?.start ?? Number.POSITIVE_INFINITY;
       const textClip =
-        (editor.config?.vfx ?? []).find(
-          (clip) => clip.type === "text" && clip.start === 0,
-        ) ??
+        findIntroTextVfx(editor.config?.vfx ?? [], firstWordStart) ??
         (editor.config?.vfx ?? []).find((clip) => clip.type === "text");
       const seekTo = textClip?.start ?? 0;
       if (Math.abs(editor.sourceSec - seekTo) > 0.05) {

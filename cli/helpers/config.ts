@@ -14,6 +14,7 @@ import {
   isVfxType,
 } from "../../src/lib/episode/config-types";
 import { isVideoSrc } from "../../src/lib/episode/media";
+import { findIntroTextVfx } from "../../src/lib/episode/text-vfx";
 import {
   DEFAULT_TEXT_TEMPLATE_ID,
   isTextTemplateId,
@@ -605,11 +606,12 @@ export function writeEpisodeTitle(
   const configPath = path.join(episodeDir, "config.yaml");
   const existing = readYaml(configPath);
   let vfx = ensureDefaultTextVfx(parseVfx(existing.vfx, configPath), { title });
-  vfx = vfx.map((clip) => {
-    if (clip.type !== "text" || clip.start !== 0) return clip;
-    if (clip.text.trim() !== "") return clip;
-    return { ...clip, text: title };
-  });
+  const intro = findIntroTextVfx(vfx, Number.POSITIVE_INFINITY);
+  if (intro && intro.text.trim() === "") {
+    vfx = vfx.map((clip) =>
+      clip.id === intro.id ? { ...clip, text: title } : clip,
+    );
+  }
   writeEpisodeConfig(episodeDir, { title, vfx });
   return vfx;
 }

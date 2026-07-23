@@ -14,14 +14,20 @@ export type EditableBRoll = {
 
 /** Selected b-roll that is currently visible under the playhead. */
 export function useEditableBRoll(): EditableBRoll | null {
-  const selection = useSelection((s) => s.selection);
-  const sourceSec = useEditor((s) => s.sourceSec);
-  const bRolls = useEditor((s) => s.config?.bRolls);
+  // Derived selectors keep this from re-rendering on every playback frame:
+  // `sourceSec` changes per frame, but the boolean it feeds rarely does.
+  const id = useSelection((s) =>
+    s.selection?.kind === "broll" && typeof s.selection.ids[0] === "string"
+      ? s.selection.ids[0]
+      : null,
+  );
+  const clip = useEditor((s) =>
+    id != null ? (s.config?.bRolls.find((c) => c.id === id) ?? null) : null,
+  );
+  const active = useEditor(
+    (s) => clip != null && isBRollActiveAt(clip, s.sourceSec),
+  );
 
-  if (selection?.kind !== "broll") return null;
-  const id = selection.ids[0];
-  if (typeof id !== "string") return null;
-  const clip = bRolls?.find((c) => c.id === id);
-  if (!clip || !isBRollActiveAt(clip, sourceSec)) return null;
+  if (!clip || !active) return null;
   return { clip, transform: resolveTransform(clip) };
 }

@@ -14,15 +14,21 @@ export type EditablePunchIn = {
 
 /** Selected punch-in that is currently active under the playhead. */
 export function useEditablePunchIn(): EditablePunchIn | null {
-  const selection = useSelection((s) => s.selection);
-  const sourceSec = useEditor((s) => s.sourceSec);
-  const punchIns = useEditor((s) => s.config?.punchInSegments);
+  // Derived selectors keep this from re-rendering on every playback frame:
+  // `sourceSec` changes per frame, but the boolean it feeds rarely does.
+  const index = useSelection((s) =>
+    s.selection?.kind === "punchIn" && typeof s.selection.ids[0] === "number"
+      ? s.selection.ids[0]
+      : null,
+  );
+  const punchIn = useEditor((s) =>
+    index != null ? (s.config?.punchInSegments[index] ?? null) : null,
+  );
+  const active = useEditor(
+    (s) => punchIn != null && isPunchInActiveAt(punchIn, s.sourceSec),
+  );
 
-  if (selection?.kind !== "punchIn") return null;
-  const index = selection.ids[0];
-  if (typeof index !== "number") return null;
-  const punchIn = punchIns?.[index];
-  if (!punchIn || !isPunchInActiveAt(punchIn, sourceSec)) return null;
+  if (index == null || !punchIn || !active) return null;
   return {
     index,
     punchIn,

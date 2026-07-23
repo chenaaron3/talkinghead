@@ -12,6 +12,7 @@ import {
   writeEpisodeTitle,
 } from "./helpers/config";
 import { buildCutsFromWords } from "./helpers/cuts";
+import { ensurePreviewProxy } from "./helpers/preview-proxy";
 import { rebuildAllPropsIndex } from "./helpers/props-index";
 import { PUBLIC_EPISODES_DIR, ROOT } from "./helpers/types";
 import { buildWaveform, waveformCacheValid } from "./helpers/waveform";
@@ -227,6 +228,7 @@ export async function runProcess(
   }
 
   const videoSrc = linkVideo(videoPath, episodeId);
+  ensurePreviewProxy(episodeId, videoPath);
 
   if (cutout) {
     const baked = await bakeCutout({

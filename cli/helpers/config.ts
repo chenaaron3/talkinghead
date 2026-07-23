@@ -29,7 +29,6 @@ import {
   SourcePunchIn,
   SourceSfx,
   SourceVfx,
-  type,
 } from "./types";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

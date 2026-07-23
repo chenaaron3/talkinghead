@@ -10,9 +10,19 @@ import { TransformOverlay } from './player/TransformOverlay';
 import { PunchInOriginOverlay } from './player/PunchInOriginOverlay';
 
 import type { PlayerRef } from '@remotion/player';
+
+/** Isolates the per-frame `frame` subscription away from the Player tree. */
+function FrameCounter({ durationInFrames }: { durationInFrames: number }) {
+  const frame = useEditor((s) => s.frame);
+  return (
+    <div className="shrink-0 border-t border-border px-2 py-1 text-center text-xs text-muted">
+      f{frame} / {durationInFrames}
+    </div>
+  );
+}
+
 export function PlayerPanel() {
   const props = useEditor((s) => s.props);
-  const frame = useEditor((s) => s.frame);
   const seekOutput = useEditor((s) => s.seekOutput);
   const syncActiveCaption = useEditor((s) => s.syncActiveCaption);
 
@@ -56,32 +66,38 @@ export function PlayerPanel() {
     };
   }, [seekOutput, syncActiveCaption]);
 
+  // Store → player sync via subscription (not a React render dependency),
+  // so the Player and overlays don't re-render on every playback frame.
   useLayoutEffect(() => {
-    const player = ref.current;
-    if (!player) return;
-    if (isTimelineScrubbing()) {
+    return useEditor.subscribe((state, prev) => {
+      if (state.frame === prev.frame) return;
+      const player = ref.current;
+      if (!player) return;
+      const frame = state.frame;
+      if (isTimelineScrubbing()) {
+        seekTargetRef.current = frame;
+        player.seekTo(frame);
+        return;
+      }
+      const current = player.getCurrentFrame();
+      if (Math.abs(current - frame) <= 1) {
+        seekTargetRef.current = null;
+        return;
+      }
+      // Playback lag: player advanced a few frames past a stale store frame
+      // (slow React sync). Don't pause/seek — that was causing random stalls.
+      // Larger gaps are intentional seeks (e.g. click timeline while playing).
+      const lag = current - frame;
+      if (player.isPlaying() && lag > 0 && lag <= 8) {
+        return;
+      }
       seekTargetRef.current = frame;
+      if (player.isPlaying()) {
+        player.pause();
+      }
       player.seekTo(frame);
-      return;
-    }
-    const current = player.getCurrentFrame();
-    if (Math.abs(current - frame) <= 1) {
-      seekTargetRef.current = null;
-      return;
-    }
-    // Playback lag: player advanced a few frames past a stale store frame
-    // (slow React sync). Don't pause/seek — that was causing random stalls.
-    // Larger gaps are intentional seeks (e.g. click timeline while playing).
-    const lag = current - frame;
-    if (player.isPlaying() && lag > 0 && lag <= 8) {
-      return;
-    }
-    seekTargetRef.current = frame;
-    if (player.isPlaying()) {
-      player.pause();
-    }
-    player.seekTo(frame);
-  }, [frame]);
+    });
+  }, []);
 
   if (!props) return null;
 
@@ -112,9 +128,7 @@ export function PlayerPanel() {
           <PunchInOriginOverlay onDraggingChange={onOverlayDragging} />
         </div>
       </div>
-      <div className="shrink-0 border-t border-border px-2 py-1 text-center text-xs text-muted">
-        f{frame} / {props.durationInFrames}
-      </div>
+      <FrameCounter durationInFrames={props.durationInFrames} />
     </div>
   );
 }

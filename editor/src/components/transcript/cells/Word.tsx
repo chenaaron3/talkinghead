@@ -1,5 +1,6 @@
 import type { MouseEvent } from "react";
 import { useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import {
   handlesForSelectedRange,
@@ -50,8 +51,52 @@ export function Word({
   captionIndices,
   onCaptionDragStart,
 }: Props) {
-  const sourceSec = useEditor((s) => s.sourceSec);
-  const selection = useSelection((s) => s.selection);
+  // Perf: this component renders once per transcript word, and the stores
+  // update every frame during playback. Subscribe to derived primitives only,
+  // so a word re-renders when *its* state changes — never on every frame.
+  const active = useEditor(
+    (s) => s.sourceSec >= caption.start && s.sourceSec < caption.end,
+  );
+  const styleRange = useSelection(
+    useShallow((s) => resolveStyleRange(annotation, s.selection)),
+  );
+  const selectedRange = useSelection(
+    useShallow((s) => resolveSelectedRange(annotation, s.selection)),
+  );
+  const captionSelected = useSelection((s) =>
+    isSelected(s.selection, "caption", caption.index),
+  );
+  const listicleSelected = useSelection(
+    (s) =>
+      annotation.listicleItemIndex != null &&
+      isSelected(s.selection, "listicleItem", annotation.listicleItemIndex),
+  );
+  const bRollSelected = useSelection(
+    useShallow((s) =>
+      (annotation.bRollMarkers ?? []).map((m) =>
+        isSelected(s.selection, "broll", m.id),
+      ),
+    ),
+  );
+  const vfxSelected = useSelection(
+    useShallow((s) =>
+      (annotation.vfxMarkers ?? []).map((m) =>
+        isSelected(s.selection, "vfx", m.id),
+      ),
+    ),
+  );
+  const punchInSelected = useSelection(
+    useShallow((s) =>
+      (annotation.punchInMarkers ?? []).map((m) =>
+        isSelected(s.selection, "punchIn", m.index),
+      ),
+    ),
+  );
+  const sfxSelected = useSelection(
+    useShallow((s) =>
+      (annotation.sfx ?? []).map((m) => isSelected(s.selection, "sfx", m.id)),
+    ),
+  );
   const seekSource = useEditor((s) => s.seekSource);
   const selectCaption = useSelection((s) => s.selectCaption);
   const selectCaptionExtend = useSelection((s) => s.selectCaptionExtend);
@@ -71,14 +116,10 @@ export function Word({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(caption.text);
 
-  const active = sourceSec >= caption.start && sourceSec < caption.end;
-  const styleRange = resolveStyleRange(annotation, selection);
-  const selectedRange = resolveSelectedRange(annotation, selection);
   const { start: startHandle, end: endHandle } = handlesForSelectedRange(
     selectedRange,
     onStartRangeResize,
   );
-  const captionSelected = isSelected(selection, "caption", caption.index);
 
   if (editing) {
     return (
@@ -112,11 +153,7 @@ export function Word({
           label={
             annotation.listicleLabel ?? `Item ${annotation.listicleNumber}`
           }
-          selected={isSelected(
-            selection,
-            "listicleItem",
-            annotation.listicleItemIndex!,
-          )}
+          selected={listicleSelected}
           dragging={
             draggingStart?.kind === "listicle" &&
             draggingStart.id === annotation.listicleItemIndex
@@ -124,12 +161,12 @@ export function Word({
           onMouseDown={(e) => onStartListicleDrag?.(e)}
         />
       ) : null}
-      {annotation.bRollMarkers?.map((marker) => (
+      {annotation.bRollMarkers?.map((marker, i) => (
         <BRollBadge
           key={marker.id}
           src={marker.src}
           label={marker.src.split("/").pop() ?? marker.src}
-          selected={isSelected(selection, "broll", marker.id)}
+          selected={bRollSelected[i] ?? false}
           dragging={
             draggingStart?.kind === "broll" && draggingStart.id === marker.id
           }
@@ -138,12 +175,12 @@ export function Word({
           }
         />
       ))}
-      {annotation.vfxMarkers?.map((marker) => (
+      {annotation.vfxMarkers?.map((marker, i) => (
         <VfxBadge
           key={marker.id}
           label={marker.label}
           kind={marker.type}
-          selected={isSelected(selection, "vfx", marker.id)}
+          selected={vfxSelected[i] ?? false}
           dragging={
             draggingStart?.kind === "vfx" && draggingStart.id === marker.id
           }
@@ -152,10 +189,10 @@ export function Word({
           }
         />
       ))}
-      {annotation.punchInMarkers?.map((marker) => (
+      {annotation.punchInMarkers?.map((marker, i) => (
         <PunchInBadge
           key={`zoom-${marker.index}`}
-          selected={isSelected(selection, "punchIn", marker.index)}
+          selected={punchInSelected[i] ?? false}
           dragging={
             draggingStart?.kind === "zoom" &&
             draggingStart.id === marker.index
@@ -165,11 +202,11 @@ export function Word({
           }
         />
       ))}
-      {annotation.sfx?.map((marker) => (
+      {annotation.sfx?.map((marker, i) => (
         <SfxBadge
           key={marker.id}
           label={marker.label}
-          selected={isSelected(selection, "sfx", marker.id)}
+          selected={sfxSelected[i] ?? false}
           dragging={
             draggingStart?.kind === "sfx" && draggingStart.id === marker.id
           }

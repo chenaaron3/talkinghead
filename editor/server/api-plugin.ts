@@ -5,6 +5,7 @@ import YAML from 'yaml';
 
 import { findSourceVideo, loadEpisodeConfig, writeEpisodeConfig } from '../../cli/helpers/config';
 import { createEpisodeWithVideo } from '../../cli/helpers/episode-id';
+import { ensurePreviewProxy } from '../../cli/helpers/preview-proxy';
 import { rebuildAllPropsIndex } from '../../cli/helpers/props-index';
 import {
     AUDIO_EXTENSIONS, HEIC_EXTENSIONS, IMAGE_EXTENSIONS, PUBLIC_MUSIC_DIR, PUBLIC_SFX_DIR, ROOT,
@@ -378,12 +379,30 @@ function loadEpisodeData(episodeId: string) {
     transcript,
   });
 
+  // Editor playback uses a decode-friendly H.264 proxy; props.json written to
+  // disk (and used by renders) keeps the original video. Cutout episodes
+  // already play a baked plate, so they are left alone.
+  let editorProps = props;
+  if (!props.cutoutSrc) {
+    try {
+      const previewSrc = ensurePreviewProxy(episodeId, videoPath);
+      if (previewSrc) {
+        editorProps = { ...props, videoSrc: previewSrc };
+      }
+    } catch (err) {
+      console.error(
+        `[preview] proxy unavailable for ${episodeId}:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
   const waveformPath = path.join(episodeDir, "generated", "waveform.json");
   const waveform = fs.existsSync(waveformPath)
     ? (JSON.parse(fs.readFileSync(waveformPath, "utf8")) as SerializedWaveform)
     : null;
 
-  return { episodeDir, config, transcript, props, probe, waveform };
+  return { episodeDir, config, transcript, props, editorProps, probe, waveform };
 }
 
 function ensureBRollAssets(bRolls: EpisodeConfig["bRolls"]) {
@@ -445,14 +464,14 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
 
           if (req.method === "GET" && pathname === "/api/episode") {
             const episodeId = requireEpisodeId(req, url, defaultEpisodeId);
-            const { config, transcript, props, waveform } =
+            const { config, transcript, editorProps, waveform } =
               loadEpisodeData(episodeId);
             const schedule = getEpisodeScheduleInfo(episodeId);
             return sendJson(res, 200, {
               episodeId,
               config,
               transcript,
-              props,
+              props: editorProps,
               waveform,
               schedule,
             });
@@ -528,11 +547,11 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
             );
             writeJson(transcriptPath, body.transcript);
 
-            const { props } = loadEpisodeData(episodeId);
+            const { props, editorProps } = loadEpisodeData(episodeId);
             writeJson(path.join(episodeDir, "generated", "props.json"), props);
             rebuildAllPropsIndex(props);
 
-            return sendJson(res, 200, { ok: true, props });
+            return sendJson(res, 200, { ok: true, props: editorProps });
           }
 
           if (req.method === "POST" && pathname === "/api/ensure-broll") {

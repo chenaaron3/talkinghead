@@ -4,7 +4,7 @@ import {
   isQuoteTemplateId,
   resolveQuoteTemplateStyle,
 } from "../captions/quote-templates";
-import { CaptionStyle, DEFAULT_CAPTION_STYLE, type } from "../captions/style";
+import { CaptionStyle, DEFAULT_CAPTION_STYLE } from "../captions/style";
 import {
   groupStyledCaptionWords,
   padLastWordInGroups,

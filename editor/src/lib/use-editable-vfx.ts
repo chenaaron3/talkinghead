@@ -18,20 +18,21 @@ export type EditableVfx = {
 
 /** Selected transformable VFX with baked media, visible under the playhead. */
 export function useEditableVfx(): EditableVfx | null {
-  const selection = useSelection((s) => s.selection);
-  const sourceSec = useEditor((s) => s.sourceSec);
-  const vfx = useEditor((s) => s.config?.vfx);
+  // Derived selectors keep this from re-rendering on every playback frame:
+  // `sourceSec` changes per frame, but the boolean it feeds rarely does.
+  const id = useSelection((s) =>
+    s.selection?.kind === "vfx" && typeof s.selection.ids[0] === "string"
+      ? s.selection.ids[0]
+      : null,
+  );
+  const clip = useEditor((s) =>
+    id != null ? (s.config?.vfx?.find((c) => c.id === id) ?? null) : null,
+  );
+  const active = useEditor(
+    (s) => clip != null && isVfxActiveAt(clip, s.sourceSec),
+  );
 
-  if (selection?.kind !== "vfx") return null;
-  const id = selection.ids[0];
-  if (typeof id !== "string") return null;
-  const clip = vfx?.find((c) => c.id === id);
-  if (
-    !clip ||
-    !vfxHasMedia(clip) ||
-    !vfxSupportsTransform(clip) ||
-    !isVfxActiveAt(clip, sourceSec)
-  ) {
+  if (!clip || !active || !vfxHasMedia(clip) || !vfxSupportsTransform(clip)) {
     return null;
   }
   return {

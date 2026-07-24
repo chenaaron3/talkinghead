@@ -82,6 +82,18 @@ export function normalizeCaptionStyle(
     stroke = fallback.stroke;
   }
 
+  let textShadow: string | null;
+  if ("textShadow" in src) {
+    const raw = src.textShadow;
+    if (raw == null || raw === "") textShadow = null;
+    else {
+      const value = String(raw).trim();
+      textShadow = value || null;
+    }
+  } else {
+    textShadow = fallback.textShadow ?? null;
+  }
+
   return {
     fontFamily,
     fontSize:
@@ -105,5 +117,6 @@ export function normalizeCaptionStyle(
     textAlign,
     backdropColor,
     contourBoard,
+    textShadow,
   };
 }

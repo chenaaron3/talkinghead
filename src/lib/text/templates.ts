@@ -7,6 +7,8 @@ export const TEXT_TEMPLATE_IDS = [
   "typewriter",
   "white-board",
   "stamp",
+  "glow",
+  "scrappy",
 ] as const;
 
 export type TextTemplateId = (typeof TEXT_TEMPLATE_IDS)[number];
@@ -93,6 +95,48 @@ export const TEXT_TEMPLATES: Record<TextTemplateId, TextTemplate> = {
     id: "stamp",
     label: "Stamp",
     style: { ...DEFAULT_TEXT_STYLE },
+  },
+  glow: {
+    id: "glow",
+    label: "Glow",
+    style: {
+      fontFamily: "montserrat",
+      fontSize: 72,
+      color: "#F5EDB8",
+      y: QUOTE_CAPTION_Y,
+      animation: "fade",
+      stroke: null,
+      shadow: false,
+      textTransform: "uppercase",
+      captionsAtATime: 1,
+      stack: false,
+      backdrop: "none",
+      fontStyle: "normal",
+      textAlign: "center",
+      backdropColor: null,
+      textShadow:
+        "0 0 16px rgba(255, 220, 90, 0.95), 0 0 32px rgba(255, 200, 60, 0.7), 0 0 48px rgba(255, 180, 40, 0.45)",
+    },
+  },
+  scrappy: {
+    id: "scrappy",
+    label: "Scrappy",
+    style: {
+      fontFamily: "nunito",
+      fontSize: 56,
+      color: "#111111",
+      y: QUOTE_CAPTION_Y,
+      animation: "fade",
+      stroke: null,
+      shadow: false,
+      textTransform: "uppercase",
+      captionsAtATime: 8,
+      stack: false,
+      backdrop: "scrap",
+      fontStyle: "normal",
+      textAlign: "center",
+      backdropColor: null,
+    },
   },
 };
 

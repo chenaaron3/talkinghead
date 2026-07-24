@@ -24,11 +24,12 @@ import { ZoomInspector } from "./ZoomInspector";
 export function InspectorPanel() {
   const editableBRoll = useEditableBRoll();
   const selection = useSelection((s) => s.selection);
-  const vfx = useEditor((s) => s.config?.vfx);
+  const config = useEditor((s) => s.config);
+  const vfx = config?.vfx;
   const sfx = useEditor((s) => s.config?.sfx);
   const music = useEditor((s) => s.config?.music);
   const punchIns = useEditor((s) => s.config?.punchInSegments);
-  const listicleItems = useEditor((s) => s.config?.listicleOverlay?.items);
+  const listicle = useEditor((s) => s.config?.listicleOverlay);
   const clearSelection = useSelection((s) => s.clearSelection);
 
   let title: string | null = null;
@@ -47,8 +48,9 @@ export function InspectorPanel() {
     } else if (clip?.type === "quote") {
       title = vfxTypeLabel(clip.type);
       body = <QuoteVfxInspector clip={clip} />;
-    } else if (clip?.type === "text") {
-      title = vfxTypeLabel(clip.type);
+    } else if (clip?.type === "text" || clip?.type === "listicle-text") {
+      title =
+        clip.type === "listicle-text" ? "Listicle text" : vfxTypeLabel(clip.type);
       body = <TextVfxInspector clip={clip} />;
     }
   } else if (editableBRoll) {
@@ -81,12 +83,9 @@ export function InspectorPanel() {
       body = <ZoomInspector index={index} punchIn={punchIn} />;
     }
   } else if (selection?.kind === "listicleItem") {
-    const index = primaryId(selection);
-    const item =
-      typeof index === "number" ? listicleItems?.[index] : undefined;
-    if (item != null && typeof index === "number") {
+    if (listicle) {
       title = "Listicle";
-      body = <ListicleInspector index={index} item={item} />;
+      body = <ListicleInspector />;
     }
   } else if (selection?.kind === "captions") {
     title = "Captions";

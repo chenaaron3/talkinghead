@@ -38,7 +38,7 @@ import {
   withTextContent,
   withTextSfx,
   withTextSfxVolume,
-  isTextVfx,
+  isScreenTextVfxClip,
   type VfxPreset,
 } from './lib/vfx';
 import { normalizeCaptionStyle } from '@src/lib/captions/parse-style';
@@ -64,6 +64,10 @@ import {
   resolvePunchInOrigin,
   withPunchInOrigin,
 } from './lib/punchin';
+import {
+  withListicleTemplate,
+  type ListicleTemplateId,
+} from './lib/listicle';
 import { MIN_LISTICLE_SEC, MIN_RANGE_SEC } from './lib/range';
 import { cutKeepRegion, restoreGap, setSectionEdge } from './lib/sections';
 import { deserializeWaveform, peakMax } from '@src/lib/audio/waveform';
@@ -270,14 +274,10 @@ type EditorActions = {
     live?: boolean,
   ) => void;
   updateListicleOverlay: (start: number, end: number, live?: boolean) => void;
-  updateListicleItemReveal: (
+  updateListicleTemplate: (templateId: ListicleTemplateId) => void;
+  updateListicleMarkerStart: (
     index: number,
-    reveal: number,
-    live?: boolean,
-  ) => void;
-  updateListicleItemLabel: (
-    index: number,
-    label: string,
+    start: number,
     live?: boolean,
   ) => void;
 };
@@ -1315,9 +1315,10 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     updateVfxRange: (id, start, end, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
+      if (end <= start + MIN_RANGE_SEC) return;
+
       const clip = (config.vfx ?? []).find((c) => c.id === id);
       if (!clip) return;
-      if (end <= start + MIN_RANGE_SEC) return;
       const result = upsertVfx(config.vfx ?? [], {
         ...clip,
         start,
@@ -1374,6 +1375,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     updateTextTemplate: (id, templateId) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
+
       const clip = (config.vfx ?? []).find((c) => c.id === id);
       if (!clip) return;
       const next = withTextTemplate(clip, templateId);
@@ -1388,6 +1390,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     updateTextVfxStyle: (id, patch, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
+
       const clip = (config.vfx ?? []).find((c) => c.id === id);
       if (!clip) return;
       const next = withTextStyle(clip, patch);
@@ -1402,6 +1405,7 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     updateTextVfxContent: (id, text, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
+
       const clip = (config.vfx ?? []).find((c) => c.id === id);
       if (!clip) return;
       const next = withTextContent(clip, text);
@@ -1416,8 +1420,9 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     updateTextVfxSfx: (id, sfx, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
+
       const clip = (config.vfx ?? []).find((c) => c.id === id);
-      if (!clip || !isTextVfx(clip)) return;
+      if (!clip || !isScreenTextVfxClip(clip)) return;
       const next = withTextSfx(clip, sfx);
       const result = upsertVfx(config.vfx ?? [], next);
       if ("error" in result) return;
@@ -1430,8 +1435,9 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
     updateTextVfxSfxVolume: (id, volume, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
+
       const clip = (config.vfx ?? []).find((c) => c.id === id);
-      if (!clip || !isTextVfx(clip)) return;
+      if (!clip || !isScreenTextVfxClip(clip)) return;
       const next = withTextSfxVolume(clip, volume);
       const result = upsertVfx(config.vfx ?? [], next);
       if ("error" in result) return;
@@ -1528,10 +1534,25 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const nextStart = Math.max(0, start);
       const nextEnd = Math.min(end, duration);
       if (nextEnd <= nextStart + MIN_LISTICLE_SEC) return;
-      const items = config.listicleOverlay.items.map((item) => ({
-        ...item,
-        reveal: Math.max(nextStart, Math.min(nextEnd, item.reveal)),
-      }));
+
+      const clampClip = <T extends { start: number; end: number }>(clip: T): T => {
+        let clipStart = Math.max(nextStart, clip.start);
+        let clipEnd = Math.min(nextEnd, clip.end);
+        if (clipEnd <= clipStart + MIN_RANGE_SEC) {
+          clipEnd = Math.min(nextEnd, clipStart + MIN_RANGE_SEC);
+        }
+        return { ...clip, start: clipStart, end: clipEnd };
+      };
+
+      const clipIds = new Set<string>();
+      for (const item of config.listicleOverlay.items) {
+        clipIds.add(item.markerId);
+        clipIds.add(item.revealId);
+      }
+      const vfx = (config.vfx ?? []).map((clip) =>
+        clipIds.has(clip.id) ? clampClip(clip) : clip,
+      );
+
       commit(
         {
           config: {
@@ -1540,8 +1561,8 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
               ...config.listicleOverlay,
               start: nextStart,
               end: nextEnd,
-              items,
             },
+            vfx,
           },
           transcript,
         },
@@ -1549,38 +1570,42 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       );
     },
 
-    updateListicleItemReveal: (index, reveal, live = false) => {
+    updateListicleTemplate: (templateId) => {
       const { config, transcript } = get();
       if (!config || !transcript || !config.listicleOverlay) return;
-      const { start, end } = config.listicleOverlay;
-      const nextReveal = Math.max(start, Math.min(end, reveal));
-      const items = config.listicleOverlay.items.map((item, i) =>
-        i === index ? { ...item, reveal: nextReveal } : item,
-      );
-      commit(
-        {
-          config: {
-            ...config,
-            listicleOverlay: { ...config.listicleOverlay, items },
-          },
-          transcript,
-        },
-        live,
-      );
+      commit({
+        config: withListicleTemplate(config, templateId),
+        transcript,
+      });
     },
 
-    updateListicleItemLabel: (index, label, live = false) => {
+    updateListicleMarkerStart: (index, start, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript || !config.listicleOverlay) return;
-      if (!config.listicleOverlay.items[index]) return;
-      const items = config.listicleOverlay.items.map((item, i) =>
-        i === index ? { ...item, label } : item,
+      const item = config.listicleOverlay.items[index];
+      if (!item) return;
+      const marker = (config.vfx ?? []).find((c) => c.id === item.markerId);
+      if (!marker) return;
+      const { start: listStart, end: listEnd } = config.listicleOverlay;
+      const duration = marker.end - marker.start;
+      const nextStart = Math.max(listStart, Math.min(listEnd, start));
+      let nextEnd = nextStart + duration;
+      if (nextEnd > listEnd) {
+        nextEnd = listEnd;
+      }
+      if (nextEnd <= nextStart + MIN_RANGE_SEC) return;
+
+      const vfx = (config.vfx ?? []).map((clip) =>
+        clip.id === item.markerId
+          ? { ...clip, start: nextStart, end: nextEnd }
+          : clip,
       );
+
       commit(
         {
           config: {
             ...config,
-            listicleOverlay: { ...config.listicleOverlay, items },
+            vfx,
           },
           transcript,
         },

@@ -6,12 +6,26 @@ import {
   captionIndexToSourceSec,
 } from "../helpers/cuts";
 import { getResultsOrCached } from "../helpers/transcript-cache";
-import type { TranscriptCaption, SourceListicle } from "../helpers/types";
+import {
+  DEFAULT_LISTICLE_TEMPLATE_ID,
+  resolveListicleTemplate,
+} from "../../src/lib/listicle/templates";
+import { normalizeCaptionStyle } from "../../src/lib/captions/parse-style";
+import type {
+  TranscriptCaption,
+  SourceListicle,
+  SourceListicleTextVfx,
+} from "../helpers/types";
+
+export type ListicleBuildResult = {
+  overlay: SourceListicle;
+  vfx: SourceListicleTextVfx[];
+};
 
 const MODEL = "gpt-4.1-mini";
 const MIN_ITEMS = 3;
 const MAX_ITEMS = 5;
-const MAX_LABEL_WORDS = 5;
+const MAX_TEXT_WORDS = 8;
 
 export const ListicleDetectionSchema = z.object({
   listStartWordIndex: z
@@ -27,14 +41,36 @@ export const ListicleDetectionSchema = z.object({
   items: z
     .array(
       z.object({
-        label: z
+        markerText: z
           .string()
-          .describe(`Short on-screen label, max ${MAX_LABEL_WORDS} words`),
-        startWordIndex: z
+          .describe(
+            `Enumeration phrase only, e.g. "number three" — no trailing particles like "is", "the", "are" (max ${MAX_TEXT_WORDS} words)`,
+          ),
+        markerStartWordIndex: z
           .number()
           .int()
           .nonnegative()
-          .describe("Index of the first spoken word for this point"),
+          .describe("First word of the marker phrase"),
+        markerEndWordIndex: z
+          .number()
+          .int()
+          .nonnegative()
+          .describe("Last word of the marker phrase (inclusive)"),
+        revealText: z
+          .string()
+          .describe(
+            `Spoken list item content, e.g. "Fisherman's Bastion" (max ${MAX_TEXT_WORDS} words)`,
+          ),
+        revealStartWordIndex: z
+          .number()
+          .int()
+          .nonnegative()
+          .describe("First spoken word of the list item"),
+        revealEndWordIndex: z
+          .number()
+          .int()
+          .nonnegative()
+          .describe("Last spoken word of the list item (inclusive)"),
       }),
     )
     .max(MAX_ITEMS)
@@ -45,32 +81,108 @@ export const ListicleDetectionSchema = z.object({
 
 export type ListicleDetection = z.infer<typeof ListicleDetectionSchema>;
 
-function clampLabel(label: string): string {
-  return label
+function clampWords(text: string, maxWords: number): string {
+  return text
     .trim()
     .split(/\s+/)
     .filter(Boolean)
-    .slice(0, MAX_LABEL_WORDS)
+    .slice(0, maxWords)
     .join(" ");
+}
+
+function wordRangeToSec(
+  startIndex: number,
+  endIndex: number,
+  captions: TranscriptCaption[],
+): { start: number; end: number } | null {
+  const start = captionIndexToSourceSec(startIndex, captions, "start");
+  const end = captionIndexToSourceSec(endIndex, captions, "end");
+  if (start == null || end == null || end <= start) return null;
+  return { start, end };
+}
+
+function buildListicleTextVfx(
+  listicleItemId: string,
+  role: "marker" | "reveal",
+  text: string,
+  range: { start: number; end: number },
+  defaults: { templateId: string; style: ReturnType<typeof normalizeCaptionStyle> },
+): SourceListicleTextVfx {
+  return {
+    id: `${listicleItemId}-${role}`,
+    type: "listicle-text",
+    listicleItemId,
+    role,
+    text,
+    start: range.start,
+    end: range.end,
+    templateId: defaults.templateId,
+    style: defaults.style,
+    sfx: null,
+  };
 }
 
 export function detectionToListicleOverlay(
   detection: ListicleDetection,
   captions: TranscriptCaption[],
-): SourceListicle | null {
+): ListicleBuildResult | null {
   if (detection.items.length < MIN_ITEMS) return null;
 
-  const items = [];
-  for (const item of detection.items.slice(0, MAX_ITEMS)) {
-    const label = clampLabel(item.label);
-    if (!label) continue;
-    const reveal = captionIndexToSourceSec(
-      item.startWordIndex,
+  const template = resolveListicleTemplate(DEFAULT_LISTICLE_TEMPLATE_ID);
+  const markerDefaults = {
+    templateId: template.marker.templateId,
+    style: normalizeCaptionStyle(undefined, template.marker.style),
+  };
+  const revealDefaults = {
+    templateId: template.reveal.templateId,
+    style: normalizeCaptionStyle(undefined, template.reveal.style),
+  };
+
+  const items: SourceListicle["items"] = [];
+  const vfx: SourceListicleTextVfx[] = [];
+
+  for (let i = 0; i < detection.items.slice(0, MAX_ITEMS).length; i++) {
+    const item = detection.items[i]!;
+    const revealText = clampWords(item.revealText, MAX_TEXT_WORDS);
+    if (!revealText) continue;
+
+    const markerText = clampWords(item.markerText, MAX_TEXT_WORDS);
+    if (!markerText) continue;
+
+    const markerRange = wordRangeToSec(
+      item.markerStartWordIndex,
+      item.markerEndWordIndex,
       captions,
-      "start",
     );
-    if (reveal == null) continue;
-    items.push({ label, reveal });
+    const revealRange = wordRangeToSec(
+      item.revealStartWordIndex,
+      item.revealEndWordIndex,
+      captions,
+    );
+    if (!markerRange || !revealRange) continue;
+
+    const listicleItemId = `listicle-item-${i}`;
+    const marker = buildListicleTextVfx(
+      listicleItemId,
+      "marker",
+      markerText,
+      markerRange,
+      markerDefaults,
+    );
+    const reveal = buildListicleTextVfx(
+      listicleItemId,
+      "reveal",
+      revealText,
+      revealRange,
+      revealDefaults,
+    );
+
+    items.push({
+      id: listicleItemId,
+      markerId: marker.id,
+      revealId: reveal.id,
+    });
+    vfx.push(marker, reveal);
   }
 
   if (items.length < MIN_ITEMS) return null;
@@ -86,18 +198,26 @@ export function detectionToListicleOverlay(
     "end",
   );
 
-  if (start == null) start = items[0]!.reveal;
+  if (start == null) start = vfx[0]!.start;
   if (end == null) {
     const last = captions[captions.length - 1];
-    end = last ? last.end : items[items.length - 1]!.reveal + 2;
+    end = last ? last.end : vfx[vfx.length - 1]!.end + 0.5;
   }
 
-  start = Math.min(start, items[0]!.reveal);
-  end = Math.max(end, items[items.length - 1]!.reveal + 0.5);
+  start = Math.min(start, vfx[0]!.start);
+  end = Math.max(end, vfx[vfx.length - 1]!.end + 0.5);
 
   if (end <= start) return null;
 
-  return { start, end, items };
+  return {
+    overlay: {
+      start,
+      end,
+      templateId: DEFAULT_LISTICLE_TEMPLATE_ID,
+      items,
+    },
+    vfx,
+  };
 }
 
 async function callOpenAI(captions: TranscriptCaption[]): Promise<ListicleDetection> {
@@ -122,9 +242,10 @@ async function callOpenAI(captions: TranscriptCaption[]): Promise<ListicleDetect
           "(e.g. one / two / three, first / second / third, number 1 / number 2, tip one / tip two).",
           "Vague sequential tips, 'also…', 'next…', or implied structure without enumeration → items: [].",
           `Require at least ${MIN_ITEMS} enumerated points; fewer than ${MIN_ITEMS} → items: [].`,
-          "Return short on-screen labels (max 5 words each) and word indices into the numbered transcript.",
+          "For each item return:",
+          "- markerText + marker word indices: the spoken enumeration only (e.g. 'number three' — never trailing 'is' / 'the').",
+          "- revealText + reveal word indices: the spoken list item content (e.g. 'Fisherman's Bastion').",
           "Prefer the main enumerated list the speaker walks through.",
-          "startWordIndex must be the first word of that point in the transcript.",
           "listStartWordIndex/listEndWordIndex should cover the whole list section.",
           `At most ${MAX_ITEMS} items.`,
         ].join(" "),
@@ -182,7 +303,7 @@ export async function buildListicleOverlay(options: {
   transcriptPath: string;
   cachePath: string;
   force: boolean;
-}): Promise<SourceListicle | null> {
+}): Promise<ListicleBuildResult | null> {
   if (!options.enabled) return null;
 
   const detection = await detectListicle({
@@ -192,15 +313,15 @@ export async function buildListicleOverlay(options: {
     force: options.force,
   });
 
-  const overlay = detectionToListicleOverlay(detection, options.captions);
+  const result = detectionToListicleOverlay(detection, options.captions);
 
-  if (overlay) {
+  if (result) {
     console.log(
-      `[listicle] overlay ${overlay.start.toFixed(2)}–${overlay.end.toFixed(2)}s (${overlay.items.length} items)`,
+      `[listicle] overlay ${result.overlay.start.toFixed(2)}–${result.overlay.end.toFixed(2)}s (${result.overlay.items.length} items, ${result.vfx.length} clips)`,
     );
   } else {
     console.log("[listicle] no list detected — skipping overlay");
   }
 
-  return overlay;
+  return result;
 }

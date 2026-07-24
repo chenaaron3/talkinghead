@@ -42,11 +42,14 @@ export type Asset = VisualAsset | AudioAsset;
 export type SourceCut = Range;
 
 export type SourceListicleItem = {
-  label: string;
-  reveal: number;
+  id: string;
+  markerId: string;
+  revealId: string;
 };
 
 export type SourceListicle = Range & {
+  /** Key into the listicle template catalog. */
+  templateId: string;
   items: SourceListicleItem[];
 };
 
@@ -158,9 +161,25 @@ export function arollDisplaySrcForCutout(cutoutSrc: string): string {
  * Visual effect kinds. Expand this union as new effects land.
  * `quote` restyles captions for a range (see quote-templates).
  * `text` is a free-text overlay for a range (see text/templates).
+ * `listicle-text` is listicle marker/reveal copy — lives in `vfx` but not user-placed.
  */
-export const VFX_TYPES = ["location", "shake", "quote", "text"] as const;
+export const VFX_TYPES = [
+  "location",
+  "shake",
+  "quote",
+  "text",
+  "listicle-text",
+] as const;
 export type VfxType = (typeof VFX_TYPES)[number];
+
+/** VFX kinds users can add from the asset palette / VFX track. */
+export const USER_PLACEABLE_VFX_TYPES = [
+  "location",
+  "shake",
+  "quote",
+  "text",
+] as const satisfies readonly VfxType[];
+export type UserPlaceableVfxType = (typeof USER_PLACEABLE_VFX_TYPES)[number];
 
 export function isVfxType(value: unknown): value is VfxType {
   return (
@@ -209,12 +228,10 @@ export type SourceQuoteVfx = SourceVfxBase & {
 };
 
 /**
- * On-screen text overlay for a source range.
- * Owns its own `text`, timing, and look (text templates).
+ * Shared on-screen text fields for `text` and `listicle-text` clips.
  * Entrance SFX seeded at creation ({@link DEFAULT_TEXT_ENTRANCE_SFX}); omit / null = silent.
  */
-export type SourceTextVfx = SourceVfxBase & {
-  type: "text";
+export type SourceScreenTextVfxFields = {
   /** On-screen copy for this clip. */
   text: string;
   /** Key into the curated Text template catalog. */
@@ -223,11 +240,46 @@ export type SourceTextVfx = SourceVfxBase & {
   style: CaptionStyle;
 } & HasSFX;
 
+/**
+ * On-screen text overlay for a source range.
+ * Owns its own `text`, timing, and look (text templates).
+ */
+export type SourceTextVfx = SourceVfxBase & {
+  type: "text";
+} & SourceScreenTextVfxFields;
+
+/** Listicle marker or reveal — same look as text, owned by a listicle item. */
+export type SourceListicleTextVfx = SourceVfxBase & {
+  type: "listicle-text";
+  listicleItemId: string;
+  role: "marker" | "reveal";
+} & SourceScreenTextVfxFields;
+
+export type SourceScreenTextVfx = SourceTextVfx | SourceListicleTextVfx;
+
+export function isListicleTextVfx(
+  clip: SourceVfx,
+): clip is SourceListicleTextVfx {
+  return clip.type === "listicle-text";
+}
+
+export function isScreenTextVfx(clip: SourceVfx): clip is SourceScreenTextVfx {
+  return clip.type === "text" || clip.type === "listicle-text";
+}
+
+export function isUserPlaceableVfx(clip: SourceVfx): clip is Exclude<
+  SourceVfx,
+  SourceListicleTextVfx
+> {
+  return clip.type !== "listicle-text";
+}
+
 export type SourceVfx =
   | SourceLocationVfx
   | SourceShakeVfx
   | SourceQuoteVfx
-  | SourceTextVfx;
+  | SourceTextVfx
+  | SourceListicleTextVfx;
 
 /**
  * Distribute over `SourceVfx`, keeping members whose declared keys include all of `K`

@@ -6,7 +6,22 @@ import type { Selection } from "./selection";
 
 import type { RangeEdge, WordAnnotation } from "./word-annotations";
 
-export type RangeKind = "broll" | "vfx" | "sfx" | "zoom";
+export type RangeKind =
+  | "broll"
+  | "vfx"
+  | "sfx"
+  | "zoom"
+  | "listicleMarker"
+  | "listicleReveal";
+
+/** Range kinds backed by a clip id in `config.vfx` (including listicle-text). */
+export function isClipVfxRangeKind(
+  kind: RangeKind,
+): kind is "vfx" | "listicleMarker" | "listicleReveal" {
+  return (
+    kind === "vfx" || kind === "listicleMarker" || kind === "listicleReveal"
+  );
+}
 
 export type HandleConfig = {
   kind: RangeKind;
@@ -35,6 +50,79 @@ function isEndEdge(edge: RangeEdge): boolean {
   return edge === "end" || edge === "both";
 }
 
+function selectedListicleItemIndex(
+  selection: Selection | null,
+): number | null {
+  if (selection?.kind !== "listicleItem") return null;
+  const id = selection.ids[0];
+  return typeof id === "number" ? id : null;
+}
+
+function listicleRangeForWord(
+  annotation: WordAnnotation,
+  role: "marker" | "reveal",
+  selected: boolean,
+): ActiveRange | null {
+  const range =
+    role === "marker"
+      ? annotation.listicleMarkerRange
+      : annotation.listicleRevealRange;
+  if (!range) return null;
+  return {
+    kind: role === "marker" ? "listicleMarker" : "listicleReveal",
+    id: range.id,
+    edge: range.edge,
+    selected,
+  };
+}
+
+function listicleRangeFromVfxId(
+  annotation: WordAnnotation,
+  vfxId: string,
+): ActiveRange | null {
+  if (annotation.listicleRevealRange?.id === vfxId) {
+    return listicleRangeForWord(annotation, "reveal", true);
+  }
+  if (annotation.listicleMarkerRange?.id === vfxId) {
+    return listicleRangeForWord(annotation, "marker", true);
+  }
+  return null;
+}
+
+function selectedListicleTextVfxId(
+  selection: Selection | null,
+): string | null {
+  if (selection?.kind !== "vfx") return null;
+  const id = selection.ids[0];
+  return typeof id === "string" ? id : null;
+}
+
+function listicleStyleRange(
+  annotation: WordAnnotation,
+  selection: Selection | null,
+): ActiveRange | null {
+  const vfxId = selectedListicleTextVfxId(selection);
+  if (vfxId) {
+    const fromClip = listicleRangeFromVfxId(annotation, vfxId);
+    if (fromClip) return fromClip;
+  }
+
+  const selectedItem = selectedListicleItemIndex(selection);
+  if (selectedItem == null) return null;
+
+  const marker =
+    annotation.listicleMarkerRange?.itemIndex === selectedItem
+      ? listicleRangeForWord(annotation, "marker", true)
+      : null;
+  const reveal =
+    annotation.listicleRevealRange?.itemIndex === selectedItem
+      ? listicleRangeForWord(annotation, "reveal", true)
+      : null;
+
+  // Prefer reveal tint when both ranges cover the same word (rare overlap).
+  return reveal ?? marker;
+}
+
 /**
  * Range covering this word for transcript tint.
  * Priority: vfx > b-roll > selected sfx > zoom.
@@ -43,6 +131,9 @@ export function resolveStyleRange(
   annotation: WordAnnotation,
   selection: Selection | null,
 ): ActiveRange | null {
+  const listicleRange = listicleStyleRange(annotation, selection);
+  if (listicleRange) return listicleRange;
+
   const vfx = annotation.vfxRanges;
   if (vfx && vfx.length > 0) {
     const selected = vfx.find((r) => isSelected(selection, "vfx", r.id));
@@ -91,11 +182,37 @@ export function resolveStyleRange(
   return null;
 }
 
+function listicleSelectedRange(
+  annotation: WordAnnotation,
+  selection: Selection | null,
+): ActiveRange | null {
+  const vfxId = selectedListicleTextVfxId(selection);
+  if (vfxId) {
+    const fromClip = listicleRangeFromVfxId(annotation, vfxId);
+    if (fromClip) return fromClip;
+  }
+
+  const selectedItem = selectedListicleItemIndex(selection);
+  if (selectedItem == null) return null;
+
+  if (annotation.listicleMarkerRange?.itemIndex === selectedItem) {
+    return listicleRangeForWord(annotation, "marker", true);
+  }
+  if (annotation.listicleRevealRange?.itemIndex === selectedItem) {
+    return listicleRangeForWord(annotation, "reveal", true);
+  }
+
+  return null;
+}
+
 /** Selected range covering this word — drives resize handles. */
 export function resolveSelectedRange(
   annotation: WordAnnotation,
   selection: Selection | null,
 ): ActiveRange | null {
+  const listicleRange = listicleSelectedRange(annotation, selection);
+  if (listicleRange) return listicleRange;
+
   const vfx = annotation.vfxRanges?.find((r) =>
     isSelected(selection, "vfx", r.id),
   );

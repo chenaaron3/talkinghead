@@ -8,6 +8,11 @@ import {
   resolveStyleRange,
   type StartRangeResize,
 } from "../../../lib/active-range";
+import {
+  isListicleItemActive,
+  listicleItemIndexFromAnnotation,
+  listicleTextVfxIdFromAnnotation,
+} from "../../../lib/listicle";
 import { isSelected } from "../../../lib/selection";
 import { wordClassName } from "../../../lib/word-classes";
 import { useSelection } from "../../../selection-store";
@@ -66,10 +71,12 @@ export function Word({
   const captionSelected = useSelection((s) =>
     isSelected(s.selection, "caption", caption.index),
   );
+  const config = useEditor((s) => s.config);
+  const listicleItemIndex = listicleItemIndexFromAnnotation(annotation);
   const listicleSelected = useSelection(
     (s) =>
-      annotation.listicleItemIndex != null &&
-      isSelected(s.selection, "listicleItem", annotation.listicleItemIndex),
+      listicleItemIndex != null &&
+      isListicleItemActive(s.selection, config, listicleItemIndex),
   );
   const bRollSelected = useSelection(
     useShallow((s) =>
@@ -104,7 +111,6 @@ export function Word({
   const selectVfx = useSelection((s) => s.selectVfx);
   const selectSfx = useSelection((s) => s.selectSfx);
   const selectPunchIn = useSelection((s) => s.selectPunchIn);
-  const selectListicleItem = useSelection((s) => s.selectListicleItem);
   const setCaptionText = useEditor((s) => s.setCaptionText);
   const setCaptionEmphasis = useEditor((s) => s.setCaptionEmphasis);
   const placeBRollOnCaption = useEditor((s) => s.placeBRollOnCaption);
@@ -146,8 +152,7 @@ export function Word({
 
   return (
     <>
-      {annotation.listicleNumber != null &&
-      annotation.listicleItemIndex != null ? (
+      {annotation.listicleNumber != null && listicleItemIndex != null ? (
         <ListicleBadge
           number={annotation.listicleNumber}
           label={
@@ -156,7 +161,7 @@ export function Word({
           selected={listicleSelected}
           dragging={
             draggingStart?.kind === "listicle" &&
-            draggingStart.id === annotation.listicleItemIndex
+            draggingStart.id === listicleItemIndex
           }
           onMouseDown={(e) => onStartListicleDrag?.(e)}
         />
@@ -240,6 +245,16 @@ export function Word({
               cutCaption(caption);
               return;
             }
+
+            if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
+              const clipId = listicleTextVfxIdFromAnnotation(annotation);
+              if (clipId) {
+                selectVfx(clipId);
+                seekSource(caption.start);
+                return;
+              }
+            }
+
             if (e.shiftKey) {
               selectCaptionExtend(caption.index, captionIndices);
             } else if (e.metaKey || e.ctrlKey) {
@@ -254,8 +269,6 @@ export function Word({
               selectBRoll(annotation.bRollRanges[0].id);
             } else if (annotation.punchInIndex != null) {
               selectPunchIn(annotation.punchInIndex);
-            } else if (annotation.listicleItemIndex != null) {
-              selectListicleItem(annotation.listicleItemIndex);
             } else if (annotation.sfxRanges?.[0]) {
               selectSfx(annotation.sfxRanges[0].id);
             } else if (annotation.sfx?.[0]) {

@@ -94,13 +94,30 @@ export function groupCaptionWords(
  * Group a sequence of words that may change style mid-stream.
  * Splits into contiguous style runs, then batches each run with its own
  * `captionsAtATime` so Quote boundaries never share a group with defaults.
+ * Optional `segmentKey` splits runs further (e.g. listicle hidden ranges).
  */
 export function groupStyledCaptionWords(
-  words: Array<CaptionWord & { styleKey: string; captionsAtATime: number }>,
+  words: Array<
+    CaptionWord & {
+      styleKey: string;
+      captionsAtATime: number;
+      segmentKey?: string;
+    }
+  >,
 ): Array<CaptionWordGroup & { styleKey: string }> {
   const result: Array<CaptionWordGroup & { styleKey: string }> = [];
-  let run: Array<CaptionWord & { styleKey: string; captionsAtATime: number }> =
-    [];
+  let run: Array<
+    CaptionWord & {
+      styleKey: string;
+      captionsAtATime: number;
+      segmentKey?: string;
+    }
+  > = [];
+
+  const runBoundary = (
+    word: (typeof words)[number],
+  ): string =>
+    `${word.styleKey}\0${word.segmentKey ?? "0"}`;
 
   const flushRun = () => {
     if (run.length === 0) return;
@@ -119,7 +136,7 @@ export function groupStyledCaptionWords(
   };
 
   for (const word of words) {
-    if (run.length > 0 && run[0]!.styleKey !== word.styleKey) {
+    if (run.length > 0 && runBoundary(run[0]!) !== runBoundary(word)) {
       flushRun();
     }
     run.push(word);

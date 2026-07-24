@@ -13,7 +13,9 @@ type Props = {
 };
 
 export function VfxTrack({ width, sourceX }: Props) {
-  const vfx = useEditor((s) => s.config?.vfx ?? EMPTY_VFX);
+  const vfx = useEditor((s) => s.config?.vfx ?? EMPTY_VFX).filter(
+    (clip) => clip.type !== "listicle-text",
+  );
   const selection = useSelection((s) => s.selection);
   const selectVfx = useSelection((s) => s.selectVfx);
   const updateVfxRange = useEditor((s) => s.updateVfxRange);

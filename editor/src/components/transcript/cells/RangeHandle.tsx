@@ -15,6 +15,8 @@ const STYLES: Record<RangeKind, string> = {
   vfx: "bg-vfx hover:bg-[#fda4af]",
   sfx: "bg-sfx hover:bg-[#5eead4]",
   zoom: "bg-purple-400 hover:bg-purple-300",
+  listicleMarker: "bg-amber-500 hover:bg-amber-400",
+  listicleReveal: "bg-violet-500 hover:bg-violet-400",
 };
 
 /** Matches word highlight: 1em content + py-[0.05em] top/bottom. */

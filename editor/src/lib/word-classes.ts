@@ -10,21 +10,27 @@ const COLOR_VAR: Record<ActiveRange["kind"], string> = {
   vfx: "var(--color-vfx)",
   sfx: "var(--color-sfx)",
   zoom: "var(--color-purple-400)",
+  listicleMarker: "#f59e0b",
+  listicleReveal: "#8b5cf6",
 };
 
-const UNDERLINE: Record<"broll" | "vfx" | "zoom", string> = {
+type OverlayRangeKind = Exclude<ActiveRange["kind"], "sfx">;
+
+const UNDERLINE: Record<OverlayRangeKind, string> = {
   broll: "border-broll/70",
   vfx: "border-vfx/70",
   zoom: "border-purple-400/70",
+  listicleMarker: "border-amber-500/70",
+  listicleReveal: "border-violet-500/70",
 };
 
-const HIGHLIGHT: Record<
-  "broll" | "vfx" | "zoom",
-  { idle: string; playhead: string }
-> = {
+const HIGHLIGHT: Record<OverlayRangeKind, { idle: string; playhead: string }> =
+{
   broll: { idle: "bg-broll/45", playhead: "bg-broll/50" },
   vfx: { idle: "bg-vfx/45", playhead: "bg-vfx/50" },
   zoom: { idle: "bg-purple-500/15", playhead: "bg-purple-500/20" },
+  listicleMarker: { idle: "bg-amber-500/35", playhead: "bg-amber-500/45" },
+  listicleReveal: { idle: "bg-violet-500/35", playhead: "bg-violet-500/45" },
 };
 
 function roundEdge(edge: RangeEdge | undefined): string {
@@ -56,14 +62,13 @@ type Input = {
   isResizing: boolean;
 };
 
-/** B-roll / vfx / zoom: inactive = underline, active = highlight; word selected = both. */
+/** B-roll / vfx / zoom / listicle: inactive = underline, active = highlight. */
 function overlayRangeTint(
-  range: ActiveRange,
+  range: ActiveRange & { kind: OverlayRangeKind },
   playheadActive: boolean,
   captionSelected: boolean,
 ): string[] {
-  const kind =
-    range.kind === "zoom" ? "zoom" : range.kind === "vfx" ? "vfx" : "broll";
+  const kind = range.kind;
   const showHighlight = range.selected || captionSelected;
   const showUnderline = !range.selected || captionSelected;
 
@@ -95,10 +100,11 @@ function rangeTint(
   playheadActive: boolean,
   captionSelected: boolean,
 ): string[] {
-  if (range.kind === "sfx") {
+  const { kind } = range;
+  if (kind === "sfx") {
     return sfxRangeTint(range, playheadActive);
   }
-  return overlayRangeTint(range, playheadActive, captionSelected);
+  return overlayRangeTint({ ...range, kind }, playheadActive, captionSelected);
 }
 
 export function wordClassName(input: Input): string {

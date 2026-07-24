@@ -27,13 +27,16 @@ export type CaptionGroup = {
 };
 
 export type ListicleItem = {
-  label: string;
-  revealFrame: number;
+  text: string;
+  /** Output frame when this row enters the accumulating board. */
+  startFrame: number;
 };
 
 export type ListicleOverlay = {
   startFrame: number;
   endFrame: number;
+  /** When true, render accumulating board; when false, text clips are in `vfx`. */
+  aggregated?: boolean;
   items: ListicleItem[];
 };
 

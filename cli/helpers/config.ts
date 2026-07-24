@@ -18,6 +18,10 @@ import { isVideoSrc } from "../../src/lib/episode/media";
 import { findIntroTextVfx } from "../../src/lib/episode/text-vfx";
 import { defaultTextEntranceSfx } from "../../src/lib/episode/vfx";
 import {
+  DEFAULT_LISTICLE_TEMPLATE_ID,
+  isListicleTemplateId,
+} from "../../src/lib/listicle/templates";
+import {
   DEFAULT_TEXT_TEMPLATE_ID,
   isTextTemplateId,
   resolveTextTemplateStyle,
@@ -32,6 +36,7 @@ import {
   SourceCut,
   SourceCutout,
   SourceListicle,
+  SourceListicleTextVfx,
   SourceMusic,
   SourcePunchIn,
   SourceSfx,
@@ -164,6 +169,32 @@ function parseCuts(value: unknown, configPath: string): SourceCut[] {
   });
 }
 
+function parseScreenTextFields(
+  entry: Record<string, unknown>,
+  path: string,
+  configPath: string,
+): {
+  text: string;
+  templateId: string;
+  style: ReturnType<typeof normalizeCaptionStyle>;
+  sfx: ReturnType<typeof parseEntranceSfx> extends infer T ? T : never;
+} {
+  const text = String(entry.text ?? "").trim();
+  if (!text) {
+    throw new Error(`"${path}" needs text in ${configPath}`);
+  }
+  const rawTemplate = String(entry.templateId ?? "").trim();
+  const templateId = isTextTemplateId(rawTemplate)
+    ? rawTemplate
+    : DEFAULT_TEXT_TEMPLATE_ID;
+  const style = normalizeCaptionStyle(
+    entry.style,
+    resolveTextTemplateStyle(templateId),
+  );
+  const sfx = parseEntranceSfx(entry.sfx, `${path}.sfx`, configPath);
+  return { text, templateId, style, sfx };
+}
+
 function parseListicleOverlay(
   value: unknown,
   configPath: string,
@@ -177,6 +208,11 @@ function parseListicleOverlay(
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
     throw new Error(`"listicleOverlay" needs valid start/end in ${configPath}`);
   }
+  const rawTemplate = String(value.templateId ?? "").trim();
+  const templateId =
+    rawTemplate && isListicleTemplateId(rawTemplate)
+      ? rawTemplate
+      : DEFAULT_LISTICLE_TEMPLATE_ID;
   const itemsRaw = value.items;
   if (!Array.isArray(itemsRaw)) {
     throw new Error(`"listicleOverlay.items" must be a list in ${configPath}`);
@@ -187,16 +223,17 @@ function parseListicleOverlay(
         `"listicleOverlay.items[${i}]" must be an object in ${configPath}`,
       );
     }
-    const label = String(item.label ?? "").trim();
-    const reveal = Number(item.reveal);
-    if (!label || !Number.isFinite(reveal)) {
+    const id = String(item.id ?? "").trim();
+    const markerId = String(item.markerId ?? "").trim();
+    const revealId = String(item.revealId ?? "").trim();
+    if (!id || !markerId || !revealId) {
       throw new Error(
-        `"listicleOverlay.items[${i}]" needs label + reveal in ${configPath}`,
+        `"listicleOverlay.items[${i}]" needs id, markerId, revealId in ${configPath}`,
       );
     }
-    return { label, reveal };
+    return { id, markerId, revealId };
   });
-  return { start, end, items };
+  return { start, end, templateId, items };
 }
 
 function parsePunchInSegments(
@@ -405,7 +442,7 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
     }
     if (!isVfxType(entry.type)) {
       throw new Error(
-        `"vfx[${index}]" needs type (location | shake | quote | text) in ${configPath}`,
+        `"vfx[${index}]" needs type (location | shake | quote | text | listicle-text) in ${configPath}`,
       );
     }
 
@@ -435,25 +472,52 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
     }
 
     if (entry.type === "text") {
-      const rawTemplate = String(entry.templateId ?? "").trim();
-      const templateId = isTextTemplateId(rawTemplate)
-        ? rawTemplate
-        : DEFAULT_TEXT_TEMPLATE_ID;
-      const style = normalizeCaptionStyle(
-        entry.style,
-        resolveTextTemplateStyle(templateId),
+      const fields = parseScreenTextFields(
+        entry,
+        `vfx[${index}]`,
+        configPath,
       );
       const clip: SourceTextVfx = {
         id,
         type: "text",
         start,
         end,
-        text: String(entry.text ?? ""),
-        templateId,
-        style,
+        text: fields.text,
+        templateId: fields.templateId,
+        style: fields.style,
       };
-      const sfx = parseEntranceSfx(entry.sfx, `vfx[${index}].sfx`, configPath);
-      if (sfx !== undefined) clip.sfx = sfx;
+      if (fields.sfx !== undefined) clip.sfx = fields.sfx;
+      return clip;
+    }
+
+    if (entry.type === "listicle-text") {
+      const listicleItemId = String(entry.listicleItemId ?? "").trim();
+      const role = entry.role;
+      if (
+        !listicleItemId ||
+        (role !== "marker" && role !== "reveal")
+      ) {
+        throw new Error(
+          `"vfx[${index}]" listicle-text needs listicleItemId and role (marker | reveal) in ${configPath}`,
+        );
+      }
+      const fields = parseScreenTextFields(
+        entry,
+        `vfx[${index}]`,
+        configPath,
+      );
+      const clip: SourceListicleTextVfx = {
+        id,
+        type: "listicle-text",
+        start,
+        end,
+        listicleItemId,
+        role,
+        text: fields.text,
+        templateId: fields.templateId,
+        style: fields.style,
+      };
+      if (fields.sfx !== undefined) clip.sfx = fields.sfx;
       return clip;
     }
 

@@ -18,7 +18,12 @@ import {
   mapSourceSecToOutputSec,
   validateCuts,
 } from "../timeline/source-timeline";
-import { DEFAULT_TEXT_TEMPLATE_ID, isTextTemplateId, resolveTextTemplateStyle } from "../text/templates";
+import { resolveListicleTemplate } from "../listicle/templates";
+import {
+  DEFAULT_TEXT_TEMPLATE_ID,
+  isTextTemplateId,
+  resolveTextTemplateStyle,
+} from "../text/templates";
 import { resolveKenBurns } from "../visual/ken-burns";
 import {
   DEFAULT_PUNCH_IN_ANIMATE,
@@ -44,7 +49,7 @@ import type {
   SourcePunchIn,
   SourceBRoll,
   SourceQuoteVfx,
-  SourceTextVfx,
+  SourceScreenTextVfx,
   SourceVfx,
   SourceMusic,
   SourceSfx,
@@ -80,25 +85,64 @@ function quoteForCaption(
   return null;
 }
 
+/** Words covered by listicle marker/reveal text (minimal mode only). */
+function listicleHiddenCaptionRanges(
+  overlay: SourceListicle | null,
+  vfx: SourceVfx[],
+): Array<{ start: number; end: number }> {
+  if (!overlay) return [];
+  if (resolveListicleTemplate(overlay.templateId).aggregated) return [];
+  const byId = new Map(vfx.map((clip) => [clip.id, clip]));
+  const ranges: Array<{ start: number; end: number }> = [];
+  for (const item of overlay.items) {
+    const marker = byId.get(item.markerId);
+    const reveal = byId.get(item.revealId);
+    if (marker) ranges.push({ start: marker.start, end: marker.end });
+    if (reveal) ranges.push({ start: reveal.start, end: reveal.end });
+  }
+  return ranges;
+}
+
+function captionInListicleHiddenRange(
+  cap: TranscriptCaption,
+  ranges: Array<{ start: number; end: number }>,
+): boolean {
+  for (const range of ranges) {
+    if (cap.start < range.end && cap.end > range.start) return true;
+  }
+  return false;
+}
+
 function buildCaptionGroups(options: {
   captions: TranscriptCaption[];
   segments: KeepSegment[];
   fps: number;
   captionStyle: CaptionStyle;
   vfx: SourceVfx[];
+  listicleOverlay: SourceListicle | null;
 }): CaptionGroup[] {
-  const { captions, segments, fps, captionStyle, vfx } = options;
+  const { captions, segments, fps, captionStyle, vfx, listicleOverlay } =
+    options;
   const renderCaptions = prepareRenderCaptions(captions);
   const quotes = quoteVfxClips(vfx);
+  const hiddenRanges = listicleHiddenCaptionRanges(listicleOverlay, vfx);
 
   type StyledWord = CaptionWord & {
     styleKey: string;
+    segmentKey: string;
     captionsAtATime: number;
     style: CaptionStyle;
   };
 
   const styledWords: StyledWord[] = [];
+  let segment = 0;
+
   for (const cap of renderCaptions) {
+    if (captionInListicleHiddenRange(cap, hiddenRanges)) {
+      segment++;
+      continue;
+    }
+
     const outStart = mapSourceSecToOutputFrame(cap.start, segments, fps);
     const outEnd = mapSourceSecToOutputFrame(cap.end, segments, fps);
     if (outStart == null || outEnd == null) continue;
@@ -116,6 +160,7 @@ function buildCaptionGroups(options: {
       startFrame,
       endFrame,
       styleKey,
+      segmentKey: String(segment),
       captionsAtATime: style.captionsAtATime,
       style,
       emphasis: cap.emphasis,
@@ -175,6 +220,7 @@ function mapSourceRangeToOutputFrames(
 
 function buildListicle(
   overlay: SourceListicle | null,
+  vfx: SourceVfx[],
   segments: KeepSegment[],
   fps: number,
   cuts: BuildPropsInput["config"]["cuts"],
@@ -182,13 +228,21 @@ function buildListicle(
 ): ListicleOverlay | null {
   if (!overlay || overlay.items.length === 0) return null;
 
+  const aggregated = resolveListicleTemplate(overlay.templateId).aggregated;
+  const byId = new Map(vfx.map((clip) => [clip.id, clip]));
+
   const items = overlay.items
     .map((item) => {
-      const outSec = mapSourceSecToOutputSec(item.reveal, segments);
+      const marker = byId.get(item.markerId);
+      const reveal = byId.get(item.revealId);
+      if (marker?.type !== "listicle-text" || reveal?.type !== "listicle-text") {
+        return null;
+      }
+      const outSec = mapSourceSecToOutputSec(marker.start, segments);
       if (outSec == null) return null;
       return {
-        label: item.label,
-        revealFrame: Math.max(0, Math.round(outSec * fps)),
+        text: reveal.text,
+        startFrame: Math.max(0, Math.round(outSec * fps)),
       };
     })
     .filter((x): x is NonNullable<typeof x> => x != null);
@@ -206,11 +260,12 @@ function buildListicle(
   if (!range) return null;
 
   return {
-    startFrame: Math.min(range.startFrame, items[0]!.revealFrame),
+    startFrame: Math.min(range.startFrame, items[0]!.startFrame),
     endFrame: Math.max(
       range.endFrame,
-      items[items.length - 1]!.revealFrame + 1,
+      items[items.length - 1]!.startFrame + 1,
     ),
+    aggregated,
     items,
   };
 }
@@ -334,7 +389,7 @@ function buildBRolls(
   return result.sort((a, b) => a.startFrame - b.startFrame);
 }
 
-function resolveClipTextStyle(clip: SourceTextVfx): CaptionStyle {
+function resolveClipTextStyle(clip: SourceScreenTextVfx): CaptionStyle {
   const templateId = isTextTemplateId(clip.templateId)
     ? clip.templateId
     : DEFAULT_TEXT_TEMPLATE_ID;
@@ -374,7 +429,7 @@ function buildVfx(
       continue;
     }
 
-    if (clip.type === "text") {
+    if (clip.type === "text" || clip.type === "listicle-text") {
       const built: TextVfxClip = {
         id: clip.id,
         type: "text",
@@ -482,10 +537,12 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     fps,
     captionStyle,
     vfx: config.vfx ?? [],
+    listicleOverlay: config.listicleOverlay,
   });
 
   const listicle = buildListicle(
     config.listicleOverlay,
+    config.vfx ?? [],
     keepSegments,
     fps,
     config.cuts,
@@ -509,8 +566,14 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     transcript.duration,
   );
 
+  const listicleAggregated =
+    config.listicleOverlay != null &&
+    resolveListicleTemplate(config.listicleOverlay.templateId).aggregated;
+  const sourceVfx = (config.vfx ?? []).filter(
+    (clip) => clip.type !== "listicle-text" || !listicleAggregated,
+  );
   const vfx = buildVfx(
-    config.vfx ?? [],
+    sourceVfx,
     keepSegments,
     fps,
     config.cuts,

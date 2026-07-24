@@ -200,16 +200,23 @@ export async function runProcess(
   }
 
   if (config.listicle && !config.listicleOverlay) {
-    const overlay = await buildListicleOverlay({
+    const result = await buildListicleOverlay({
       enabled: config.listicle,
       captions,
       transcriptPath,
       cachePath: path.join(generatedDir, "listicle.json"),
       force,
     });
-    if (overlay) {
-      writeEpisodeConfig(episodeDir, { listicleOverlay: overlay });
-      config = { ...config, listicleOverlay: overlay };
+    if (result) {
+      writeEpisodeConfig(episodeDir, {
+        listicleOverlay: result.overlay,
+        vfx: [...(config.vfx ?? []), ...result.vfx],
+      });
+      config = {
+        ...config,
+        listicleOverlay: result.overlay,
+        vfx: [...(config.vfx ?? []), ...result.vfx],
+      };
     }
   }
 

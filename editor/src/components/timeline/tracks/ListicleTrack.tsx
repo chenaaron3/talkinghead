@@ -1,5 +1,8 @@
-import { clampRangeEdge, MIN_LISTICLE_SEC } from "../../../lib/range";
+import type { SourceListicleTextVfx } from "@src/lib/types";
+
+import { isListicleItemActive, resolveListicleItems } from "../../../lib/listicle";
 import { isSelected } from "../../../lib/selection";
+import { clampRangeEdge, MIN_LISTICLE_SEC } from "../../../lib/range";
 import { useTimelineSnap } from "../../../lib/use-timeline-snap";
 import { useSelection } from "../../../selection-store";
 import { useEditor } from "../../../store";
@@ -11,13 +14,17 @@ type Props = {
 };
 
 export function ListicleTrack({ width, sourceX }: Props) {
-  const listicle = useEditor((s) => s.config?.listicleOverlay);
+  const config = useEditor((s) => s.config);
+  const listicle = config?.listicleOverlay;
+  const items = resolveListicleItems(config);
   const selection = useSelection((s) => s.selection);
   const selectListicleItem = useSelection((s) => s.selectListicleItem);
+  const selectVfx = useSelection((s) => s.selectVfx);
   const updateListicleOverlay = useEditor((s) => s.updateListicleOverlay);
-  const updateListicleItemReveal = useEditor(
-    (s) => s.updateListicleItemReveal,
+  const updateListicleMarkerStart = useEditor(
+    (s) => s.updateListicleMarkerStart,
   );
+  const updateVfxRange = useEditor((s) => s.updateVfxRange);
   const snap = useTimelineSnap();
   const { startDrag } = useTrackDrag();
 
@@ -25,6 +32,68 @@ export function ListicleTrack({ width, sourceX }: Props) {
 
   const left = sourceX(listicle.start);
   const right = sourceX(listicle.end);
+
+  const itemSelected = (index: number) =>
+    isListicleItemActive(selection, config, index);
+
+  const clipSelected = (clipId: string) =>
+    isSelected(selection, "vfx", clipId);
+
+  const renderRangeBar = (
+    clip: SourceListicleTextVfx,
+    className: string,
+    label: string,
+  ) => (
+    <div
+      className={`absolute top-1 bottom-1 z-[1] cursor-pointer rounded px-1 text-[9px] text-white select-none ${className} ${
+        clipSelected(clip.id) ? "outline outline-2 outline-white" : ""
+      }`}
+      style={{
+        left: sourceX(clip.start),
+        width: Math.max(8, sourceX(clip.end) - sourceX(clip.start)),
+      }}
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        selectVfx(clip.id);
+      }}
+    >
+      <Handle
+        side="left"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          const origin = clip.start;
+          const fixedEnd = clip.end;
+          startDrag(e, (dxSec, _dxPx, shiftKey) => {
+            const raw = Math.max(0, origin + dxSec);
+            const snapped = snap(raw, shiftKey, "start");
+            const { start, end } = clampRangeEdge("start", snapped, {
+              start: origin,
+              end: fixedEnd,
+            });
+            updateVfxRange(clip.id, start, end, true);
+          });
+        }}
+      />
+      <Handle
+        side="right"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          const origin = clip.end;
+          const fixedStart = clip.start;
+          startDrag(e, (dxSec, _dxPx, shiftKey) => {
+            const raw = origin + dxSec;
+            const snapped = snap(raw, shiftKey, "end");
+            const { start, end } = clampRangeEdge("end", snapped, {
+              start: fixedStart,
+              end: origin,
+            });
+            updateVfxRange(clip.id, start, end, true);
+          });
+        }}
+      />
+    </div>
+  );
 
   return (
     <TrackLabel label="List" width={width}>
@@ -71,31 +140,40 @@ export function ListicleTrack({ width, sourceX }: Props) {
           }}
         />
       </div>
-      {listicle.items.map((item, i) => (
-        <div
-          key={`li-${i}`}
-          className={`absolute top-1 bottom-1 z-[1] flex w-6 cursor-ew-resize items-center justify-center rounded bg-green-500/70 text-[9px] text-white select-none hover:bg-green-400/80 ${
-            isSelected(selection, "listicleItem", i)
-              ? "z-[2] outline outline-2 outline-white"
-              : ""
-          }`}
-          style={{ left: sourceX(item.reveal) }}
-          title={`${item.label} @ ${item.reveal.toFixed(2)}s`}
-          onClick={(e) => {
-            e.stopPropagation();
-            selectListicleItem(i);
-          }}
-          onMouseDown={(e) => {
-            if (e.button !== 0) return;
-            const origin = item.reveal;
-            selectListicleItem(i);
-            startDrag(e, (dxSec, _dxPx, shiftKey) => {
-              const reveal = snap(origin + dxSec, shiftKey, "start");
-              updateListicleItemReveal(i, reveal, true);
-            });
-          }}
-        >
-          {i + 1}
+      {items.map(({ item, index, marker, reveal }) => (
+        <div key={item.id}>
+          <div
+            className={`absolute top-1 bottom-1 z-[2] flex w-6 cursor-pointer items-center justify-center rounded bg-green-500/70 text-[9px] text-white select-none hover:bg-green-400/80 ${
+              itemSelected(index) ? "outline outline-2 outline-white" : ""
+            }`}
+            style={{ left: sourceX(marker.start) }}
+            title={`${index + 1}. ${reveal.text}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              selectListicleItem(index);
+            }}
+            onMouseDown={(e) => {
+              if (e.button !== 0) return;
+              const origin = marker.start;
+              selectListicleItem(index);
+              startDrag(e, (dxSec, _dxPx, shiftKey) => {
+                const start = snap(origin + dxSec, shiftKey, "start");
+                updateListicleMarkerStart(index, start, true);
+              });
+            }}
+          >
+            {index + 1}
+          </div>
+          {renderRangeBar(
+            marker,
+            "bg-amber-500/60 hover:bg-amber-400/70",
+            `Marker: ${marker.text}`,
+          )}
+          {renderRangeBar(
+            reveal,
+            "bg-violet-500/60 hover:bg-violet-400/70",
+            `Reveal: ${reveal.text}`,
+          )}
         </div>
       ))}
     </TrackLabel>

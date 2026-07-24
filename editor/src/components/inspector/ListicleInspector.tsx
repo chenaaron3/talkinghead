@@ -1,25 +1,29 @@
-import type { SourceListicleItem } from "@src/lib/types";
+import type { ListicleTemplateId } from "@src/lib/listicle/templates";
 
+import { LISTICLE_TEMPLATE_LIST, resolveListicleOverlayTemplateId } from '../../lib/listicle';
 import { useEditor } from '../../store';
-import { TextField } from './field';
+import { StyleTemplatePicker } from './StyleTemplatePicker';
 
-export function ListicleInspector({
-  index,
-  item,
-}: {
-  index: number;
-  item: SourceListicleItem;
-}) {
-  const updateListicleItemLabel = useEditor((s) => s.updateListicleItemLabel);
+export function ListicleInspector() {
+  const listicle = useEditor((s) => s.config?.listicleOverlay);
+  const updateListicleTemplate = useEditor((s) => s.updateListicleTemplate);
+
+  if (!listicle) return null;
+
+  const templateId = resolveListicleOverlayTemplateId(listicle);
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[11px] text-muted">Item {index + 1}</p>
-      <TextField
-        id="listicle-label"
-        label="Label"
-        value={item.label}
-        onLiveChange={(label) => updateListicleItemLabel(index, label, true)}
+      <StyleTemplatePicker
+        templates={LISTICLE_TEMPLATE_LIST.map((t) => ({
+          id: t.id,
+          label: t.label,
+          style: t.marker.style,
+        }))}
+        value={templateId}
+        onChange={(id) =>
+          updateListicleTemplate(id as ListicleTemplateId)
+        }
       />
     </div>
   );

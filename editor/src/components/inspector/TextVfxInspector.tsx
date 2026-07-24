@@ -8,8 +8,8 @@ import { TextField } from './field';
 import { StyleTemplatePicker } from './StyleTemplatePicker';
 
 import type { TextTemplateId } from "@src/lib/text/templates";
-import type { SourceTextVfx } from "@src/lib/types";
-export function TextVfxInspector({ clip }: { clip: SourceTextVfx }) {
+import type { SourceScreenTextVfx } from "@src/lib/types";
+export function TextVfxInspector({ clip }: { clip: SourceScreenTextVfx }) {
   const updateTextTemplate = useEditor((s) => s.updateTextTemplate);
   const updateTextVfxStyle = useEditor((s) => s.updateTextVfxStyle);
   const updateTextVfxContent = useEditor((s) => s.updateTextVfxContent);

@@ -21,7 +21,7 @@ export function ListicleBadge({
         "relative mx-0.5 inline-flex cursor-ew-resize items-center align-middle select-none",
         dragging ? "z-10" : "",
       ].join(" ")}
-      title={`${number}. ${label} — drag to move reveal point`}
+      title={`${number}. ${label} — drag to move marker`}
       onMouseDown={onMouseDown}
       onClick={(e) => e.stopPropagation()}
     >

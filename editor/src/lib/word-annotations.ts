@@ -1,5 +1,6 @@
 import type { EpisodeConfig, SourceVfx, VfxType } from "@src/lib/types";
 import { findIntroTextVfx } from "@src/lib/episode/text-vfx";
+import { listicleItemLabel, resolveListicleItems } from "./listicle";
 import type { FlatCaption } from "./captions";
 import { vfxClipLabel } from "./vfx";
 
@@ -29,6 +30,10 @@ export type WordAnnotation = {
   listicleNumber?: number;
   listicleItemIndex?: number;
   listicleLabel?: string;
+  /** Listicle marker text range (shown when item selected). */
+  listicleMarkerRange?: { id: string; itemIndex: number; edge: RangeEdge };
+  /** Listicle reveal text range (shown when item selected). */
+  listicleRevealRange?: { id: string; itemIndex: number; edge: RangeEdge };
 };
 
 function rangeEdge(
@@ -50,14 +55,17 @@ function rangeEdge(
   return "middle";
 }
 
-function listicleItemAt(
+function listicleMarkerAt(
   caption: FlatCaption,
-  items: { label: string; reveal: number }[],
+  config: EpisodeConfig,
 ): { index: number; number: number; label: string } | undefined {
-  for (let i = 0; i < items.length; i++) {
-    const reveal = items[i]!.reveal;
-    if (reveal >= caption.start && reveal < caption.end) {
-      return { index: i, number: i + 1, label: items[i]!.label };
+  for (const { item, index, marker } of resolveListicleItems(config)) {
+    if (marker.start >= caption.start && marker.start < caption.end) {
+      return {
+        index,
+        number: index + 1,
+        label: listicleItemLabel(config, item),
+      };
     }
   }
   return undefined;
@@ -104,50 +112,24 @@ function vfxMarkersAt(
  */
 function attachIntroTextMarker(
   captions: FlatCaption[],
-  clips: SourceVfx[],
+  vfx: SourceVfx[],
   out: Map<number, WordAnnotation>,
 ): void {
   if (captions.length === 0) return;
-  const clip = findIntroTextVfx(clips, captions[0]!.start);
-  if (!clip) return;
-
-  const target = captions[0]!;
-  const annotation = out.get(target.index) ?? {};
-  const markers = annotation.vfxMarkers ?? [];
-  if (!markers.some((m) => m.id === clip.id)) {
-    markers.push({
-      id: clip.id,
-      type: clip.type,
-      label: vfxClipLabel(clip),
-    });
-    annotation.vfxMarkers = markers;
-  }
-  // Short intro that ends before speech: still show a range chip on word 0.
-  const overlaps = captions.some(
-    (c) => c.start < clip.end && c.end > clip.start,
-  );
-  if (!overlaps) {
-    const ranges = annotation.vfxRanges ?? [];
-    if (!ranges.some((r) => r.id === clip.id)) {
-      ranges.push({ id: clip.id, edge: "both" });
-      annotation.vfxRanges = ranges;
-    }
-  }
-  out.set(target.index, annotation);
-}
-
-function punchInMarkersAt(
-  caption: FlatCaption,
-  segments: { start: number }[],
-): Array<{ index: number }> {
-  const out: Array<{ index: number }> = [];
-  for (let i = 0; i < segments.length; i++) {
-    const start = segments[i]!.start;
-    if (start >= caption.start && start < caption.end) {
-      out.push({ index: i });
-    }
-  }
-  return out;
+  const firstWordStart = captions[0]!.start;
+  const intro = findIntroTextVfx(vfx, firstWordStart);
+  if (!intro) return;
+  const first = captions[0]!;
+  const existing = out.get(first.index) ?? {};
+  const markers = existing.vfxMarkers ?? [];
+  if (markers.some((m) => m.id === intro.id)) return;
+  out.set(first.index, {
+    ...existing,
+    vfxMarkers: [
+      ...markers,
+      { id: intro.id, label: vfxClipLabel(intro), type: intro.type },
+    ],
+  });
 }
 
 export function buildWordAnnotations(
@@ -157,7 +139,7 @@ export function buildWordAnnotations(
   const out = new Map<number, WordAnnotation>();
   if (!config) return out;
 
-  const listicleItems = config.listicleOverlay?.items ?? [];
+  const listicleItems = resolveListicleItems(config);
 
   for (const caption of captions) {
     const annotation: WordAnnotation = {};
@@ -174,12 +156,16 @@ export function buildWordAnnotations(
 
     const vfxRanges: Array<{ id: string; edge: RangeEdge }> = [];
     for (const clip of config.vfx ?? []) {
+      if (clip.type === "listicle-text") continue;
       const edge = rangeEdge(caption, clip.start, clip.end, captions);
       if (edge) vfxRanges.push({ id: clip.id, edge });
     }
     if (vfxRanges.length > 0) annotation.vfxRanges = vfxRanges;
 
-    const vfxMarkers = vfxMarkersAt(caption, config.vfx ?? []);
+    const vfxMarkers = vfxMarkersAt(
+      caption,
+      (config.vfx ?? []).filter((clip) => clip.type !== "listicle-text"),
+    );
     if (vfxMarkers.length > 0) annotation.vfxMarkers = vfxMarkers;
 
     const sfx = sfxAt(caption, config.sfx ?? []);
@@ -208,11 +194,40 @@ export function buildWordAnnotations(
     );
     if (punchInMarkers.length > 0) annotation.punchInMarkers = punchInMarkers;
 
-    const listicleItem = listicleItemAt(caption, listicleItems);
+    const listicleItem = listicleMarkerAt(caption, config);
     if (listicleItem) {
       annotation.listicleNumber = listicleItem.number;
       annotation.listicleItemIndex = listicleItem.index;
       annotation.listicleLabel = listicleItem.label;
+    }
+
+    for (const { index, marker, reveal } of listicleItems) {
+      const markerEdge = rangeEdge(
+        caption,
+        marker.start,
+        marker.end,
+        captions,
+      );
+      if (markerEdge) {
+        annotation.listicleMarkerRange = {
+          id: marker.id,
+          itemIndex: index,
+          edge: markerEdge,
+        };
+      }
+      const revealEdge = rangeEdge(
+        caption,
+        reveal.start,
+        reveal.end,
+        captions,
+      );
+      if (revealEdge) {
+        annotation.listicleRevealRange = {
+          id: reveal.id,
+          itemIndex: index,
+          edge: revealEdge,
+        };
+      }
     }
 
     if (Object.keys(annotation).length > 0) {
@@ -223,4 +238,18 @@ export function buildWordAnnotations(
   attachIntroTextMarker(captions, config.vfx ?? [], out);
 
   return out;
+}
+
+function punchInMarkersAt(
+  caption: FlatCaption,
+  segments: { start: number }[],
+): Array<{ index: number }> {
+  const markers: Array<{ index: number }> = [];
+  for (let i = 0; i < segments.length; i++) {
+    const start = segments[i]!.start;
+    if (start >= caption.start && start < caption.end) {
+      markers.push({ index: i });
+    }
+  }
+  return markers;
 }

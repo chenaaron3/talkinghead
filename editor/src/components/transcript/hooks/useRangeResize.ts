@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { cutsToKeepRegions } from "@src/lib/timeline/source-timeline";
 import type { FlatCaption } from "../../../lib/captions";
-import type { RangeKind } from "../../../lib/active-range";
+import { isClipVfxRangeKind, type RangeKind } from "../../../lib/active-range";
 import {
   captionForEndEdge,
   captionForStartEdge,
@@ -16,7 +16,6 @@ import {
   EMPTY_CUTS,
   EMPTY_PUNCH_INS,
   EMPTY_SFX,
-  EMPTY_VFX,
 } from "../../../lib/empty";
 import { useSelection } from "../../../selection-store";
 import { useEditor } from "../../../store";
@@ -29,7 +28,7 @@ export type RangeResize =
       linked: LinkedEdgeTarget[];
     }
   | {
-      kind: "vfx";
+      kind: "vfx" | "listicleMarker" | "listicleReveal";
       id: string;
       edge: "start" | "end";
       linked: LinkedEdgeTarget[];
@@ -85,7 +84,6 @@ function linkedForEdge(
 
 export function useRangeResize() {
   const bRolls = useEditor((s) => s.config?.bRolls ?? EMPTY_BROLLS);
-  const vfx = useEditor((s) => s.config?.vfx ?? EMPTY_VFX);
   const sfx = useEditor((s) => s.config?.sfx ?? EMPTY_SFX);
   const punchIns = useEditor((s) => s.config?.punchInSegments ?? EMPTY_PUNCH_INS);
   const captions = useEditor((s) => s.transcript?.captions ?? EMPTY_CAPTIONS);
@@ -109,8 +107,8 @@ export function useRangeResize() {
   const updateVfxRange = useEditor((s) => s.updateVfxRange);
   const updateSfxRange = useEditor((s) => s.updateSfxRange);
   const updatePunchInRange = useEditor((s) => s.updatePunchInRange);
-  const updateListicleItemReveal = useEditor(
-    (s) => s.updateListicleItemReveal,
+  const updateListicleMarkerStart = useEditor(
+    (s) => s.updateListicleMarkerStart,
   );
   const beginGesture = useEditor((s) => s.beginGesture);
 
@@ -138,9 +136,7 @@ export function useRangeResize() {
       return;
     }
     if (target.kind === "vfx") {
-      const clip = useEditor
-        .getState()
-        .config?.vfx?.find((c) => c.id === target.id);
+      const clip = useEditor.getState().config?.vfx?.find((c) => c.id === target.id);
       if (!clip) return;
       const { start, end } = clampRangeEdge(edge, value, clip);
       updateVfxRange(clip.id, start, end, true);
@@ -160,14 +156,14 @@ export function useRangeResize() {
     if (!resize) return;
 
     if (resize.kind === "listicle") {
-      const reveal = snapTranscriptCaptionEdge(
+      const start = snapTranscriptCaptionEdge(
         caption,
         "start",
         indexedCaptions,
         keeps,
       );
-      updateListicleItemReveal(resize.id, reveal, true);
-      seekSource(reveal);
+      updateListicleMarkerStart(resize.id, start, true);
+      seekSource(start);
       return;
     }
 
@@ -181,7 +177,9 @@ export function useRangeResize() {
     const primary: LinkedEdgeTarget =
       resize.kind === "zoom"
         ? { kind: "zoom", id: resize.id }
-        : { kind: resize.kind, id: resize.id };
+        : isClipVfxRangeKind(resize.kind)
+          ? { kind: "vfx", id: String(resize.id) }
+          : { kind: resize.kind, id: String(resize.id) };
 
     applyEdge(primary, resize.edge, value);
 
@@ -221,9 +219,10 @@ export function useRangeResize() {
       return;
     }
 
-    if (kind === "vfx") {
+    if (isClipVfxRangeKind(kind)) {
       const clipId = String(id);
-      const clip = vfx.find((c) => c.id === clipId);
+      const config = useEditor.getState().config;
+      const clip = config?.vfx?.find((c) => c.id === clipId);
       if (!clip) return;
       selectVfx(clipId);
       const sec = edge === "start" ? clip.start : clip.end;
@@ -233,7 +232,7 @@ export function useRangeResize() {
         { kind: "vfx", id: clipId },
         indexedCaptions,
       );
-      setResize({ kind: "vfx", id: clipId, edge, linked });
+      setResize({ kind, id: clipId, edge, linked });
       seekSource(sec);
       return;
     }
@@ -277,12 +276,15 @@ export function useRangeResize() {
   const startListicleDrag = (e: MouseEvent, itemIndex: number) => {
     e.preventDefault();
     e.stopPropagation();
-    const item = useEditor.getState().config?.listicleOverlay?.items[itemIndex];
+    const config = useEditor.getState().config;
+    const item = config?.listicleOverlay?.items[itemIndex];
     if (!item) return;
+    const marker = config?.vfx?.find((c) => c.id === item.markerId);
+    if (!marker) return;
     beginGesture();
     selectListicleItem(itemIndex);
     setResize({ kind: "listicle", id: itemIndex });
-    seekSource(item.reveal);
+    seekSource(marker.start);
   };
 
   return {

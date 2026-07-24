@@ -135,6 +135,8 @@ export type CaptionStyle = {
    * instead of a single rectangular stamp.
    */
   contourBoard?: boolean;
+  /** Custom CSS text-shadow; overrides the boolean `shadow` when set. */
+  textShadow?: string | null;
 };
 
 /** Matches the historic hard-coded TikTok yellow captions. */

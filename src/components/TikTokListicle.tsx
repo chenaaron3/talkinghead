@@ -118,7 +118,7 @@ function ListicleRow({
   frame: number;
   fps: number;
 }) {
-  const local = frame - item.revealFrame;
+  const local = frame - item.startFrame;
   const enterFrames = Math.max(1, Math.round(ROW_ENTER_SEC * fps));
   const checkFrames = Math.max(1, Math.round(CHECK_ANIM_SEC * fps));
 
@@ -148,7 +148,9 @@ function ListicleRow({
       }}
     >
       <CheckCircle progress={checkProgress} />
-      <p style={{ ...LABEL_STYLE, opacity: labelOpacity }}>{item.label}</p>
+      <p style={{ ...LABEL_STYLE, opacity: labelOpacity }}>
+        {item.text}
+      </p>
     </div>
   );
 }
@@ -164,10 +166,10 @@ export const TikTokListicle: React.FC<{
   const sfx = (
     <SfxOverlay
       sfx={listicle.items.map((item, index) => ({
-        id: `listicle-${item.revealFrame}-${index}`,
+        id: `listicle-${item.startFrame}-${index}`,
         src: "sfx/realistic/mouse_click.wav",
-        startFrame: item.revealFrame,
-        endFrame: item.revealFrame + Math.max(1, Math.ceil(0.2 * fps)),
+        startFrame: item.startFrame,
+        endFrame: item.startFrame + Math.max(1, Math.ceil(0.2 * fps)),
       }))}
     />
   );
@@ -177,7 +179,7 @@ export const TikTokListicle: React.FC<{
   }
 
   const visibleItems = listicle.items.filter(
-    (item) => frame >= item.revealFrame,
+    (item) => frame >= item.startFrame,
   );
   if (visibleItems.length === 0) {
     return sfx;
@@ -204,7 +206,7 @@ export const TikTokListicle: React.FC<{
         <div style={CARD_STYLE}>
           {visibleItems.map((item, index) => (
             <ListicleRow
-              key={`${item.revealFrame}-${item.label}-${index}`}
+              key={`${item.startFrame}-${item.text}-${index}`}
               item={item}
               frame={frame}
               fps={fps}

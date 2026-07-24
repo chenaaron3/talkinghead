@@ -25,6 +25,9 @@ export function useListicleOverlay(listicle: ListicleOverlay | null): {
   return {
     active,
     showText: !active || frame < minTextFrames,
-    node: listicle ? <TikTokListicle listicle={listicle} /> : null,
+    node:
+      listicle && listicle.aggregated !== false ? (
+        <TikTokListicle listicle={listicle} />
+      ) : null,
   };
 }

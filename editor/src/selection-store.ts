@@ -131,7 +131,21 @@ export const useSelection = create<SelectionState & SelectionActions>(
     selectSfx: (id) => get().select("sfx", id),
     selectMusic: (id) => get().select("music", id),
     selectPunchIn: (index) => get().select("punchIn", index),
-    selectListicleItem: (index) => get().select("listicleItem", index),
+    selectListicleItem: (index) => {
+      get().select("listicleItem", index);
+      if (index == null) return;
+      const editor = useEditor.getState();
+      const item = editor.config?.listicleOverlay?.items[index];
+      if (!item) return;
+      const marker = editor.config?.vfx?.find((c) => c.id === item.markerId);
+      if (!marker) return;
+      if (
+        editor.sourceSec < marker.start ||
+        editor.sourceSec >= marker.end
+      ) {
+        editor.seekSource(marker.start);
+      }
+    },
     selectGap: (gapId) => get().select("gap", gapId),
     selectKeepRegion: (index) => get().select("keepRegion", index),
     selectCaption: (index, mode = "replace") => {

@@ -22,9 +22,11 @@ export function captionStyleToCss(style: CaptionStyle): CSSProperties {
       ? `${style.stroke.width}px ${style.stroke.color}`
       : undefined,
     paintOrder: style.stroke ? "stroke fill" : undefined,
-    textShadow: style.shadow
-      ? "0 3px 0 #000, 0 6px 16px rgba(0,0,0,0.85)"
-      : undefined,
+    textShadow:
+      style.textShadow ??
+      (style.shadow
+        ? "0 3px 0 #000, 0 6px 16px rgba(0,0,0,0.85)"
+        : undefined),
     margin: 0,
     maxWidth: "100%",
   };

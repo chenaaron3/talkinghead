@@ -28,6 +28,23 @@ export type QuoteTemplate = {
 
 export const DEFAULT_QUOTE_TEMPLATE_ID: QuoteTemplateId = "handwritten-white";
 
+const QUOTE_TEXT_SHADOW =
+  "0 2px 0 #000, 0 4px 14px rgba(0,0,0,0.8)";
+
+const QUOTE_WHITE_WORD = {
+  fill: "#FFFFFF",
+  opacity: 1,
+  border: { width: 6, color: "#000000" },
+  textShadow: QUOTE_TEXT_SHADOW,
+} as const;
+
+const QUOTE_HANDWRITTEN_WORD = {
+  fill: "#FFFFFF",
+  opacity: 1,
+  border: { width: 5, color: "#000000" },
+  textShadow: QUOTE_TEXT_SHADOW,
+} as const;
+
 const BOLD_WHITE_BASE: CaptionGroupStyle = {
   fontFamily: "montserrat",
   fontSize: 72,
@@ -38,10 +55,7 @@ const BOLD_WHITE_BASE: CaptionGroupStyle = {
   background: { kind: "none" },
   fontStyle: "normal",
   textAlign: "center",
-  wordStyle: {
-    fill: "#FFFFFF",
-    opacity: 1,
-  },
+  wordStyle: { ...QUOTE_WHITE_WORD },
 };
 
 export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
@@ -63,10 +77,7 @@ export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
       background: { kind: "none" },
       fontStyle: "normal",
       textAlign: "center",
-      wordStyle: {
-        fill: "#FFFFFF",
-        opacity: 1,
-      },
+      wordStyle: { ...QUOTE_HANDWRITTEN_WORD },
     },
   },
   "handwritten-box": {
@@ -82,10 +93,7 @@ export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
       background: { kind: "box", color: "rgba(0, 0, 0, 0.82)" },
       fontStyle: "normal",
       textAlign: "center",
-      wordStyle: {
-        fill: "#FFFFFF",
-        opacity: 1,
-      },
+      wordStyle: { ...QUOTE_HANDWRITTEN_WORD },
     },
   },
   scrappy: {

@@ -94,7 +94,46 @@ export function applyEmphasisFill(
   emphasis: CaptionEmphasis | undefined,
 ): WordStyle {
   if (!emphasis) return wordStyle;
-  return { ...wordStyle, fill: EMPHASIS_COLORS[emphasis] };
+
+  const lum = hexFillLuminance(wordStyle.fill);
+  const onLight = lum != null && lum > 0.8;
+  const fill = onLight
+    ? EMPHASIS_ON_LIGHT_FILL[emphasis]
+    : EMPHASIS_COLORS[emphasis];
+
+  const border = wordStyle.border ?? (onLight ? DEFAULT_EMPHASIS_BORDER : undefined);
+  const emphasizedBorder =
+    border && onLight
+      ? { ...border, width: border.width + 1 }
+      : border;
+
+  return {
+    ...wordStyle,
+    fill,
+    border: emphasizedBorder,
+    textShadow: wordStyle.textShadow ?? (onLight ? EMPHASIS_TEXT_SHADOW : undefined),
+  };
+}
+
+const DEFAULT_EMPHASIS_BORDER = { width: 6, color: "#000000" };
+
+const EMPHASIS_TEXT_SHADOW =
+  "0 2px 0 #000, 0 4px 14px rgba(0,0,0,0.8)";
+
+/** Brighter emphasis fills when the base word is white / light (quotes, UGC, etc.). */
+const EMPHASIS_ON_LIGHT_FILL: Record<CaptionEmphasis, string> = {
+  positive: "#FFE600",
+  negative: "#FF5252",
+};
+
+function hexFillLuminance(fill: string): number | null {
+  const match = /^#([0-9a-fA-F]{6})$/i.exec(fill.trim());
+  if (!match) return null;
+  const hex = match[1]!;
+  const r = Number.parseInt(hex.slice(0, 2), 16) / 255;
+  const g = Number.parseInt(hex.slice(2, 4), 16) / 255;
+  const b = Number.parseInt(hex.slice(4, 6), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
 /** @deprecated Use captionGroupCss — kept for any lingering imports. */

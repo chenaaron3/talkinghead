@@ -1,30 +1,40 @@
-import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
-import YAML from 'yaml';
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import YAML from "yaml";
 
-import { findSourceVideo, loadEpisodeConfig, writeEpisodeConfig } from '../../cli/helpers/config';
-import { createEpisodeWithVideo } from '../../cli/helpers/episode-id';
-import { ensurePreviewProxy } from '../../cli/helpers/preview-proxy';
-import { rebuildAllPropsIndex } from '../../cli/helpers/props-index';
 import {
-    AUDIO_EXTENSIONS, HEIC_EXTENSIONS, IMAGE_EXTENSIONS, PUBLIC_MUSIC_DIR, PUBLIC_SFX_DIR, ROOT,
-    SOURCE_DIR, VIDEO_EXTENSIONS
-} from '../../cli/helpers/types';
-import { probeVideoFps } from '../../cli/helpers/whisper';
-import { runProcess } from '../../cli/process';
-import { renderEpisode } from '../../cli/render-episode';
-import { runSchedule } from '../../cli/schedule/run';
-import { buildProps } from '../../src/lib/episode/build-props';
-import { normalizeBRollMedia, probeMedia } from './broll-media';
-import { getEpisodeScheduleInfo, listEditorEpisodes } from './episodes';
+  findSourceVideo,
+  loadEpisodeConfig,
+  writeEpisodeConfig,
+} from "../../cli/helpers/config";
+import { createEpisodeWithVideo } from "../../cli/helpers/episode-id";
+import { ensurePreviewProxy } from "../../cli/helpers/preview-proxy";
+import { rebuildAllPropsIndex } from "../../cli/helpers/props-index";
+import {
+  AUDIO_EXTENSIONS,
+  HEIC_EXTENSIONS,
+  IMAGE_EXTENSIONS,
+  PUBLIC_MUSIC_DIR,
+  PUBLIC_SFX_DIR,
+  ROOT,
+  SOURCE_DIR,
+  VIDEO_EXTENSIONS,
+} from "../../cli/helpers/types";
+import { probeVideoFps } from "../../cli/helpers/whisper";
+import { runProcess } from "../../cli/process";
+import { renderEpisode } from "../../cli/render-episode";
+import { runSchedule } from "../../cli/schedule/run";
+import { buildProps } from "../../src/lib/episode/build-props";
+import { normalizeBRollMedia, probeMedia } from "./broll-media";
+import { getEpisodeScheduleInfo, listEditorEpisodes } from "./episodes";
 import {
   bakeLocationMap,
   deleteVfxAsset,
   ensureVfxAssets,
   listEpisodeVfxAssets,
   searchPlaces,
-} from './vfx-location';
+} from "./vfx-location";
 
 import type { Plugin } from "vite";
 import type { EpisodeConfig, Transcript } from "../../cli/helpers/types";
@@ -402,7 +412,15 @@ function loadEpisodeData(episodeId: string) {
     ? (JSON.parse(fs.readFileSync(waveformPath, "utf8")) as SerializedWaveform)
     : null;
 
-  return { episodeDir, config, transcript, props, editorProps, probe, waveform };
+  return {
+    episodeDir,
+    config,
+    transcript,
+    props,
+    editorProps,
+    probe,
+    waveform,
+  };
 }
 
 function ensureBRollAssets(bRolls: EpisodeConfig["bRolls"]) {
@@ -527,6 +545,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
               ...existingYaml,
               aroll: body.config.aroll,
               title: body.config.title,
+              captionTemplateId: body.config.captionTemplateId,
               captionStyle: body.config.captionStyle,
               cuts: body.config.cuts,
               listicleOverlay: body.config.listicleOverlay,
@@ -848,6 +867,7 @@ export function editorApiPlugin(defaultEpisodeId: string | null): Plugin {
                 writeEpisodeConfig(episodeDir, {
                   aroll: body.config.aroll,
                   title: body.config.title,
+                  captionTemplateId: body.config.captionTemplateId,
                   captionStyle: body.config.captionStyle,
                   cuts: body.config.cuts,
                   listicleOverlay: body.config.listicleOverlay,

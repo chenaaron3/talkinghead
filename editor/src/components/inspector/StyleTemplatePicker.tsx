@@ -15,7 +15,7 @@ export type StyleTemplateChip = {
   style: CaptionGroupStyle;
 };
 
-/** Shared template preview + sidescroll used by Captions, Quote, and Title inspectors. */
+/** Shared template preview + chip picker for Captions, Quote, and Title inspectors. */
 export function StyleTemplatePicker({
   templates,
   value,
@@ -64,8 +64,7 @@ export function StyleTemplatePicker({
         )}
       </div>
 
-      <div className="min-w-0 overflow-x-auto">
-        <div className="flex w-max gap-2 pb-1">
+      <div className="flex min-w-0 flex-wrap gap-2">
           {templates.map((template) => {
             const selectedChip = template.id === value;
             const face = resolveCaptionFont(template.style.fontFamily);
@@ -105,7 +104,6 @@ export function StyleTemplatePicker({
               </button>
             );
           })}
-        </div>
       </div>
     </div>
   );

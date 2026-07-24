@@ -203,7 +203,7 @@ export const CAPTION_ENTER_SEC = 0.18;
 export const WORD_STATE_BLEND_SEC = 0.08;
 
 /** Group-scope typewriter delay between characters. */
-export const TYPEWRITER_CHAR_DELAY_SEC = 0.01;
+export const TYPEWRITER_CHAR_DELAY_SEC = 0.02;
 
 export function resolveCaptionFont(id: CaptionFontId): CaptionFontFace {
   return CAPTION_FONTS[id];

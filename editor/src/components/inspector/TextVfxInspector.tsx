@@ -22,7 +22,7 @@ export function TextVfxInspector({ clip }: { clip: SourceScreenTextVfx }) {
   const overrides = normalizeCaptionOverrides(clip.style);
 
   return (
-    <div className="flex w-full min-w-0 max-w-full flex-col gap-4 overflow-x-hidden">
+    <div className="flex w-full min-w-0 flex-col gap-4">
       <TextField
         id="text-vfx-content"
         label="Text"
@@ -45,8 +45,8 @@ export function TextVfxInspector({ clip }: { clip: SourceScreenTextVfx }) {
         resolvedFill={style.wordStyle.fill}
         resolvedY={style.y}
         resolvedFontSize={style.fontSize}
-        resolvedCaptionsAtATime={style.captionsAtATime}
         onPatch={(partial, live) => updateTextVfxStyle(clip.id, partial, live)}
+        showCaptionsAtATime={false}
       />
     </div>
   );

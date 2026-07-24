@@ -30,7 +30,7 @@ export function CaptionsInspector() {
   );
 
   return (
-    <div className="flex w-full min-w-0 max-w-full flex-col gap-4 overflow-x-hidden">
+    <div className="flex w-full min-w-0 flex-col gap-4">
       <StyleTemplatePicker
         templates={CAPTION_TEMPLATE_LIST}
         value={templateId}

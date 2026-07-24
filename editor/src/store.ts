@@ -193,7 +193,7 @@ type EditorActions = {
     patch: CaptionStyleOverrides,
     live?: boolean,
   ) => void;
-  /** Switch caption template; preserves existing overrides. */
+  /** Switch caption template; preserves Y override only. */
   setCaptionTemplate: (templateId: CaptionTemplateId, live?: boolean) => void;
   updateQuoteTemplate: (id: string, templateId: QuoteTemplateId) => void;
   updateQuoteStyle: (
@@ -1176,13 +1176,15 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       const id = isCaptionTemplateId(templateId)
         ? templateId
         : DEFAULT_CAPTION_TEMPLATE_ID;
+      const prev = normalizeCaptionOverrides(config.captionStyle);
+      const captionStyle: CaptionStyleOverrides =
+        prev.y != null ? { y: prev.y } : {};
       commit(
         {
           config: {
             ...config,
             captionTemplateId: id,
-            // Preserve overrides on template switch.
-            captionStyle: normalizeCaptionOverrides(config.captionStyle),
+            captionStyle,
           },
           transcript,
         },

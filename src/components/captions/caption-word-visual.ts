@@ -1,149 +1,177 @@
 import type { CSSProperties } from "react";
 
-import type {
-  CaptionAnimation,
-  CaptionBackdrop,
+import {
+  WORD_STATE_BLEND_SEC,
+  type CaptionGroupStyle,
+  type WordStyle,
 } from "../../lib/captions/style";
-import { DEFAULT_HIGHLIGHT_COLOR } from "../../lib/captions/style";
 import type { CaptionWord } from "../../lib/types";
 
 import {
-  EMPHASIS_COLORS,
-  EMPHASIS_POP_SEC,
-  wordFadeOpacity,
-  wordPopScale,
+  resolveEnterExitMotion,
+  wordStateBlendT,
+  wordTypewriterCharStart,
+  type CaptionMotion,
 } from "./caption-animation";
+import { backgroundChromeStyle, scrapRotationDeg } from "./CaptionBackground";
+import {
+  applyEmphasisFill,
+  blendWordStyles,
+  resolveWordStyleForState,
+  wordStyleToCss,
+} from "./caption-style-css";
 
-/** Resolved paint props for one caption word. */
 export type CaptionWordVisual = {
-  /** Typewriter omits unspoken words entirely (layout grows). */
   mount: boolean;
-  color?: string;
   opacity: number;
   transform?: string;
-  visibility: "visible" | "hidden";
+  wordCss: CSSProperties;
+  backgroundCss: CSSProperties;
 };
 
-export type ResolveCaptionWordVisualInput = {
+function motionTransform(
+  motion: CaptionMotion,
+  scrapIndex: number,
+  scrap: boolean,
+): string | undefined {
+  const parts: string[] = [];
+  if (motion.scale !== 1) parts.push(`scale(${motion.scale})`);
+  if (motion.translateY !== 0) parts.push(`translateY(${motion.translateY}px)`);
+  if (scrap) parts.push(`rotate(${scrapRotationDeg(scrapIndex)}deg)`);
+  return parts.length > 0 ? parts.join(" ") : undefined;
+}
+
+function resolvePaintStyle(
+  groupStyle: CaptionGroupStyle,
+  word: CaptionWord,
+  frame: number,
+  fps: number,
+  cycleStates: boolean,
+): WordStyle {
+  if (!cycleStates) {
+    return applyEmphasisFill(
+      resolveWordStyleForState(groupStyle, "active"),
+      word.emphasis,
+    );
+  }
+
+  const blend = wordStateBlendT(frame, word, fps, WORD_STATE_BLEND_SEC);
+  const from = resolveWordStyleForState(groupStyle, blend.from);
+  const to = resolveWordStyleForState(groupStyle, blend.to);
+  const mixed = blendWordStyles(from, to, blend.t);
+  return applyEmphasisFill(mixed, word.emphasis);
+}
+
+function hasWordStateDeltas(style: CaptionGroupStyle): boolean {
+  return Boolean(
+    style.pastWordStyle || style.futureWordStyle || style.activeWordStyle,
+  );
+}
+
+/**
+ * Paint + optional per-word enter/exit.
+ * Typewriter letter reveal / cursor live in {@link CaptionWordSpan}.
+ */
+export function resolveCaptionWordVisual(input: {
   word: CaptionWord;
   index: number;
   frame: number;
   fps: number;
   groupEndFrame: number;
-  fadeFrames: number;
-  animation: CaptionAnimation;
-  spoken: boolean;
-  active: boolean;
-  backdrop: CaptionBackdrop;
-};
+  groupStyle: CaptionGroupStyle;
+  /** When true, apply groupStyle.animation enter/exit on this word. */
+  animateWord: boolean;
+  /** When true, cycle past/active/future (if deltas exist). */
+  cycleWordStates: boolean;
+}): CaptionWordVisual {
+  const {
+    word,
+    index,
+    frame,
+    fps,
+    groupEndFrame,
+    groupStyle,
+    animateWord,
+    cycleWordStates,
+  } = input;
 
-function scrapRotationDeg(index: number): number {
-  return ((index * 37) % 13) - 6;
-}
+  const cycleStates = cycleWordStates && hasWordStateDeltas(groupStyle);
+  const paint = resolvePaintStyle(
+    groupStyle,
+    word,
+    frame,
+    fps,
+    cycleStates,
+  );
+  const bg = paint.background;
+  const scrap = bg?.kind === "scrap";
+  const typewriter = groupStyle.animation === "typewriter";
 
-function scrapClipPath(index: number): string {
-  const variants = [
-    "polygon(2% 8%, 96% 3%, 100% 88%, 4% 97%)",
-    "polygon(0% 12%, 98% 0%, 94% 100%, 3% 90%)",
-    "polygon(4% 0%, 100% 6%, 97% 94%, 0% 100%)",
-    "polygon(1% 5%, 100% 2%, 96% 100%, 0% 92%)",
-  ];
-  return variants[index % variants.length]!;
-}
-
-/** Pill / scrap chrome shared by render + template preview. */
-export function captionWordBackdropStyle(
-  backdrop: CaptionBackdrop,
-  index: number,
-): CSSProperties {
-  if (backdrop === "scrap") {
+  // Text / non-animated words: paint only (parent may own group motion).
+  if (!animateWord) {
+    if (typewriter && frame < word.startFrame) {
+      return {
+        mount: false,
+        opacity: 0,
+        wordCss: wordStyleToCss(paint),
+        backgroundCss: {},
+      };
+    }
     return {
-      backgroundColor: "#FFFFFF",
-      padding: "0.12em 0.28em",
-      clipPath: scrapClipPath(index),
-      boxDecorationBreak: "clone",
-      WebkitBoxDecorationBreak: "clone",
+      mount: true,
+      opacity: paint.opacity ?? 1,
+      transform: scrap ? `rotate(${scrapRotationDeg(index)}deg)` : undefined,
+      wordCss: wordStyleToCss({ ...paint, opacity: 1 }),
+      backgroundCss: backgroundChromeStyle(bg, index),
     };
   }
-  if (backdrop === "pill") {
+
+  // Caption words: enter/exit on the word (typewriter uses letter reveal instead).
+  const showUnspoken = cycleStates;
+  if (frame < word.startFrame && !showUnspoken) {
     return {
-      backgroundColor: "rgba(0, 0, 0, 0.78)",
-      padding: "0.12em 0.4em",
-      borderRadius: 999,
+      mount: false,
+      opacity: 0,
+      wordCss: wordStyleToCss(paint),
+      backgroundCss: {},
     };
   }
-  return {};
-}
 
-/**
- * Map caption word + animation state → flat visual props.
- * Used by CaptionWordSpan and the inspector template preview.
- */
-export function resolveCaptionWordVisual({
-  word,
-  index,
-  frame,
-  fps,
-  groupEndFrame,
-  fadeFrames,
-  animation,
-  spoken,
-  active,
-  backdrop,
-}: ResolveCaptionWordVisualInput): CaptionWordVisual {
-  if (animation === "typewriter" && !spoken) {
-    return { mount: false, opacity: 0, visibility: "hidden" };
+  const motion =
+    frame < word.startFrame && showUnspoken
+      ? { opacity: 1, scale: 1, translateY: 0, mount: true }
+      : resolveEnterExitMotion({
+          animation: typewriter ? "none" : groupStyle.animation,
+          frame,
+          startFrame: word.startFrame,
+          endFrame: groupEndFrame,
+          fps,
+        });
+
+  if (!motion.mount) {
+    return {
+      mount: false,
+      opacity: 0,
+      wordCss: wordStyleToCss(paint),
+      backgroundCss: {},
+    };
   }
-
-  let color: string | undefined;
-  let scale: number | undefined;
-  let opacity = 1;
-  let visibility: "visible" | "hidden" =
-    spoken || animation === "karaoke" || animation === "typewriter"
-      ? "visible"
-      : "hidden";
-
-  switch (animation) {
-    case "karaoke":
-      // Ahead words stay visible but dim; spoken words go full yellow.
-      color = spoken ? DEFAULT_HIGHLIGHT_COLOR : undefined;
-      opacity = spoken ? 1 : 0.35;
-      if (active) scale = wordPopScale(frame, word, fps, EMPHASIS_POP_SEC);
-      break;
-
-    case "pop":
-      if (spoken) scale = wordPopScale(frame, word, fps);
-      break;
-
-    case "fade":
-      opacity = spoken
-        ? wordFadeOpacity(frame, word, groupEndFrame, fadeFrames)
-        : 0;
-      break;
-
-    case "none":
-    case "typewriter":
-      break;
-  }
-
-  // Emphasis color wins over karaoke yellow / default paint.
-  if (word.emphasis) {
-    color = EMPHASIS_COLORS[word.emphasis];
-  }
-
-  if (animation !== "karaoke" && !spoken) {
-    opacity = 0;
-  }
-
-  const parts: string[] = [];
-  if (scale != null) parts.push(`scale(${scale})`);
-  if (backdrop === "scrap") parts.push(`rotate(${scrapRotationDeg(index)}deg)`);
 
   return {
     mount: true,
-    color,
-    opacity,
-    transform: parts.length > 0 ? parts.join(" ") : undefined,
-    visibility,
+    opacity: (paint.opacity ?? 1) * motion.opacity,
+    transform: motionTransform(motion, index, scrap),
+    wordCss: wordStyleToCss({ ...paint, opacity: 1 }),
+    backgroundCss: backgroundChromeStyle(bg, index),
   };
+}
+
+/** Per-letter mount for caption typewriter (multi-char words). */
+export function typewriterLetterVisible(
+  word: CaptionWord,
+  charIndex: number,
+  charCount: number,
+  frame: number,
+): boolean {
+  return frame >= wordTypewriterCharStart(word, charIndex, charCount);
 }

@@ -1,7 +1,6 @@
-import {
-  QUOTE_CAPTION_Y,
-  type CaptionStyle,
-} from "../captions/style";
+import { QUOTE_CAPTION_Y } from "../captions/style";
+
+import type { CaptionGroupStyle } from "../captions/style";
 
 export const TEXT_TEMPLATE_IDS = [
   "typewriter",
@@ -23,27 +22,24 @@ export function isTextTemplateId(value: unknown): value is TextTemplateId {
 export type TextTemplate = {
   id: TextTemplateId;
   label: string;
-  style: CaptionStyle;
+  style: CaptionGroupStyle;
 };
 
 /** Default on-screen text VFX — yellow stamp board. */
-export const DEFAULT_TEXT_STYLE: CaptionStyle = {
+export const DEFAULT_TEXT_STYLE: CaptionGroupStyle = {
   fontFamily: "montserrat",
   fontSize: 68,
-  color: "#111111",
   y: QUOTE_CAPTION_Y,
-  animation: "pop",
-  stroke: null,
-  // Soft text-shadow makes board look muddy; boards use a crisp lift instead.
-  shadow: false,
+  animation: "scale",
   textTransform: "uppercase",
   captionsAtATime: 1,
-  stack: false,
-  backdrop: "box",
+  background: { kind: "box", color: "#FFE600" },
   fontStyle: "normal",
   textAlign: "center",
-  backdropColor: "#FFE600",
-  contourBoard: false,
+  wordStyle: {
+    fill: "#111111",
+    opacity: 1,
+  },
 };
 
 export const DEFAULT_TEXT_TEMPLATE_ID: TextTemplateId = "stamp";
@@ -55,19 +51,18 @@ export const TEXT_TEMPLATES: Record<TextTemplateId, TextTemplate> = {
     style: {
       fontFamily: "inter",
       fontSize: 78,
-      color: "#FFFFFF",
       y: QUOTE_CAPTION_Y,
       animation: "typewriter",
-      stroke: { width: 6, color: "#000000" },
-      shadow: false,
       textTransform: "uppercase",
       captionsAtATime: 1,
-      stack: false,
-      backdrop: "none",
+      background: { kind: "none" },
       fontStyle: "italic",
       textAlign: "left",
-      backdropColor: null,
-      contourBoard: false,
+      wordStyle: {
+        fill: "#FFFFFF",
+        border: { width: 6, color: "#000000" },
+        opacity: 1,
+      },
     },
   },
   "white-board": {
@@ -76,19 +71,17 @@ export const TEXT_TEMPLATES: Record<TextTemplateId, TextTemplate> = {
     style: {
       fontFamily: "inter",
       fontSize: 62,
-      color: "#111111",
       y: QUOTE_CAPTION_Y,
-      animation: "pop",
-      stroke: null,
-      shadow: false,
+      animation: "fade",
       textTransform: "none",
       captionsAtATime: 1,
-      stack: false,
-      backdrop: "box",
+      background: { kind: "wrap", color: "#FFFFFF" },
       fontStyle: "normal",
       textAlign: "center",
-      backdropColor: "#FFFFFF",
-      contourBoard: true,
+      wordStyle: {
+        fill: "#111111",
+        opacity: 1,
+      },
     },
   },
   stamp: {
@@ -102,20 +95,19 @@ export const TEXT_TEMPLATES: Record<TextTemplateId, TextTemplate> = {
     style: {
       fontFamily: "montserrat",
       fontSize: 72,
-      color: "#F5EDB8",
       y: QUOTE_CAPTION_Y,
       animation: "fade",
-      stroke: null,
-      shadow: false,
       textTransform: "uppercase",
       captionsAtATime: 1,
-      stack: false,
-      backdrop: "none",
+      background: { kind: "none" },
       fontStyle: "normal",
       textAlign: "center",
-      backdropColor: null,
-      textShadow:
-        "0 0 16px rgba(255, 220, 90, 0.95), 0 0 32px rgba(255, 200, 60, 0.7), 0 0 48px rgba(255, 180, 40, 0.45)",
+      wordStyle: {
+        fill: "#F5EDB8",
+        opacity: 1,
+        textShadow:
+          "0 0 16px rgba(255, 220, 90, 0.95), 0 0 32px rgba(255, 200, 60, 0.7), 0 0 48px rgba(255, 180, 40, 0.45)",
+      },
     },
   },
   scrappy: {
@@ -124,18 +116,18 @@ export const TEXT_TEMPLATES: Record<TextTemplateId, TextTemplate> = {
     style: {
       fontFamily: "nunito",
       fontSize: 56,
-      color: "#111111",
       y: QUOTE_CAPTION_Y,
       animation: "fade",
-      stroke: null,
-      shadow: false,
       textTransform: "uppercase",
       captionsAtATime: 8,
-      stack: false,
-      backdrop: "scrap",
+      background: { kind: "none" },
       fontStyle: "normal",
       textAlign: "center",
-      backdropColor: null,
+      wordStyle: {
+        fill: "#111111",
+        opacity: 1,
+        background: { kind: "scrap", color: "#FFFFFF" },
+      },
     },
   },
 };
@@ -150,6 +142,6 @@ export function resolveTextTemplate(templateId: TextTemplateId): TextTemplate {
 
 export function resolveTextTemplateStyle(
   templateId: TextTemplateId,
-): CaptionStyle {
+): CaptionGroupStyle {
   return resolveTextTemplate(templateId).style;
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import {
   resolveCaptionFont,
-  type CaptionStyle,
+  type CaptionGroupStyle,
 } from "@src/lib/captions/style";
 
 import { cn } from "../../lib/utils";
@@ -12,7 +12,7 @@ import { CaptionTemplatePreview } from "./CaptionTemplatePreview";
 export type StyleTemplateChip = {
   id: string;
   label: string;
-  style: CaptionStyle;
+  style: CaptionGroupStyle;
 };
 
 /** Shared template preview + sidescroll used by Captions, Quote, and Title inspectors. */
@@ -22,11 +22,13 @@ export function StyleTemplatePicker({
   onChange,
   /** When set, used as the idle preview (e.g. live episode style). */
   fallbackStyle,
+  previewVariant = "dynamic",
 }: {
   templates: StyleTemplateChip[];
   value: string | null;
   onChange: (id: string) => void;
-  fallbackStyle?: CaptionStyle;
+  fallbackStyle?: CaptionGroupStyle;
+  previewVariant?: "dynamic" | "static";
 }) {
   const [hovered, setHovered] = useState<StyleTemplateChip | null>(null);
   const selected = templates.find((t) => t.id === value) ?? null;
@@ -46,6 +48,7 @@ export function StyleTemplatePicker({
             <CaptionTemplatePreview
               style={previewStyle}
               playing={hovered != null}
+              variant={previewVariant}
             />
             <div className="border-t border-border bg-panel-2 px-2 py-1.5 text-center text-[10px] text-muted">
               {previewLabel ?? "Current"}
@@ -89,7 +92,7 @@ export function StyleTemplatePicker({
                 <span
                   className="max-w-full truncate text-[11px] leading-tight"
                   style={{
-                    color: template.style.color,
+                    color: template.style.wordStyle.fill,
                     fontFamily: face.family,
                     fontWeight: face.weight,
                   }}

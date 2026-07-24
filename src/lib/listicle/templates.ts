@@ -1,10 +1,12 @@
-import { QUOTE_CAPTION_Y, type CaptionStyle } from "../captions/style";
+import type { CaptionGroupStyle } from "../captions/style";
 import {
   DEFAULT_TEXT_TEMPLATE_ID,
   isTextTemplateId,
   resolveTextTemplateStyle,
-  type TextTemplateId,
+  TEXT_TEMPLATES,
 } from "../text/templates";
+
+import type { TextTemplateId } from "../text/templates";
 
 export const LISTICLE_TEMPLATE_IDS = [
   "minimal-glow-scrappy",
@@ -28,7 +30,7 @@ export const DEFAULT_LISTICLE_TEMPLATE_ID: ListicleTemplateId =
 /** Default marker/reveal text VFX fields (no id, start, end, or copy). */
 export type ListicleTextDefaults = {
   templateId: TextTemplateId;
-  style: CaptionStyle;
+  style: CaptionGroupStyle;
 };
 
 export type ListicleTemplate = {
@@ -40,70 +42,40 @@ export type ListicleTemplate = {
   reveal: ListicleTextDefaults;
 };
 
-const GLOW_MARKER_STYLE: CaptionStyle = {
-  fontFamily: "montserrat",
-  fontSize: 72,
-  color: "#F5EDB8",
-  y: QUOTE_CAPTION_Y,
-  animation: "fade",
-  stroke: null,
-  shadow: false,
-  textTransform: "uppercase",
-  captionsAtATime: 1,
-  stack: false,
-  backdrop: "none",
-  fontStyle: "normal",
-  textAlign: "center",
-  backdropColor: null,
-  textShadow:
-    "0 0 16px rgba(255, 220, 90, 0.95), 0 0 32px rgba(255, 200, 60, 0.7), 0 0 48px rgba(255, 180, 40, 0.45)",
-};
-
-const SCRAPPY_REVEAL_STYLE: CaptionStyle = {
-  fontFamily: "nunito",
-  fontSize: 56,
-  color: "#111111",
-  y: QUOTE_CAPTION_Y,
-  animation: "fade",
-  stroke: null,
-  shadow: false,
-  textTransform: "uppercase",
-  captionsAtATime: 8,
-  stack: false,
-  backdrop: "scrap",
-  fontStyle: "normal",
-  textAlign: "center",
-  backdropColor: null,
-};
-
-const BOARD_REVEAL_STYLE: CaptionStyle = resolveTextTemplateStyle(
-  DEFAULT_TEXT_TEMPLATE_ID,
-);
-
 export const LISTICLE_TEMPLATES: Record<ListicleTemplateId, ListicleTemplate> =
   {
     "minimal-glow-scrappy": {
       id: "minimal-glow-scrappy",
       label: "Minimal · Glow + Scrappy",
       aggregated: false,
-      marker: { templateId: "glow", style: GLOW_MARKER_STYLE },
-      reveal: { templateId: "scrappy", style: SCRAPPY_REVEAL_STYLE },
+      marker: {
+        templateId: "glow",
+        style: { ...TEXT_TEMPLATES.glow.style },
+      },
+      reveal: {
+        templateId: "scrappy",
+        style: { ...TEXT_TEMPLATES.scrappy.style },
+      },
     },
     "aggregated-board": {
       id: "aggregated-board",
       label: "Aggregated Board",
       aggregated: true,
-      marker: { templateId: "glow", style: GLOW_MARKER_STYLE },
-      reveal: { templateId: "stamp", style: BOARD_REVEAL_STYLE },
+      marker: {
+        templateId: "glow",
+        style: { ...TEXT_TEMPLATES.glow.style },
+      },
+      reveal: {
+        templateId: "stamp",
+        style: resolveTextTemplateStyle(DEFAULT_TEXT_TEMPLATE_ID),
+      },
     },
   };
 
 export const LISTICLE_TEMPLATE_LIST: ListicleTemplate[] =
   LISTICLE_TEMPLATE_IDS.map((id) => LISTICLE_TEMPLATES[id]);
 
-export function resolveListicleTemplate(
-  templateId: string,
-): ListicleTemplate {
+export function resolveListicleTemplate(templateId: string): ListicleTemplate {
   if (isListicleTemplateId(templateId)) {
     return LISTICLE_TEMPLATES[templateId];
   }

@@ -1,69 +1,198 @@
 import { interpolate } from "remotion";
 
-import type { CaptionEmphasis, CaptionWord } from "../../lib/types";
+import {
+  CAPTION_ENTER_SEC,
+  TYPEWRITER_CHAR_DELAY_SEC,
+} from "../../lib/captions/style";
+
 import type { CaptionAnimation } from "../../lib/captions/style";
 
+import type { CaptionEmphasis, CaptionWord } from "../../lib/types";
 export const EMPHASIS_COLORS: Record<CaptionEmphasis, string> = {
   positive: "#00E676",
   negative: "#FF5252",
 };
 
-export const EMPHASIS_POP_SEC = 0.18;
-export const POP_SEC = 0.18;
 export const CURSOR_BLINK_FRAMES = 16;
+export const SLIDE_OFFSET_PX = 28;
 
-export function wordFadeOpacity(
-  frame: number,
-  word: CaptionWord,
-  groupEndFrame: number,
-  fadeFrames: number,
-): number {
-  if (frame < word.startFrame) {
-    return 0;
-  }
+export type CaptionMotion = {
+  opacity: number;
+  scale: number;
+  translateY: number;
+  /** Typewriter: false until the glyph should exist in layout. */
+  mount: boolean;
+};
 
-  const local = frame - word.startFrame;
-  const fadeIn = Math.min(
-    fadeFrames,
-    Math.max(1, word.endFrame - word.startFrame),
-  );
-  const fadeOutStart = Math.max(
-    word.startFrame + fadeIn,
-    groupEndFrame - fadeFrames,
-  );
-  const fadeOutLocal = fadeOutStart - word.startFrame;
-  const groupLocalEnd = groupEndFrame - word.startFrame;
-
-  if (local < fadeIn) {
-    return interpolate(local, [0, fadeIn], [0, 1], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    });
-  }
-
-  if (frame >= fadeOutStart && groupLocalEnd > fadeOutLocal) {
-    return interpolate(local, [fadeOutLocal, groupLocalEnd], [1, 0], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    });
-  }
-
-  return 1;
+export function enterFramesFor(fps: number): number {
+  return Math.max(2, Math.round(CAPTION_ENTER_SEC * fps));
 }
 
-export function wordPopScale(
+export function shouldSkipMotion(
+  durationFrames: number,
+  enterFrames: number,
+): boolean {
+  return durationFrames < enterFrames;
+}
+
+/**
+ * Enter/exit motion for a timed target (word or group).
+ * Exit mirrors enter near the end of `endFrame`.
+ */
+export function resolveEnterExitMotion(input: {
+  animation: CaptionAnimation;
+  frame: number;
+  startFrame: number;
+  endFrame: number;
+  fps: number;
+}): CaptionMotion {
+  const { animation, frame, startFrame, endFrame, fps } = input;
+  const enterFrames = enterFramesFor(fps);
+  const duration = Math.max(1, endFrame - startFrame);
+  const skip = shouldSkipMotion(duration, enterFrames);
+
+  if (frame < startFrame) {
+    return { opacity: 0, scale: 1, translateY: 0, mount: false };
+  }
+  if (frame >= endFrame) {
+    return { opacity: 0, scale: 1, translateY: 0, mount: false };
+  }
+
+  if (animation === "none" || animation === "typewriter" || skip) {
+    return { opacity: 1, scale: 1, translateY: 0, mount: true };
+  }
+
+  const local = frame - startFrame;
+  const exitFrames = Math.min(
+    enterFrames,
+    Math.max(1, Math.floor(duration / 2)),
+  );
+  const exitStart = Math.max(enterFrames, duration - exitFrames);
+
+  let enterT = 1;
+  if (local < enterFrames) {
+    enterT = interpolate(local, [0, enterFrames], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+  }
+
+  let exitT = 0;
+  if (local >= exitStart) {
+    exitT = interpolate(local, [exitStart, duration], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+  }
+
+  const t = enterT * (1 - exitT);
+
+  switch (animation) {
+    case "fade":
+      return { opacity: t, scale: 1, translateY: 0, mount: true };
+    case "scale": {
+      const enterScale =
+        local < enterFrames
+          ? interpolate(
+              local,
+              [0, enterFrames * 0.6, enterFrames],
+              [0.4, 1.25, 1],
+              {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              },
+            )
+          : 1;
+      const exitScale =
+        local >= exitStart
+          ? interpolate(local, [exitStart, duration], [1, 0.85], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            })
+          : 1;
+      return {
+        opacity: local >= exitStart ? 1 - exitT : 1,
+        scale: enterScale * exitScale,
+        translateY: 0,
+        mount: true,
+      };
+    }
+    case "slide": {
+      const enterY =
+        local < enterFrames
+          ? interpolate(local, [0, enterFrames], [-SLIDE_OFFSET_PX, 0], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            })
+          : 0;
+      const exitY =
+        local >= exitStart
+          ? interpolate(local, [exitStart, duration], [0, SLIDE_OFFSET_PX], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            })
+          : 0;
+      return {
+        opacity: t,
+        scale: 1,
+        translateY: enterY + exitY,
+        mount: true,
+      };
+    }
+    default:
+      return { opacity: 1, scale: 1, translateY: 0, mount: true };
+  }
+}
+
+export type WordState = "future" | "active" | "past";
+
+export function wordStateAt(frame: number, word: CaptionWord): WordState {
+  if (frame < word.startFrame) return "future";
+  if (frame >= word.endFrame) return "past";
+  return "active";
+}
+
+/** Blend progress 0–1 while leaving `from` toward `to` around a boundary. */
+export function wordStateBlendT(
   frame: number,
   word: CaptionWord,
   fps: number,
-  durationSec = POP_SEC,
-): number {
-  const popFrames = Math.max(2, Math.round(durationSec * fps));
-  return interpolate(
-    frame - word.startFrame,
-    [0, popFrames * 0.6, popFrames],
-    [0.4, 1.25, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
+  blendSec: number,
+): { from: WordState; to: WordState; t: number } {
+  const blendFrames = Math.max(1, Math.round(blendSec * fps));
+  const state = wordStateAt(frame, word);
+
+  if (state === "active") {
+    const since = frame - word.startFrame;
+    if (since < blendFrames) {
+      return {
+        from: "future",
+        to: "active",
+        t: interpolate(since, [0, blendFrames], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        }),
+      };
+    }
+    return { from: "active", to: "active", t: 1 };
+  }
+
+  if (state === "past") {
+    const since = frame - word.endFrame;
+    if (since < blendFrames) {
+      return {
+        from: "active",
+        to: "past",
+        t: interpolate(since, [0, blendFrames], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        }),
+      };
+    }
+    return { from: "past", to: "past", t: 1 };
+  }
+
+  return { from: "future", to: "future", t: 1 };
 }
 
 export function lastVisibleWordIndex(
@@ -78,7 +207,6 @@ export function lastVisibleWordIndex(
   return last;
 }
 
-/** Shared blink phase for caption + title typewriter cursors. */
 export function typewriterCursorBlink(frame: number): boolean {
   return Math.floor(frame / (CURSOR_BLINK_FRAMES / 2)) % 2 === 0;
 }
@@ -98,36 +226,64 @@ export function typewriterCursorOn(
 }
 
 /**
- * How many frames to spend revealing a title / free-text typewriter,
- * leaving room to read before the clip ends.
+ * Static typewriter: word chunks with global char stagger.
+ * Spaces between words are implicit (flex gap); timing includes a beat per space.
+ * Letter reveal inside each word uses {@link wordTypewriterCharStart}.
+ * Uses {@link TYPEWRITER_CHAR_DELAY_SEC} when it fits; otherwise compresses to `endFrame`.
  */
-export function typewriterTypeFrames(
+export function typewriterWordTimings(
+  text: string,
   fps: number,
-  durationFrames: number,
-): number {
-  const typeSec = Math.min(2.2, Math.max(0.8, durationFrames / fps - 1.2));
-  return Math.max(1, Math.round(typeSec * fps));
+  endFrame: number,
+): CaptionWord[] {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length === 0) return [];
+
+  const tokens = flat.split(" ").filter((t) => t.length > 0);
+  const totalChars = flat.length;
+  const groupEnd = Math.max(1, endFrame);
+
+  const idealDelay = Math.max(1, Math.round(TYPEWRITER_CHAR_DELAY_SEC * fps));
+  const idealTotal = totalChars * idealDelay;
+  const fitsIdeal = idealTotal <= groupEnd;
+
+  const frameAt = (charIndex: number): number => {
+    if (fitsIdeal) return charIndex * idealDelay;
+    return Math.min(
+      groupEnd - 1,
+      Math.floor((charIndex / totalChars) * groupEnd),
+    );
+  };
+
+  let charOffset = 0;
+
+  return tokens.map((wordText, i) => {
+    const startFrame = frameAt(charOffset);
+    const wordEndFrame = frameAt(charOffset + wordText.length);
+    if (i < tokens.length - 1) {
+      charOffset += wordText.length + 1;
+    } else {
+      charOffset += wordText.length;
+    }
+    return {
+      text: wordText,
+      startFrame,
+      endFrame: wordEndFrame,
+    };
+  });
 }
 
 /**
- * Split free text into per-character caption words staggered across
- * `typeFrames`, so text VFX can reuse {@link lastVisibleWordIndex} /
- * {@link typewriterCursorOn} like quote captions.
+ * Word-scope typewriter: reveal letters across the word's own duration.
+ * Returns start frames for each character relative to composition.
  */
-export function typewriterCharWords(
-  text: string,
-  typeFrames: number,
-  startFrame = 0,
-): CaptionWord[] {
-  if (text.length === 0) return [];
-  const span = Math.max(1, typeFrames);
-  return Array.from(text).map((ch, i) => {
-    const t = text.length <= 1 ? 0 : i / (text.length - 1);
-    const wordStart = startFrame + Math.floor(t * (span - 1));
-    return {
-      text: ch,
-      startFrame: wordStart,
-      endFrame: wordStart + 1,
-    };
-  });
+export function wordTypewriterCharStart(
+  word: CaptionWord,
+  charIndex: number,
+  charCount: number,
+): number {
+  if (charCount <= 1) return word.startFrame;
+  const span = Math.max(1, word.endFrame - word.startFrame);
+  const t = charIndex / charCount;
+  return word.startFrame + Math.floor(t * span);
 }

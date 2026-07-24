@@ -18,10 +18,7 @@ export function compactEntranceSfx(sfx: AudioAsset): AudioAsset {
  * Set entrance SFX on any {@link HasSFX} clip.
  * Pass `null` to clear (omit); omit / null both mean silent at render.
  */
-export function withSfx<T extends HasSFX>(
-  clip: T,
-  sfx: AudioAsset | null,
-): T {
+export function withSfx<T extends HasSFX>(clip: T, sfx: AudioAsset | null): T {
   if (!sfx) {
     const next = { ...clip };
     delete next.sfx;
@@ -39,10 +36,7 @@ export function withoutSfx<T extends HasSFX>(clip: T): T {
  * Update entrance SFX volume on any {@link HasSFX} clip.
  * No-op when `sfx` is missing or null (silent).
  */
-export function withSfxVolume<T extends HasSFX>(
-  clip: T,
-  volume: number,
-): T {
+export function withSfxVolume<T extends HasSFX>(clip: T, volume: number): T {
   if (!clip.sfx) return clip;
   const v = Math.min(1, Math.max(0, volume));
   return withSfx(clip, { ...clip.sfx, volume: v });

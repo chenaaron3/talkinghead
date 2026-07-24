@@ -2,13 +2,16 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 
-import { normalizeCaptionStyle } from "../../src/lib/captions/parse-style";
+import { normalizeCaptionOverrides } from "../../src/lib/captions/parse-style";
 import {
   DEFAULT_QUOTE_TEMPLATE_ID,
   isQuoteTemplateId,
-  resolveQuoteTemplateStyle,
 } from "../../src/lib/captions/quote-templates";
-import { defaultEpisodeCaptionStyle } from "../../src/lib/captions/templates";
+import {
+  DEFAULT_CAPTION_TEMPLATE_ID,
+  isCaptionTemplateId,
+} from "../../src/lib/captions/templates";
+import type { CaptionStyleOverrides } from "../../src/lib/captions/style";
 import {
   DEFAULT_BROLL_ENTRANCE_SFX,
   isVfxType,
@@ -24,7 +27,6 @@ import {
 import {
   DEFAULT_TEXT_TEMPLATE_ID,
   isTextTemplateId,
-  resolveTextTemplateStyle,
 } from "../../src/lib/text/templates";
 import { DEFAULT_PUNCH_IN_SCALE } from "../../src/lib/visual/punchin";
 import { DEFAULT_TEXT_VFX_DURATION_SEC } from "./constants";
@@ -176,7 +178,7 @@ function parseScreenTextFields(
 ): {
   text: string;
   templateId: string;
-  style: ReturnType<typeof normalizeCaptionStyle>;
+  style: CaptionStyleOverrides;
   sfx: ReturnType<typeof parseEntranceSfx> extends infer T ? T : never;
 } {
   const text = String(entry.text ?? "").trim();
@@ -187,10 +189,7 @@ function parseScreenTextFields(
   const templateId = isTextTemplateId(rawTemplate)
     ? rawTemplate
     : DEFAULT_TEXT_TEMPLATE_ID;
-  const style = normalizeCaptionStyle(
-    entry.style,
-    resolveTextTemplateStyle(templateId),
-  );
+  const style = normalizeCaptionOverrides(entry.style);
   const sfx = parseEntranceSfx(entry.sfx, `${path}.sfx`, configPath);
   return { text, templateId, style, sfx };
 }
@@ -464,10 +463,7 @@ function parseVfx(value: unknown, configPath: string): SourceVfx[] {
       const templateId = isQuoteTemplateId(rawTemplate)
         ? rawTemplate
         : DEFAULT_QUOTE_TEMPLATE_ID;
-      const style = normalizeCaptionStyle(
-        entry.style,
-        resolveQuoteTemplateStyle(templateId),
-      );
+      const style = normalizeCaptionOverrides(entry.style);
       return { id, type: "quote", start, end, templateId, style };
     }
 
@@ -648,7 +644,7 @@ function ensureDefaultTextVfx(
     end: DEFAULT_TEXT_VFX_DURATION_SEC,
     text: opts.title ?? "",
     templateId,
-    style: { ...resolveTextTemplateStyle(templateId) },
+    style: {},
     sfx: defaultTextEntranceSfx(DEFAULT_TEXT_VFX_DURATION_SEC),
   };
   return [...vfx, clip].sort((a, b) => a.start - b.start);
@@ -667,15 +663,17 @@ export function loadEpisodeConfig(episodeDir: string): EpisodeConfig {
     throw new Error(`Missing required "aroll" in ${configPath}`);
   }
 
-  const captionStyle = normalizeCaptionStyle(
-    merged.captionStyle,
-    defaultEpisodeCaptionStyle(),
-  );
+  const rawCaptionTemplate = String(merged.captionTemplateId ?? "").trim();
+  const captionTemplateId = isCaptionTemplateId(rawCaptionTemplate)
+    ? rawCaptionTemplate
+    : DEFAULT_CAPTION_TEMPLATE_ID;
+  const captionStyle = normalizeCaptionOverrides(merged.captionStyle);
   const vfx = ensureDefaultTextVfx(parseVfx(local.vfx, configPath), { title });
 
   return {
     aroll,
     title,
+    captionTemplateId,
     captionStyle,
     listicle: Boolean(merged.listicle ?? false),
     punchIns: Boolean(merged.punchIns ?? false),

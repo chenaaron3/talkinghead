@@ -160,6 +160,11 @@
       "lufs": -8.69,
       "truePeakDb": -0.3,
       "gain": 0.431
+    },
+    "sfx/realistic/typing.mp3": {
+      "lufs": -31.3,
+      "truePeakDb": -7.89,
+      "gain": 2.2105
     }
   }
 }

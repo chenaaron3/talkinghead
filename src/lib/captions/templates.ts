@@ -1,7 +1,7 @@
 import {
   DEFAULT_CAPTION_STYLE,
   TRENDING_CAPTION_Y,
-  type CaptionStyle,
+  type CaptionGroupStyle,
 } from "./style";
 
 /** Templates for the episode’s default caption style. */
@@ -26,10 +26,12 @@ export function isCaptionTemplateId(
 export type CaptionTemplate = {
   id: CaptionTemplateId;
   label: string;
-  style: CaptionStyle;
+  style: CaptionGroupStyle;
 };
 
 export const DEFAULT_CAPTION_TEMPLATE_ID: CaptionTemplateId = "classic";
+
+const SHADOW = "0 3px 0 #000, 0 6px 16px rgba(0,0,0,0.85)";
 
 export const CAPTION_TEMPLATES: Record<CaptionTemplateId, CaptionTemplate> = {
   classic: {
@@ -43,18 +45,18 @@ export const CAPTION_TEMPLATES: Record<CaptionTemplateId, CaptionTemplate> = {
     style: {
       fontFamily: "inter",
       fontSize: 40,
-      color: "#FFFFFF",
       y: TRENDING_CAPTION_Y,
       animation: "none",
-      stroke: { width: 6, color: "#000000" },
-      shadow: false,
       textTransform: "lowercase",
       captionsAtATime: 5,
-      stack: false,
-      backdrop: "none",
+      background: { kind: "none" },
       fontStyle: "normal",
       textAlign: "center",
-      backdropColor: null,
+      wordStyle: {
+        fill: "#FFFFFF",
+        border: { width: 6, color: "#000000" },
+        opacity: 1,
+      },
     },
   },
   beast: {
@@ -63,18 +65,19 @@ export const CAPTION_TEMPLATES: Record<CaptionTemplateId, CaptionTemplate> = {
     style: {
       fontFamily: "montserrat",
       fontSize: 68,
-      color: "#FFFFFF",
       y: TRENDING_CAPTION_Y,
-      animation: "pop",
-      stroke: { width: 10, color: "#000000" },
-      shadow: true,
+      animation: "scale",
       textTransform: "uppercase",
       captionsAtATime: 3,
-      stack: false,
-      backdrop: "none",
+      background: { kind: "none" },
       fontStyle: "normal",
       textAlign: "center",
-      backdropColor: null,
+      wordStyle: {
+        fill: "#FFFFFF",
+        border: { width: 10, color: "#000000" },
+        opacity: 1,
+        textShadow: SHADOW,
+      },
     },
   },
   hormozi: {
@@ -83,18 +86,25 @@ export const CAPTION_TEMPLATES: Record<CaptionTemplateId, CaptionTemplate> = {
     style: {
       fontFamily: "montserrat",
       fontSize: 64,
-      color: "#FFFFFF",
       y: TRENDING_CAPTION_Y,
-      animation: "karaoke",
-      stroke: { width: 8, color: "#000000" },
-      shadow: true,
+      animation: "none",
       textTransform: "uppercase",
       captionsAtATime: 5,
-      stack: false,
-      backdrop: "none",
+      background: { kind: "none" },
       fontStyle: "normal",
       textAlign: "center",
-      backdropColor: null,
+      wordStyle: {
+        fill: "#FFFFFF",
+        border: { width: 8, color: "#000000" },
+        opacity: 1,
+        textShadow: SHADOW,
+      },
+      futureWordStyle: { opacity: 0.35 },
+      activeWordStyle: {
+        fill: "#FFE600",
+        background: { kind: "rounded", color: "rgba(255, 230, 0, 0.25)" },
+      },
+      pastWordStyle: { opacity: 1 },
     },
   },
 };
@@ -113,11 +123,11 @@ export function resolveCaptionTemplate(
 
 export function resolveCaptionTemplateStyle(
   templateId: CaptionTemplateId,
-): CaptionStyle {
+): CaptionGroupStyle {
   return resolveCaptionTemplate(templateId).style;
 }
 
-/** Episode default when config omits captionStyle entirely. */
-export function defaultEpisodeCaptionStyle(): CaptionStyle {
+/** Episode default when config omits caption style entirely. */
+export function defaultEpisodeCaptionStyle(): CaptionGroupStyle {
   return { ...DEFAULT_CAPTION_STYLE };
 }

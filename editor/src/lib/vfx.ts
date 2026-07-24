@@ -1,4 +1,50 @@
-import { MapPin, Quote, Type, Vibrate, type LucideIcon } from "lucide-react";
+import { LucideIcon, MapPin, Quote, Type, Vibrate } from "lucide-react";
+
+import { normalizeCaptionOverrides } from "@src/lib/captions/parse-style";
+import {
+  DEFAULT_QUOTE_TEMPLATE_ID,
+  isQuoteTemplateId,
+  QUOTE_TEMPLATES,
+  resolveQuoteTemplateStyle,
+} from "@src/lib/captions/quote-templates";
+import {
+  applyCaptionOverrides,
+  type CaptionGroupStyle,
+  type CaptionStyleOverrides,
+} from "@src/lib/captions/style";
+import {
+  DEFAULT_SHAKE_INTENSITY,
+  isScreenTextVfx,
+  USER_PLACEABLE_VFX_TYPES,
+  vfxSupportsImageAsset,
+  vfxSupportsTransform,
+} from "@src/lib/episode/config-types";
+import {
+  compactEntranceSfx,
+  defaultTextEntranceSfx,
+  withSfx,
+  withSfxVolume,
+} from "@src/lib/episode/vfx";
+import {
+  DEFAULT_TEXT_TEMPLATE_ID,
+  isTextTemplateId,
+  resolveTextTemplateStyle,
+  TEXT_TEMPLATES,
+} from "@src/lib/text/templates";
+
+import {
+  BROLL_SCALE_MAX,
+  BROLL_SCALE_MIN,
+  clampBRollScale,
+  resolveTransform,
+  TRANSFORM_DEFAULTS,
+} from "./broll";
+import { MIN_RANGE_SEC } from "./range";
+
+import type { AudioAsset } from "@src/lib/episode/config-types";
+import type { QuoteTemplateId } from "@src/lib/captions/quote-templates";
+import type { TextTemplateId } from "@src/lib/text/templates";
+
 import type {
   ImageAsset,
   SourceListicleTextVfx,
@@ -13,45 +59,13 @@ import type {
   Transform,
   VfxType,
 } from "@src/lib/types";
-import {
-  DEFAULT_SHAKE_INTENSITY,
-  USER_PLACEABLE_VFX_TYPES,
-  isScreenTextVfx,
-  vfxSupportsImageAsset,
-  vfxSupportsTransform,
-  type AudioAsset,
-} from "@src/lib/episode/config-types";
-import {
-  compactEntranceSfx,
-  defaultTextEntranceSfx,
-  withSfx,
-  withSfxVolume,
-} from "@src/lib/episode/vfx";
-import type { CaptionStyle } from "@src/lib/captions/style";
-import {
-  DEFAULT_QUOTE_TEMPLATE_ID,
-  QUOTE_TEMPLATES,
-  isQuoteTemplateId,
-  resolveQuoteTemplateStyle,
-  type QuoteTemplateId,
-} from "@src/lib/captions/quote-templates";
-import {
-  DEFAULT_TEXT_TEMPLATE_ID,
-  TEXT_TEMPLATES,
-  isTextTemplateId,
-  resolveTextTemplateStyle,
-  type TextTemplateId,
-} from "@src/lib/text/templates";
-import { normalizeCaptionStyle } from "@src/lib/captions/parse-style";
 
-import {
-  BROLL_SCALE_MAX,
-  BROLL_SCALE_MIN,
-  TRANSFORM_DEFAULTS,
-  clampBRollScale,
-  resolveTransform,
-} from "./broll";
-import { MIN_RANGE_SEC } from "./range";
+function compactOverrides(
+  style: CaptionStyleOverrides | undefined,
+): CaptionStyleOverrides | undefined {
+  const next = normalizeCaptionOverrides(style);
+  return Object.keys(next).length > 0 ? next : undefined;
+}
 
 export {
   BROLL_SCALE_MAX,
@@ -85,10 +99,12 @@ export type VfxPreset = {
 };
 
 /** Drag payloads from the VFX tab (presets, not baked files). */
-export const VFX_PRESETS: VfxPreset[] = USER_PLACEABLE_VFX_TYPES.map((type) => ({
-  type,
-  label: VFX_META[type].label,
-}));
+export const VFX_PRESETS: VfxPreset[] = USER_PLACEABLE_VFX_TYPES.map(
+  (type) => ({
+    type,
+    label: VFX_META[type].label,
+  }),
+);
 
 /** Type-level display label (e.g. inspector title). */
 export function vfxTypeLabel(type: VfxType): string {
@@ -139,10 +155,10 @@ export function vfxHasMedia(
     vfxSupportsImageAsset(clip) &&
     Boolean(
       clip.src &&
-        clip.width != null &&
-        clip.width > 0 &&
-        clip.height != null &&
-        clip.height > 0,
+      clip.width != null &&
+      clip.width > 0 &&
+      clip.height != null &&
+      clip.height > 0,
     )
   );
 }
@@ -158,14 +174,11 @@ export function resolveQuoteTemplateId(clip: SourceQuoteVfx): QuoteTemplateId {
 }
 
 /** Resolved editable style on a Quote clip (falls back to template). */
-export function resolveQuoteStyle(clip: SourceQuoteVfx): CaptionStyle {
-  if (clip.style) {
-    return normalizeCaptionStyle(
-      clip.style,
-      resolveQuoteTemplateStyle(resolveQuoteTemplateId(clip)),
-    );
-  }
-  return resolveQuoteTemplateStyle(resolveQuoteTemplateId(clip));
+export function resolveQuoteStyle(clip: SourceQuoteVfx): CaptionGroupStyle {
+  return applyCaptionOverrides(
+    resolveQuoteTemplateStyle(resolveQuoteTemplateId(clip)),
+    clip.style,
+  );
 }
 
 export function resolveTextTemplateId(
@@ -177,14 +190,11 @@ export function resolveTextTemplateId(
 }
 
 /** Resolved editable style on a Text clip (falls back to template). */
-export function resolveTextStyle(clip: SourceScreenTextVfx): CaptionStyle {
-  if (clip.style) {
-    return normalizeCaptionStyle(
-      clip.style,
-      resolveTextTemplateStyle(resolveTextTemplateId(clip)),
-    );
-  }
-  return resolveTextTemplateStyle(resolveTextTemplateId(clip));
+export function resolveTextStyle(clip: SourceScreenTextVfx): CaptionGroupStyle {
+  return applyCaptionOverrides(
+    resolveTextTemplateStyle(resolveTextTemplateId(clip)),
+    clip.style,
+  );
 }
 
 function rangesOverlap(
@@ -212,14 +222,16 @@ export function compactVfx(clip: SourceVfx): SourceVfx {
 
   if (clip.type === "quote") {
     const templateId = resolveQuoteTemplateId(clip);
-    return {
+    const out: SourceQuoteVfx = {
       id: clip.id,
       type: "quote",
       start: clip.start,
       end: clip.end,
       templateId,
-      style: resolveQuoteStyle(clip),
     };
+    const style = compactOverrides(clip.style);
+    if (style) out.style = style;
+    return out;
   }
 
   if (clip.type === "text") {
@@ -231,8 +243,9 @@ export function compactVfx(clip: SourceVfx): SourceVfx {
       end: clip.end,
       text: clip.text,
       templateId,
-      style: resolveTextStyle(clip),
     };
+    const style = compactOverrides(clip.style);
+    if (style) out.style = style;
     if (clip.sfx) {
       out.sfx = compactEntranceSfx(clip.sfx);
     }
@@ -250,8 +263,9 @@ export function compactVfx(clip: SourceVfx): SourceVfx {
       role: clip.role,
       text: clip.text,
       templateId,
-      style: resolveTextStyle(clip),
     };
+    const style = compactOverrides(clip.style);
+    if (style) out.style = style;
     if (clip.sfx) {
       out.sfx = compactEntranceSfx(clip.sfx);
     }
@@ -330,22 +344,19 @@ export function withQuoteTemplate(
   templateId: QuoteTemplateId,
 ): SourceVfx {
   if (!isQuoteVfx(clip)) return clip;
+  // Preserve user overrides across template switches.
   return compactVfx({
     ...clip,
     templateId,
-    style: { ...resolveQuoteTemplateStyle(templateId) },
   });
 }
 
 export function withQuoteStyle(
   clip: SourceVfx,
-  patch: Partial<CaptionStyle>,
+  patch: CaptionStyleOverrides,
 ): SourceVfx {
   if (!isQuoteVfx(clip)) return clip;
-  const style = normalizeCaptionStyle(
-    { ...resolveQuoteStyle(clip), ...patch },
-    resolveQuoteStyle(clip),
-  );
+  const style = normalizeCaptionOverrides({ ...clip.style, ...patch });
   return compactVfx({ ...clip, style });
 }
 
@@ -357,19 +368,15 @@ export function withTextTemplate(
   return compactVfx({
     ...clip,
     templateId,
-    style: { ...resolveTextTemplateStyle(templateId) },
   });
 }
 
 export function withTextStyle(
   clip: SourceVfx,
-  patch: Partial<CaptionStyle>,
+  patch: CaptionStyleOverrides,
 ): SourceVfx {
   if (!isScreenTextVfx(clip)) return clip;
-  const style = normalizeCaptionStyle(
-    { ...resolveTextStyle(clip), ...patch },
-    resolveTextStyle(clip),
-  );
+  const style = normalizeCaptionOverrides({ ...clip.style, ...patch });
   return compactVfx({ ...clip, style });
 }
 
@@ -413,7 +420,7 @@ export function createVfxFromPreset(
       start: range.start,
       end: range.end,
       templateId: DEFAULT_QUOTE_TEMPLATE_ID,
-      style: { ...resolveQuoteTemplateStyle(DEFAULT_QUOTE_TEMPLATE_ID) },
+      style: {},
     };
   }
   if (preset.type === "text") {
@@ -424,7 +431,7 @@ export function createVfxFromPreset(
       end: range.end,
       text: "",
       templateId: DEFAULT_TEXT_TEMPLATE_ID,
-      style: { ...resolveTextTemplateStyle(DEFAULT_TEXT_TEMPLATE_ID) },
+      style: {},
       sfx: defaultTextEntranceSfx(range.end - range.start),
     };
   }

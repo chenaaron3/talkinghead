@@ -1,12 +1,11 @@
 import {
   QUOTE_CAPTION_Y,
-  type CaptionStyle,
+  type CaptionGroupStyle,
 } from "./style";
 
 /** Templates for Quote VFX (sparing highlight looks). */
 export const QUOTE_TEMPLATE_IDS = [
   "bold-white",
-  "bold-white-stack",
   "handwritten-white",
   "handwritten-box",
   "scrappy",
@@ -24,26 +23,25 @@ export function isQuoteTemplateId(value: unknown): value is QuoteTemplateId {
 export type QuoteTemplate = {
   id: QuoteTemplateId;
   label: string;
-  style: CaptionStyle;
+  style: CaptionGroupStyle;
 };
 
 export const DEFAULT_QUOTE_TEMPLATE_ID: QuoteTemplateId = "handwritten-white";
 
-const BOLD_WHITE_BASE: CaptionStyle = {
+const BOLD_WHITE_BASE: CaptionGroupStyle = {
   fontFamily: "montserrat",
   fontSize: 72,
-  color: "#FFFFFF",
   y: QUOTE_CAPTION_Y,
   animation: "fade",
-  stroke: null,
-  shadow: false,
   textTransform: "uppercase",
   captionsAtATime: 1,
-  stack: false,
-  backdrop: "none",
+  background: { kind: "none" },
   fontStyle: "normal",
   textAlign: "center",
-  backdropColor: null,
+  wordStyle: {
+    fill: "#FFFFFF",
+    opacity: 1,
+  },
 };
 
 export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
@@ -52,34 +50,23 @@ export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
     label: "Bold White",
     style: { ...BOLD_WHITE_BASE },
   },
-  "bold-white-stack": {
-    id: "bold-white-stack",
-    label: "Bold White · 2 Lines",
-    style: {
-      ...BOLD_WHITE_BASE,
-      fontSize: 42,
-      captionsAtATime: 8,
-      stack: true,
-    },
-  },
   "handwritten-white": {
     id: "handwritten-white",
     label: "Handwritten",
     style: {
       fontFamily: "pacifico",
       fontSize: 64,
-      color: "#FFFFFF",
       y: QUOTE_CAPTION_Y,
       animation: "fade",
-      stroke: null,
-      shadow: false,
       textTransform: "uppercase",
       captionsAtATime: 3,
-      stack: false,
-      backdrop: "none",
+      background: { kind: "none" },
       fontStyle: "normal",
       textAlign: "center",
-      backdropColor: null,
+      wordStyle: {
+        fill: "#FFFFFF",
+        opacity: 1,
+      },
     },
   },
   "handwritten-box": {
@@ -88,18 +75,17 @@ export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
     style: {
       fontFamily: "pacifico",
       fontSize: 58,
-      color: "#FFFFFF",
       y: QUOTE_CAPTION_Y,
       animation: "fade",
-      stroke: null,
-      shadow: false,
       textTransform: "uppercase",
       captionsAtATime: 3,
-      stack: false,
-      backdrop: "box",
+      background: { kind: "box", color: "rgba(0, 0, 0, 0.82)" },
       fontStyle: "normal",
       textAlign: "center",
-      backdropColor: null,
+      wordStyle: {
+        fill: "#FFFFFF",
+        opacity: 1,
+      },
     },
   },
   scrappy: {
@@ -108,18 +94,18 @@ export const QUOTE_TEMPLATES: Record<QuoteTemplateId, QuoteTemplate> = {
     style: {
       fontFamily: "nunito",
       fontSize: 56,
-      color: "#111111",
       y: QUOTE_CAPTION_Y,
       animation: "fade",
-      stroke: null,
-      shadow: false,
       textTransform: "uppercase",
       captionsAtATime: 8,
-      stack: false,
-      backdrop: "scrap",
+      background: { kind: "none" },
       fontStyle: "normal",
       textAlign: "center",
-      backdropColor: null,
+      wordStyle: {
+        fill: "#111111",
+        opacity: 1,
+        background: { kind: "scrap", color: "#FFFFFF" },
+      },
     },
   },
 };
@@ -138,6 +124,6 @@ export function resolveQuoteTemplate(
 
 export function resolveQuoteTemplateStyle(
   templateId: QuoteTemplateId,
-): CaptionStyle {
+): CaptionGroupStyle {
   return resolveQuoteTemplate(templateId).style;
 }

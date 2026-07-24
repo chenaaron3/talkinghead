@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { CaptionGroupView } from "@src/components/captions/CaptionGroupView";
-import type { CaptionStyle } from "@src/lib/captions/style";
+import { DynamicGroupView } from "@src/components/captions/DynamicGroupView";
+import { StaticGroupView } from "@src/components/captions/StaticGroupView";
+import type { CaptionGroupStyle } from "@src/lib/captions/style";
 import {
-  CAPTION_FADE_DURATION_SEC,
   COMPOSITION_HEIGHT,
   COMPOSITION_WIDTH,
   SAFE_AREA,
@@ -29,7 +29,7 @@ function groupDuration(wordCount: number): number {
   return Math.max(1, (wordCount - 1) * WORD_STAGGER_FRAMES + HOLD_FRAMES);
 }
 
-function buildPreviewGroups(style: CaptionStyle): CaptionGroup[] {
+function buildPreviewGroups(style: CaptionGroupStyle): CaptionGroup[] {
   let cursor = 0;
   return PREVIEW_PHRASES.map((texts) => {
     const startFrame = cursor;
@@ -84,17 +84,19 @@ function captionFocusY(styleY: number): number {
 }
 
 /**
- * Template picker preview — captions, quotes, and text VFX paint through
- * {@link CaptionGroupView} on a scaled composition stage.
+ * Template picker preview — captions/quotes via {@link DynamicGroupView},
+ * text VFX via {@link StaticGroupView}.
  */
 export function CaptionTemplatePreview({
   style,
   playing = false,
   className,
+  variant = "dynamic",
 }: {
-  style: CaptionStyle;
+  style: CaptionGroupStyle;
   playing?: boolean;
   className?: string;
+  variant?: "dynamic" | "static";
 }) {
   const groups = useMemo(() => buildPreviewGroups(style), [style]);
   const cycleLen = useMemo(() => {
@@ -109,10 +111,6 @@ export function CaptionTemplatePreview({
   const [scale, setScale] = useState(1);
   const [offsetY, setOffsetY] = useState(0);
 
-  const fadeFrames = Math.max(
-    1,
-    Math.round(CAPTION_FADE_DURATION_SEC * PREVIEW_FPS),
-  );
   const focusY = captionFocusY(style.y);
 
   const active = groups.find(
@@ -171,12 +169,19 @@ export function CaptionTemplatePreview({
           }}
         >
           {active ? (
-            <CaptionGroupView
-              group={active}
-              frame={displayFrame}
-              fps={PREVIEW_FPS}
-              fadeFrames={fadeFrames}
-            />
+            variant === "static" ? (
+              <StaticGroupView
+                group={active}
+                frame={displayFrame}
+                fps={PREVIEW_FPS}
+              />
+            ) : (
+              <DynamicGroupView
+                group={active}
+                frame={displayFrame}
+                fps={PREVIEW_FPS}
+              />
+            )
           ) : null}
         </div>
       </div>

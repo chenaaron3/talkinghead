@@ -10,7 +10,7 @@ import {
   DEFAULT_LISTICLE_TEMPLATE_ID,
   resolveListicleTemplate,
 } from "../../src/lib/listicle/templates";
-import { normalizeCaptionStyle } from "../../src/lib/captions/parse-style";
+import type { CaptionStyleOverrides } from "../../src/lib/captions/style";
 import type {
   TranscriptCaption,
   SourceListicle,
@@ -106,7 +106,7 @@ function buildListicleTextVfx(
   role: "marker" | "reveal",
   text: string,
   range: { start: number; end: number },
-  defaults: { templateId: string; style: ReturnType<typeof normalizeCaptionStyle> },
+  defaults: { templateId: string; style: CaptionStyleOverrides },
 ): SourceListicleTextVfx {
   return {
     id: `${listicleItemId}-${role}`,
@@ -131,11 +131,11 @@ export function detectionToListicleOverlay(
   const template = resolveListicleTemplate(DEFAULT_LISTICLE_TEMPLATE_ID);
   const markerDefaults = {
     templateId: template.marker.templateId,
-    style: normalizeCaptionStyle(undefined, template.marker.style),
+    style: {} as CaptionStyleOverrides,
   };
   const revealDefaults = {
     templateId: template.reveal.templateId,
-    style: normalizeCaptionStyle(undefined, template.reveal.style),
+    style: {} as CaptionStyleOverrides,
   };
 
   const items: SourceListicle["items"] = [];

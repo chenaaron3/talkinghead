@@ -1,16 +1,30 @@
-import { normalizeCaptionStyle } from "../captions/parse-style";
 import {
   DEFAULT_QUOTE_TEMPLATE_ID,
   isQuoteTemplateId,
   resolveQuoteTemplateStyle,
 } from "../captions/quote-templates";
-import { CaptionStyle, DEFAULT_CAPTION_STYLE } from "../captions/style";
+import {
+  applyCaptionOverrides,
+  CaptionGroupStyle,
+  DEFAULT_CAPTION_STYLE,
+} from "../captions/style";
+import {
+  DEFAULT_CAPTION_TEMPLATE_ID,
+  isCaptionTemplateId,
+  resolveCaptionTemplateStyle,
+} from "../captions/templates";
 import {
   groupStyledCaptionWords,
   padLastWordInGroups,
   prepareRenderCaptions,
   stripPunctuationForDisplay,
 } from "../captions/words";
+import { resolveListicleTemplate } from "../listicle/templates";
+import {
+  DEFAULT_TEXT_TEMPLATE_ID,
+  isTextTemplateId,
+  resolveTextTemplateStyle,
+} from "../text/templates";
 import {
   cutsToKeepSegments,
   intersectWithKeepRegions,
@@ -18,12 +32,6 @@ import {
   mapSourceSecToOutputSec,
   validateCuts,
 } from "../timeline/source-timeline";
-import { resolveListicleTemplate } from "../listicle/templates";
-import {
-  DEFAULT_TEXT_TEMPLATE_ID,
-  isTextTemplateId,
-  resolveTextTemplateStyle,
-} from "../text/templates";
 import { resolveKenBurns } from "../visual/ken-burns";
 import {
   DEFAULT_PUNCH_IN_ANIMATE,
@@ -56,21 +64,34 @@ import type {
   SfxClip,
   MusicClip,
 } from "../types";
+
 function secToFrames(sec: number, fps: number): number {
   return Math.max(0, Math.round(sec * fps));
+}
+
+function resolveEpisodeCaptionStyle(
+  config: BuildPropsInput["config"],
+): CaptionGroupStyle {
+  const templateId = isCaptionTemplateId(config.captionTemplateId)
+    ? config.captionTemplateId
+    : DEFAULT_CAPTION_TEMPLATE_ID;
+  return applyCaptionOverrides(
+    resolveCaptionTemplateStyle(templateId),
+    config.captionStyle,
+  );
 }
 
 function quoteVfxClips(vfx: SourceVfx[]): SourceQuoteVfx[] {
   return vfx.filter((clip): clip is SourceQuoteVfx => clip.type === "quote");
 }
 
-function resolveClipQuoteStyle(quote: SourceQuoteVfx): CaptionStyle {
+function resolveClipQuoteStyle(quote: SourceQuoteVfx): CaptionGroupStyle {
   const templateId = isQuoteTemplateId(quote.templateId)
     ? quote.templateId
     : DEFAULT_QUOTE_TEMPLATE_ID;
-  return normalizeCaptionStyle(
-    quote.style,
+  return applyCaptionOverrides(
     resolveQuoteTemplateStyle(templateId),
+    quote.style,
   );
 }
 
@@ -117,7 +138,7 @@ function buildCaptionGroups(options: {
   captions: TranscriptCaption[];
   segments: KeepSegment[];
   fps: number;
-  captionStyle: CaptionStyle;
+  captionStyle: CaptionGroupStyle;
   vfx: SourceVfx[];
   listicleOverlay: SourceListicle | null;
 }): CaptionGroup[] {
@@ -131,7 +152,7 @@ function buildCaptionGroups(options: {
     styleKey: string;
     segmentKey: string;
     captionsAtATime: number;
-    style: CaptionStyle;
+    style: CaptionGroupStyle;
   };
 
   const styledWords: StyledWord[] = [];
@@ -167,7 +188,7 @@ function buildCaptionGroups(options: {
     });
   }
 
-  const styleByKey = new Map<string, CaptionStyle>();
+  const styleByKey = new Map<string, CaptionGroupStyle>();
   for (const word of styledWords) {
     styleByKey.set(word.styleKey, word.style);
   }
@@ -235,7 +256,10 @@ function buildListicle(
     .map((item) => {
       const marker = byId.get(item.markerId);
       const reveal = byId.get(item.revealId);
-      if (marker?.type !== "listicle-text" || reveal?.type !== "listicle-text") {
+      if (
+        marker?.type !== "listicle-text" ||
+        reveal?.type !== "listicle-text"
+      ) {
         return null;
       }
       const outSec = mapSourceSecToOutputSec(marker.start, segments);
@@ -261,10 +285,7 @@ function buildListicle(
 
   return {
     startFrame: Math.min(range.startFrame, items[0]!.startFrame),
-    endFrame: Math.max(
-      range.endFrame,
-      items[items.length - 1]!.startFrame + 1,
-    ),
+    endFrame: Math.max(range.endFrame, items[items.length - 1]!.startFrame + 1),
     aggregated,
     items,
   };
@@ -389,13 +410,13 @@ function buildBRolls(
   return result.sort((a, b) => a.startFrame - b.startFrame);
 }
 
-function resolveClipTextStyle(clip: SourceScreenTextVfx): CaptionStyle {
+function resolveClipTextStyle(clip: SourceScreenTextVfx): CaptionGroupStyle {
   const templateId = isTextTemplateId(clip.templateId)
     ? clip.templateId
     : DEFAULT_TEXT_TEMPLATE_ID;
-  return normalizeCaptionStyle(
-    clip.style,
+  return applyCaptionOverrides(
     resolveTextTemplateStyle(templateId),
+    clip.style,
   );
 }
 
@@ -530,7 +551,7 @@ export function buildProps(input: BuildPropsInput): EpisodeProps {
     0,
   );
 
-  const captionStyle = config.captionStyle ?? DEFAULT_CAPTION_STYLE;
+  const captionStyle = resolveEpisodeCaptionStyle(config);
   const captionGroups = buildCaptionGroups({
     captions: transcript.captions,
     segments: keepSegments,

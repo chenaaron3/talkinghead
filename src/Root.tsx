@@ -7,6 +7,7 @@ import allProps from "./generated/all-props.json";
 import episodesIndex from "./generated/episodes.json";
 import type { EpisodeProps } from "./lib/types";
 import { DEFAULT_TEXT_ENTRANCE_SFX } from "./lib/types";
+import { DEFAULT_TEXT_STYLE } from "./lib/text/templates";
 
 const WIDTH = 1080;
 const HEIGHT = 1920;
@@ -36,30 +37,14 @@ const fallbackProps: EpisodeProps = {
         src: DEFAULT_TEXT_ENTRANCE_SFX,
         srcDurationSec: 5,
       },
-      style: {
-        fontFamily: "montserrat",
-        fontSize: 68,
-        color: "#111111",
-        y: 0.08,
-        animation: "pop",
-        stroke: null,
-        shadow: false,
-        textTransform: "uppercase",
-        captionsAtATime: 1,
-        stack: false,
-        backdrop: "box",
-        fontStyle: "normal",
-        textAlign: "center",
-        backdropColor: "#FFE600",
-        contourBoard: false,
-      },
+      style: { ...DEFAULT_TEXT_STYLE },
     },
   ],
   sfx: [],
   music: null,
 };
 
-const propsMap = allProps as Record<string, EpisodeProps>;
+const propsMap = allProps as unknown as Record<string, EpisodeProps>;
 
 function getProps(episodeId: string): EpisodeProps {
   return propsMap[episodeId] ?? { ...fallbackProps, episodeId };

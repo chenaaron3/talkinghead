@@ -161,6 +161,11 @@
       "truePeakDb": -0.3,
       "gain": 0.431
     },
+    "sfx/realistic/typing.mp3": {
+      "lufs": -31.3,
+      "truePeakDb": -7.89,
+      "gain": 2.2105
+    },
     "music/Lofi1.mp3": {
       "lufs": -19.63,
       "truePeakDb": -4.6,

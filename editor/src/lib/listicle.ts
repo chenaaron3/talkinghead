@@ -1,4 +1,3 @@
-import { normalizeCaptionStyle } from "@src/lib/captions/parse-style";
 import type {
   EpisodeConfig,
   SourceListicle,
@@ -121,7 +120,7 @@ export function withListicleTemplate(
     return {
       ...clip,
       templateId: defaults.templateId,
-      style: normalizeCaptionStyle(undefined, defaults.style),
+      style: {},
     };
   });
   return {

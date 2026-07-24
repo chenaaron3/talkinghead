@@ -1,4 +1,4 @@
-import type { CaptionStyle } from "../captions/style";
+import type { CaptionGroupStyle } from "../captions/style";
 import type { CaptionEmphasis } from "./transcript-types";
 import type { HasSFX, Transform } from "./config-types";
 
@@ -23,7 +23,7 @@ export type CaptionGroup = {
    * Resolved style for this group (default or Quote template).
    * Optional for older generated props.json — renderer falls back to default.
    */
-  style?: CaptionStyle;
+  style?: CaptionGroupStyle;
 };
 
 export type ListicleItem = {
@@ -100,7 +100,7 @@ export type ShakeVfxClip = VfxClipBase & {
 export type TextVfxClip = VfxClipBase & {
   type: "text";
   text: string;
-  style: CaptionStyle;
+  style: CaptionGroupStyle;
 } & HasSFX;
 
 export type VfxClip = LocationVfxClip | ShakeVfxClip | TextVfxClip;

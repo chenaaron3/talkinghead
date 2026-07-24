@@ -1,20 +1,9 @@
+captionTemplateId: classic
 captionStyle:
-  fontFamily: montserrat
-  fontSize: 64
-  color: "#FFE600"
   y: 1
-  animation: fade
-  stroke:
-    width: 10
-    color: "#000000"
-  shadow: true
-  textTransform: uppercase
+  fontSize: 64
   captionsAtATime: 5
-  stack: false
-  backdrop: none
-  fontStyle: normal
-  textAlign: center
-  backdropColor: null
+  fill: "#FFE600"
 listicle: true
 punchIns: true
 emphasis: true

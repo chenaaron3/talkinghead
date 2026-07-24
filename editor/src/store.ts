@@ -41,8 +41,13 @@ import {
   isScreenTextVfxClip,
   type VfxPreset,
 } from './lib/vfx';
-import { normalizeCaptionStyle } from '@src/lib/captions/parse-style';
-import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '@src/lib/captions/style';
+import { normalizeCaptionOverrides } from '@src/lib/captions/parse-style';
+import { type CaptionStyleOverrides } from '@src/lib/captions/style';
+import {
+  DEFAULT_CAPTION_TEMPLATE_ID,
+  isCaptionTemplateId,
+  type CaptionTemplateId,
+} from '@src/lib/captions/templates';
 import type { QuoteTemplateId } from '@src/lib/captions/quote-templates';
 import type { TextTemplateId } from '@src/lib/text/templates';
 import { findIntroTextVfx } from '@src/lib/episode/text-vfx';
@@ -184,19 +189,22 @@ type EditorActions = {
   cutCaption: (caption: FlatCaption) => void;
   setMode: (mode: EditorMode) => void;
   toggleMode: () => void;
-  updateCaptionStyle: (patch: Partial<CaptionStyle>, live?: boolean) => void;
-  /** Replace the episode caption style wholesale (e.g. applying a template). */
-  setCaptionStyle: (style: CaptionStyle, live?: boolean) => void;
+  updateCaptionOverrides: (
+    patch: CaptionStyleOverrides,
+    live?: boolean,
+  ) => void;
+  /** Switch caption template; preserves existing overrides. */
+  setCaptionTemplate: (templateId: CaptionTemplateId, live?: boolean) => void;
   updateQuoteTemplate: (id: string, templateId: QuoteTemplateId) => void;
   updateQuoteStyle: (
     id: string,
-    patch: Partial<CaptionStyle>,
+    patch: CaptionStyleOverrides,
     live?: boolean,
   ) => void;
   updateTextTemplate: (id: string, templateId: TextTemplateId) => void;
   updateTextVfxStyle: (
     id: string,
-    patch: Partial<CaptionStyle>,
+    patch: CaptionStyleOverrides,
     live?: boolean,
   ) => void;
   updateTextVfxContent: (id: string, text: string, live?: boolean) => void;
@@ -1143,13 +1151,13 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       }));
     },
 
-    updateCaptionStyle: (patch, live = false) => {
+    updateCaptionOverrides: (patch, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
-      const captionStyle = normalizeCaptionStyle(
-        { ...(config.captionStyle ?? DEFAULT_CAPTION_STYLE), ...patch },
-        DEFAULT_CAPTION_STYLE,
-      );
+      const captionStyle = normalizeCaptionOverrides({
+        ...config.captionStyle,
+        ...patch,
+      });
       commit(
         {
           config: {
@@ -1162,15 +1170,19 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
       );
     },
 
-    setCaptionStyle: (style, live = false) => {
+    setCaptionTemplate: (templateId, live = false) => {
       const { config, transcript } = get();
       if (!config || !transcript) return;
-      const captionStyle = normalizeCaptionStyle(style, DEFAULT_CAPTION_STYLE);
+      const id = isCaptionTemplateId(templateId)
+        ? templateId
+        : DEFAULT_CAPTION_TEMPLATE_ID;
       commit(
         {
           config: {
             ...config,
-            captionStyle,
+            captionTemplateId: id,
+            // Preserve overrides on template switch.
+            captionStyle: normalizeCaptionOverrides(config.captionStyle),
           },
           transcript,
         },

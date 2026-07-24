@@ -1,4 +1,6 @@
-import type { CaptionStyle } from "../captions/style";
+import type {
+  CaptionStyleOverrides,
+} from "../captions/style";
 
 /** Inclusive-exclusive style time range on the source timeline (seconds). */
 export type Range = {
@@ -216,15 +218,14 @@ export type SourceShakeVfx = SourceVfxBase & {
 /**
  * Caption style highlight — applies a curated Quote look while active.
  * Does not render its own overlay; consumed when building caption groups.
- * `style` is the editable instance look; `templateId` tracks the last
- * template applied from the catalog (sidescroll).
+ * `templateId` selects the catalog look; `style` holds user overrides only.
  */
 export type SourceQuoteVfx = SourceVfxBase & {
   type: "quote";
   /** Key into the curated Quote template catalog. */
   templateId: string;
-  /** Full caption style for this instance (copied from template on pick). */
-  style: CaptionStyle;
+  /** User overrides (y / fontSize / captionsAtATime / fill). */
+  style?: CaptionStyleOverrides;
 };
 
 /**
@@ -236,8 +237,8 @@ export type SourceScreenTextVfxFields = {
   text: string;
   /** Key into the curated Text template catalog. */
   templateId: string;
-  /** Full caption style for this instance (copied from template on pick). */
-  style: CaptionStyle;
+  /** User overrides (y / fontSize / captionsAtATime / fill). */
+  style?: CaptionStyleOverrides;
 } & HasSFX;
 
 /**
@@ -267,10 +268,9 @@ export function isScreenTextVfx(clip: SourceVfx): clip is SourceScreenTextVfx {
   return clip.type === "text" || clip.type === "listicle-text";
 }
 
-export function isUserPlaceableVfx(clip: SourceVfx): clip is Exclude<
-  SourceVfx,
-  SourceListicleTextVfx
-> {
+export function isUserPlaceableVfx(
+  clip: SourceVfx,
+): clip is Exclude<SourceVfx, SourceListicleTextVfx> {
   return clip.type !== "listicle-text";
 }
 
@@ -367,11 +367,13 @@ export type EpisodeConfig = {
   aroll: string;
   /** Null when omitted — process generates via OpenAI and writes config.yaml. */
   title: string | null;
+  /** Key into the curated caption template catalog. */
+  captionTemplateId: string;
   /**
-   * Default on-screen caption look (editable).
+   * User overrides on the caption template (y / fontSize / captionsAtATime / fill).
    * Quote VFX overrides with a curated template for their range.
    */
-  captionStyle: CaptionStyle;
+  captionStyle?: CaptionStyleOverrides;
   /** Feature flags — whether process runs LLM detection steps. */
   listicle: boolean;
   punchIns: boolean;

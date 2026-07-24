@@ -1,58 +1,56 @@
-import React, { useId, type CSSProperties, type ReactNode } from "react";
+import React, {
+  Children,
+  cloneElement,
+  isValidElement,
+  useId,
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 import {
   CONTOUR_LINE_HEIGHT,
   CONTOUR_PAD_X_EM,
   CONTOUR_PAD_Y_EM,
   CONTOUR_RADIUS_EM,
-  type ContourLine,
 } from "./contour-board";
 
 /**
- * Merged sticker silhouette: one centered pill per line, goo-blended.
- * Explicit lines (not inline wrap) keep L/R padding equal.
+ * Merged sticker silhouette via inline line boxes + goo filter.
+ * Children must be inline-level (e.g. inline-block word spans).
  */
 export const ContourBoard: React.FC<{
   fill: string;
-  textAlign: "left" | "center";
+  textAlign: "left" | "center" | "right";
   textStyle: CSSProperties;
-  lines: ContourLine[];
-  renderLine: (line: ContourLine) => ReactNode;
-}> = ({ fill, textAlign, textStyle, lines, renderLine }) => {
+  children: ReactNode;
+}> = ({ fill, textAlign, textStyle, children }) => {
   const rawId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const filterId = `contour-goo-${rawId}`;
+  const items = Children.toArray(children);
 
-  const lineChrome: CSSProperties = {
+  const flowStyle: CSSProperties = {
     ...textStyle,
-    display: "inline-block",
+    display: "inline",
     padding: `${CONTOUR_PAD_Y_EM}em ${CONTOUR_PAD_X_EM}em`,
     borderRadius: `${CONTOUR_RADIUS_EM}em`,
     lineHeight: CONTOUR_LINE_HEIGHT,
     maxWidth: "100%",
-    textAlign: "center",
-    margin: 0,
-    width: "auto",
+    boxDecorationBreak: "clone",
+    WebkitBoxDecorationBreak: "clone",
     boxSizing: "border-box",
+    margin: 0,
   };
 
-  const alignItems = textAlign === "left" ? "flex-start" : "center";
-
-  const paintLines = (painted: boolean) =>
-    lines.map((line, i) => (
-      <span
-        key={`contour-line-${painted ? "fill" : "text"}-${i}`}
-        style={{
-          ...lineChrome,
-          backgroundColor: painted ? fill : "transparent",
-          color: painted ? "transparent" : textStyle.color,
-          WebkitTextFillColor: painted ? "transparent" : undefined,
-          WebkitTextStroke: painted ? undefined : textStyle.WebkitTextStroke,
-          textShadow: painted ? undefined : textStyle.textShadow,
-        }}
-      >
-        {renderLine(line)}
-      </span>
-    ));
+  const cloneLayer = (layer: "fill" | "text") =>
+    items.map((child, i) => {
+      if (!isValidElement(child)) return child;
+      const el = child as ReactElement<{ silhouette?: boolean }>;
+      return cloneElement(el, {
+        key: `${layer}-${el.key ?? i}`,
+        ...(layer === "fill" ? { silhouette: true } : null),
+      });
+    });
 
   return (
     <div
@@ -60,6 +58,7 @@ export const ContourBoard: React.FC<{
         position: "relative",
         width: "100%",
         maxWidth: "100%",
+        textAlign,
       }}
     >
       <svg
@@ -95,14 +94,21 @@ export const ContourBoard: React.FC<{
       <div
         aria-hidden
         style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems,
           width: "100%",
+          textAlign,
           filter: `url(#${filterId})`,
         }}
       >
-        {paintLines(true)}
+        <span
+          style={{
+            ...flowStyle,
+            color: "transparent",
+            WebkitTextFillColor: "transparent",
+            backgroundColor: fill,
+          }}
+        >
+          {cloneLayer("fill")}
+        </span>
       </div>
 
       <div
@@ -111,13 +117,18 @@ export const ContourBoard: React.FC<{
           left: 0,
           right: 0,
           top: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems,
           width: "100%",
+          textAlign,
         }}
       >
-        {paintLines(false)}
+        <span
+          style={{
+            ...flowStyle,
+            backgroundColor: "transparent",
+          }}
+        >
+          {cloneLayer("text")}
+        </span>
       </div>
     </div>
   );

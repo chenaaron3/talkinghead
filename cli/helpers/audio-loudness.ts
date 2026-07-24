@@ -167,48 +167,128 @@ export function listSharedMusicFiles(): Array<{ abs: string; src: string }> {
   return out.sort((a, b) => a.src.localeCompare(b.src));
 }
 
+function isValidEntry(value: unknown): value is AudioLoudnessEntry {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as AudioLoudnessEntry;
+  return (
+    Number.isFinite(entry.lufs) &&
+    Number.isFinite(entry.truePeakDb) &&
+    Number.isFinite(entry.gain) &&
+    entry.gain > 0
+  );
+}
+
+function readExistingLoudness(
+  filePath: string,
+): Record<string, AudioLoudnessEntry> {
+  if (!fs.existsSync(filePath)) return {};
+  try {
+    const raw = JSON.parse(fs.readFileSync(filePath, "utf8")) as {
+      files?: Record<string, unknown>;
+    };
+    const filesOut: Record<string, AudioLoudnessEntry> = {};
+    for (const [src, value] of Object.entries(raw.files ?? {})) {
+      if (isValidEntry(value)) filesOut[src] = value;
+    }
+    return filesOut;
+  } catch {
+    return {};
+  }
+}
+
+/** Refresh gain from cached LUFS/peak when target LUFS changes. */
+function withCurrentGain(entry: AudioLoudnessEntry): AudioLoudnessEntry {
+  return {
+    ...entry,
+    gain: round(
+      gainFromLoudness(entry.lufs, entry.truePeakDb, AUDIO_LOUDNESS_TARGET_LUFS),
+      4,
+    ),
+  };
+}
+
 function measureLibrary(
   files: Array<{ abs: string; src: string }>,
-): Record<string, AudioLoudnessEntry> {
+  existing: Record<string, AudioLoudnessEntry>,
+  force: boolean,
+): { files: Record<string, AudioLoudnessEntry>; measured: number; skipped: number } {
   const filesOut: Record<string, AudioLoudnessEntry> = {};
+  let measured = 0;
+  let skipped = 0;
+
   for (const { abs, src } of files) {
+    const prev = existing[src];
+    if (!force && prev) {
+      filesOut[src] = withCurrentGain(prev);
+      skipped += 1;
+      console.log(`[loudness] ${src} … skip (cached)`);
+      continue;
+    }
+
     process.stdout.write(`[loudness] ${src} … `);
     const entry = measureFile(abs);
     filesOut[src] = entry;
+    measured += 1;
     console.log(
       `lufs=${entry.lufs.toFixed(2)} peak=${entry.truePeakDb.toFixed(2)} gain=${entry.gain}`,
     );
   }
-  return filesOut;
+
+  return { files: filesOut, measured, skipped };
 }
+
+export type RebuildAudioLoudnessOptions = {
+  /** Remeasure every file even when a cache entry exists. */
+  force?: boolean;
+};
 
 /**
  * Measure shared SFX + music libraries, write sidecars + aggregate JSON
  * consumed by Remotion/editor via `loudnessGainFor()`.
+ *
+ * By default only new/missing files are measured; pass `{ force: true }`
+ * (or `--force`) to remeasure everything.
  */
-export function rebuildAudioLoudness(): AudioLoudnessData {
-  const sfxFiles = measureLibrary(listSharedSfxFiles());
-  const musicFiles = measureLibrary(listSharedMusicFiles());
+export function rebuildAudioLoudness(
+  options: RebuildAudioLoudnessOptions = {},
+): AudioLoudnessData {
+  const force = options.force === true;
+  const sfxPath = path.join(PUBLIC_SFX_DIR, "loudness.json");
+  const musicPath = path.join(PUBLIC_MUSIC_DIR, "loudness.json");
+
+  const sfxResult = measureLibrary(
+    listSharedSfxFiles(),
+    force ? {} : readExistingLoudness(sfxPath),
+    force,
+  );
+  const musicResult = measureLibrary(
+    listSharedMusicFiles(),
+    force ? {} : readExistingLoudness(musicPath),
+    force,
+  );
 
   const sfxData: AudioLoudnessData = {
     targetLufs: AUDIO_LOUDNESS_TARGET_LUFS,
-    files: sfxFiles,
+    files: sfxResult.files,
   };
   const musicData: AudioLoudnessData = {
     targetLufs: AUDIO_LOUDNESS_TARGET_LUFS,
-    files: musicFiles,
+    files: musicResult.files,
   };
   const aggregate: AudioLoudnessData = {
     targetLufs: AUDIO_LOUDNESS_TARGET_LUFS,
-    files: { ...sfxFiles, ...musicFiles },
+    files: { ...sfxResult.files, ...musicResult.files },
   };
 
-  writeJson(path.join(PUBLIC_SFX_DIR, "loudness.json"), sfxData);
-  writeJson(path.join(PUBLIC_MUSIC_DIR, "loudness.json"), musicData);
+  writeJson(sfxPath, sfxData);
+  writeJson(musicPath, musicData);
   writeJson(AGGREGATE_PATH, aggregate);
 
+  const measured = sfxResult.measured + musicResult.measured;
+  const skipped = sfxResult.skipped + musicResult.skipped;
   console.log(
-    `[loudness] wrote ${Object.keys(sfxFiles).length} sfx + ${Object.keys(musicFiles).length} music →`,
+    `[loudness] wrote ${Object.keys(sfxResult.files).length} sfx + ${Object.keys(musicResult.files).length} music` +
+      ` (measured ${measured}, skipped ${skipped}${force ? ", force" : ""}) →`,
   );
   console.log(`  public/sfx/loudness.json`);
   console.log(`  public/music/loudness.json`);

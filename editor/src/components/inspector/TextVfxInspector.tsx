@@ -1,4 +1,5 @@
 import { TEXT_TEMPLATE_LIST } from '@src/lib/text/templates';
+import { normalizeCaptionOverrides } from '@src/lib/captions/parse-style';
 
 import { resolveTextStyle, resolveTextTemplateId } from '../../lib/vfx';
 import { useEditor } from '../../store';
@@ -9,6 +10,7 @@ import { StyleTemplatePicker } from './StyleTemplatePicker';
 
 import type { TextTemplateId } from "@src/lib/text/templates";
 import type { SourceScreenTextVfx } from "@src/lib/types";
+
 export function TextVfxInspector({ clip }: { clip: SourceScreenTextVfx }) {
   const updateTextTemplate = useEditor((s) => s.updateTextTemplate);
   const updateTextVfxStyle = useEditor((s) => s.updateTextVfxStyle);
@@ -17,6 +19,7 @@ export function TextVfxInspector({ clip }: { clip: SourceScreenTextVfx }) {
   const updateTextVfxSfxVolume = useEditor((s) => s.updateTextVfxSfxVolume);
   const templateId = resolveTextTemplateId(clip);
   const style = resolveTextStyle(clip);
+  const overrides = normalizeCaptionOverrides(clip.style);
 
   return (
     <div className="flex w-full min-w-0 max-w-full flex-col gap-4 overflow-x-hidden">
@@ -30,6 +33,7 @@ export function TextVfxInspector({ clip }: { clip: SourceScreenTextVfx }) {
         templates={TEXT_TEMPLATE_LIST}
         value={templateId}
         onChange={(id) => updateTextTemplate(clip.id, id as TextTemplateId)}
+        previewVariant="static"
       />
       <EntranceSfxField
         value={clip.sfx}
@@ -37,7 +41,11 @@ export function TextVfxInspector({ clip }: { clip: SourceScreenTextVfx }) {
         onVolumeChange={(v) => updateTextVfxSfxVolume(clip.id, v, true)}
       />
       <CaptionStyleFields
-        style={style}
+        overrides={overrides}
+        resolvedFill={style.wordStyle.fill}
+        resolvedY={style.y}
+        resolvedFontSize={style.fontSize}
+        resolvedCaptionsAtATime={style.captionsAtATime}
         onPatch={(partial, live) => updateTextVfxStyle(clip.id, partial, live)}
       />
     </div>

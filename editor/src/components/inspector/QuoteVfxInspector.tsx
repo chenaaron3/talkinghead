@@ -22,6 +22,7 @@ export function QuoteVfxInspector({ clip }: { clip: SourceQuoteVfx }) {
       <StyleTemplatePicker
         templates={QUOTE_TEMPLATE_LIST}
         value={templateId}
+        fallbackStyle={style}
         onChange={(id) => updateQuoteTemplate(clip.id, id as QuoteTemplateId)}
       />
       <CaptionStyleFields

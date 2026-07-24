@@ -32,9 +32,12 @@ export function StyleTemplatePicker({
 }) {
   const [hovered, setHovered] = useState<StyleTemplateChip | null>(null);
   const selected = templates.find((t) => t.id === value) ?? null;
-  const previewStyle =
-    hovered?.style ?? selected?.style ?? fallbackStyle ?? null;
-  const previewLabel = hovered?.label ?? selected?.label ?? null;
+  const previewingOther =
+    hovered != null && value != null && hovered.id !== value;
+  const previewStyle = previewingOther
+    ? hovered.style
+    : (fallbackStyle ?? selected?.style ?? null);
+  const previewLabel = previewingOther ? hovered.label : (selected?.label ?? null);
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-1.5">
@@ -47,12 +50,12 @@ export function StyleTemplatePicker({
           <>
             <CaptionTemplatePreview
               style={previewStyle}
-              playing={hovered != null}
+              playing={previewingOther}
               variant={previewVariant}
             />
             <div className="border-t border-border bg-panel-2 px-2 py-1.5 text-center text-[10px] text-muted">
               {previewLabel ?? "Current"}
-              {hovered && hovered.id !== value ? (
+              {previewingOther ? (
                 <span className="text-muted/70"> · preview</span>
               ) : null}
             </div>
@@ -74,6 +77,7 @@ export function StyleTemplatePicker({
                 type="button"
                 onClick={() => {
                   useEditor.getState().beginGesture();
+                  setHovered(null);
                   onChange(template.id);
                 }}
                 onMouseEnter={() => setHovered(template)}

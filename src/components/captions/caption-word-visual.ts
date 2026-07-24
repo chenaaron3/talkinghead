@@ -13,7 +13,7 @@ import {
   wordTypewriterCharStart,
   type CaptionMotion,
 } from "./caption-animation";
-import { backgroundChromeStyle, scrapRotationDeg } from "./CaptionBackground";
+import { scrapRotationDeg, wordBackgroundChromeStyle } from "./CaptionBackground";
 import {
   applyEmphasisFill,
   blendWordStyles,
@@ -106,6 +106,7 @@ export function resolveCaptionWordVisual(input: {
   const bg = paint.background;
   const scrap = bg?.kind === "scrap";
   const typewriter = groupStyle.animation === "typewriter";
+  const backgroundCss = wordBackgroundChromeStyle(paint.background, index);
 
   // Text / non-animated words: paint only (parent may own group motion).
   if (!animateWord) {
@@ -122,7 +123,7 @@ export function resolveCaptionWordVisual(input: {
       opacity: paint.opacity ?? 1,
       transform: scrap ? `rotate(${scrapRotationDeg(index)}deg)` : undefined,
       wordCss: wordStyleToCss({ ...paint, opacity: 1 }),
-      backgroundCss: backgroundChromeStyle(bg, index),
+      backgroundCss,
     };
   }
 
@@ -162,7 +163,7 @@ export function resolveCaptionWordVisual(input: {
     opacity: (paint.opacity ?? 1) * motion.opacity,
     transform: motionTransform(motion, index, scrap),
     wordCss: wordStyleToCss({ ...paint, opacity: 1 }),
-    backgroundCss: backgroundChromeStyle(bg, index),
+    backgroundCss,
   };
 }
 

@@ -651,8 +651,24 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => {
           error?: string;
         };
         if (!res.ok) throw new Error(data.error ?? "Save failed");
-        if (data.props) set({ props: data.props });
-        set({ dirty: false });
+        const state = get();
+        if (state.episodeId && state.config && state.transcript) {
+          set({
+            props: recomputeProps({
+              episodeId: state.episodeId,
+              title: state.title,
+              videoSrc: state.videoSrc,
+              fps: state.fps,
+              width: state.width,
+              height: state.height,
+              config: state.config,
+              transcript: state.transcript,
+            }),
+            dirty: false,
+          });
+        } else {
+          set({ dirty: false });
+        }
       } catch (err) {
         set({ error: err instanceof Error ? err.message : String(err) });
       } finally {

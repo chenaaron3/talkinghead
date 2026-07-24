@@ -68,6 +68,42 @@ export function backgroundChromeStyle(
   return {};
 }
 
+/** Word-level highlight — color inside the glyph box, no extra padding. */
+export function wordBackgroundChromeStyle(
+  background: BackgroundStyle | null | undefined,
+  index = 0,
+): CSSProperties {
+  if (!background || background.kind === "none" || background.kind === "wrap") {
+    return {};
+  }
+
+  const color = background.color?.trim();
+  if (!color) return {};
+
+  if (background.kind === "rounded") {
+    return {
+      backgroundColor: color,
+      borderRadius: "0.15em",
+    };
+  }
+
+  if (background.kind === "scrap") {
+    return {
+      backgroundColor: color,
+      clipPath: scrapClipPath(index),
+    };
+  }
+
+  if (background.kind === "box") {
+    return {
+      backgroundColor: color,
+      borderRadius: 4,
+    };
+  }
+
+  return {};
+}
+
 /**
  * Shared background wrapper for group or word.
  * `wrap` → ContourBoard (inline line boxes + goo); other kinds → CSS chrome.

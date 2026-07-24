@@ -32,6 +32,7 @@ export function TextVfxInspector({ clip }: { clip: SourceScreenTextVfx }) {
       <StyleTemplatePicker
         templates={TEXT_TEMPLATE_LIST}
         value={templateId}
+        fallbackStyle={style}
         onChange={(id) => updateTextTemplate(clip.id, id as TextTemplateId)}
         previewVariant="static"
       />
